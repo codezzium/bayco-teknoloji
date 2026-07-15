@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.catalog.models import Brand, Product
@@ -9,6 +10,20 @@ from apps.leads.utils import (
     wa_link,
 )
 from apps.sitecore.models import FAQ, SiteSettings, Slider, Testimonial
+
+
+def robots_txt(request):
+    host = request.get_host()
+    scheme = request.scheme
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /panel/",
+        "Disallow: /yonetim/",
+        "",
+        f"Sitemap: {scheme}://{host}/sitemap.xml",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
 
 
 def home(request):

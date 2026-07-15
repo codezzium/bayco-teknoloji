@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Teknik Servis & Tamir — {{ site.brand_name }}{% endblock %}
+{% block head_seo %}{% include "partials/seo.html" with title="Eskişehir Telefon Tamiri & Teknik Servis | Bayço Teknoloji" description="Eskişehir telefon tamiri ve teknik servis: ekran değişimi, batarya, şarj soketi ve yazılım. Eskişehir Bayço Teknoloji'de orijinal parça, garantili işçilik, aynı gün servis." %}{% endblock %}
 
 {% block content %}
-<section class="section" style="padding-top:calc(var(--header-h) + 40px)">
+<section class="section" style="padding-top:calc(var(--header-h) + var(--campaign-h) + 32px)">
   <div class="container-x">
     <div class="grid lg:grid-cols-2 gap-10 items-start">
 

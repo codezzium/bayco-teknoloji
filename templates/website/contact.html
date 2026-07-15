@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}İletişim — {{ site.brand_name }}{% endblock %}
+{% block head_seo %}{% include "partials/seo.html" with title="İletişim | Eskişehir Bayço Teknoloji – Telefon Mağazası" description="Eskişehir Bayço Teknoloji iletişim: adres, telefon ve WhatsApp. Eskişehir'de sıfır/ikinci el telefon, takas ve teknik servis için bize ulaşın." %}{% endblock %}
 
 {% block content %}
-<section class="section" style="padding-top:calc(var(--header-h) + 40px)">
+<section class="section" style="padding-top:calc(var(--header-h) + var(--campaign-h) + 32px)">
   <div class="container-x">
     <div class="text-center max-w-2xl mx-auto mb-10 reveal in">
       <span class="eyebrow mb-3">İletişim</span>

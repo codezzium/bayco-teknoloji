@@ -4,12 +4,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>{% block title %}{{ site.brand_name }} — Telefon & Teknoloji{% endblock %}</title>
-  <meta name="description" content="{% block meta_desc %}{{ site.tagline }}. Sıfır ve ikinci el telefon satışı, takas, aksesuar ve teknik servis. {{ site.brand_name }}.{% endblock %}">
+
+  {% block head_seo %}
+    {% include "partials/seo.html" with title="Eskişehir Bayço Teknoloji | Sıfır & İkinci El Telefon, Takas ve Teknik Servis" description="Eskişehir Bayço Teknoloji: sıfır ve ikinci el telefon satışı, telefon takas, aksesuar ve teknik servis. Eskişehir'de güvenilir, garantili telefon mağazası." %}
+  {% endblock %}
+
   <meta name="theme-color" content="#150c22">
 
   <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
   <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+
+  {# Yerel işletme yapısal verisi (Google için) #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ElectronicsStore",
+    "name": "Eskişehir {{ site.brand_name }}",
+    "image": "{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}",
+    "url": "{{ request.scheme }}://{{ request.get_host }}/",
+    "telephone": "{{ site.phone }}",
+    "description": "Eskişehir'de sıfır ve ikinci el telefon satışı, telefon takas, aksesuar ve teknik servis.",
+    "priceRange": "₺₺",
+    "areaServed": { "@type": "City", "name": "Eskişehir" },
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "{{ site.address }}",
+      "addressLocality": "Eskişehir",
+      "addressRegion": "Eskişehir",
+      "addressCountry": "TR"
+    }{% if site.instagram or site.facebook %},
+    "sameAs": [{% if site.instagram %}"{{ site.instagram }}"{% endif %}{% if site.instagram and site.facebook %}, {% endif %}{% if site.facebook %}"{{ site.facebook }}"{% endif %}]{% endif %}
+  }
+  </script>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,7 +71,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   {% block head_extra %}{% endblock %}
 </head>
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body class="{% if site.campaign_active and site.campaign_text %}has-campaign{% endif %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
   {% if site.campaign_active and site.campaign_text %}
     {% include "partials/campaign_strip.html" %}

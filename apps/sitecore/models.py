@@ -7,7 +7,7 @@ class SiteSettings(models.Model):
     brand_name = models.CharField("İşletme Adı", max_length=120, default="Bayço Teknoloji")
     tagline = models.CharField(
         "Slogan", max_length=200, blank=True,
-        default="Telefon ve teknolojide güvenin adresi",
+        default="Eskişehir'in telefon ve teknoloji adresi",
     )
 
     # İletişim
@@ -18,7 +18,7 @@ class SiteSettings(models.Model):
     )
     email = models.EmailField("E-posta", blank=True, default="info@baycoteknoloji.com")
     address = models.CharField("Adres", max_length=255, blank=True,
-                               default="Merkez Mah. Teknoloji Cad. No:1, İstanbul")
+                               default="Hoşnudiye Mah. Kızılcıklı Mahmut Pehlivan Cad. No:12, Tepebaşı / Eskişehir")
     maps_embed = models.TextField(
         "Google Harita Embed URL", blank=True,
         help_text="Google Maps > Paylaş > Harita yerleştir > src bağlantısı",
@@ -28,11 +28,11 @@ class SiteSettings(models.Model):
 
     # Hero
     hero_title = models.CharField("Hero Başlık", max_length=160,
-                                  default="Yeni ve İkinci El Telefonda Doğru Adres")
+                                  default="Eskişehir'de Yeni ve İkinci El Telefonun Adresi")
     hero_subtitle = models.CharField(
         "Hero Alt Metin", max_length=300, blank=True,
-        default="Sıfır ve garantili ikinci el telefonlar, aksesuarlar ve profesyonel "
-                "teknik servis. Telefonunu sat, takas et veya hemen fiyat teklifi al.",
+        default="Eskişehir Bayço Teknoloji; sıfır ve garantili ikinci el telefonlar, aksesuar "
+                "ve profesyonel teknik servis. Telefonunu sat, takas et veya hemen fiyat teklifi al.",
     )
     hero_bg = models.ImageField("Hero Arka Plan (mağaza fotoğrafı)",
                                 upload_to="site/", blank=True, null=True)
@@ -53,8 +53,8 @@ class SiteSettings(models.Model):
     # Footer
     footer_about = models.TextField(
         "Footer Açıklama", blank=True,
-        default="Bayço Teknoloji; sıfır ve ikinci el telefon satışı, takas, aksesuar ve "
-                "teknik servis alanında güvenilir çözüm ortağınız.",
+        default="Eskişehir Bayço Teknoloji; sıfır ve ikinci el telefon satışı, takas, aksesuar "
+                "ve teknik servis alanında Eskişehir'in güvenilir adresi.",
     )
 
     # Sosyal medya

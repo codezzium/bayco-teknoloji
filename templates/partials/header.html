@@ -3,10 +3,11 @@
   <div class="container-x w-full flex items-center justify-between gap-4">
 
     <!-- Logo -->
-    <a href="{% url 'website:home' %}" class="flex items-center gap-3 shrink-0">
-      <img src="{% static 'img/logo.png' %}" alt="{{ site.brand_name }}" class="brand-logo">
-      <span class="font-display font-extrabold text-lg leading-none hidden sm:block">
-        {{ site.brand_name }}
+    <a href="{% url 'website:home' %}" class="flex items-center gap-2.5 shrink-0" aria-label="Eskişehir {{ site.brand_name }} ana sayfa">
+      <img src="{% static 'img/logo.png' %}" alt="Eskişehir {{ site.brand_name }} logo" class="brand-logo" width="44" height="44">
+      <span class="leading-none">
+        <span class="block font-display font-extrabold text-base sm:text-lg">{{ site.brand_name }}</span>
+        <span class="block text-[10px] font-semibold tracking-[0.2em] mt-0.5" style="color:var(--muted)">ESKİŞEHİR</span>
       </span>
     </a>
 

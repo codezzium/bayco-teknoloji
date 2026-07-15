@@ -1,11 +1,48 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ product.name }} — {{ site.brand_name }}{% endblock %}
-{% block meta_desc %}{{ product.name }} {{ product.storage }} {{ product.get_condition_display }}. {{ product.short_desc }} {{ product.price_display }}.{% endblock %}
+{% block head_seo %}
+<title>{{ product.name }} {{ product.storage }} {{ product.get_condition_display }} Fiyatı | Eskişehir Bayço Teknoloji</title>
+<meta name="description" content="{{ product.name }} {{ product.storage }} {{ product.get_condition_display }} – Eskişehir Bayço Teknoloji'de {{ product.price_display }}. {{ product.short_desc }} Garantili, faturalı; WhatsApp'tan hemen teklif alın.">
+<link rel="canonical" href="{{ request.build_absolute_uri }}">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="geo.region" content="TR-26"><meta name="geo.placename" content="Eskişehir">
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="Eskişehir {{ site.brand_name }}">
+<meta property="og:locale" content="tr_TR">
+<meta property="og:title" content="{{ product.name }} | Eskişehir Bayço Teknoloji">
+<meta property="og:description" content="{{ product.name }} {{ product.get_condition_display }} – {{ product.price_display }}. Eskişehir'de garantili telefon.">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta property="og:image" content="{% if product.cover %}{{ request.scheme }}://{{ request.get_host }}{{ product.cover.url }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ product.name }} | Eskişehir Bayço Teknoloji">
+<meta name="twitter:description" content="{{ product.name }} {{ product.get_condition_display }} – {{ product.price_display }}.">
+<meta name="twitter:image" content="{% if product.cover %}{{ request.scheme }}://{{ request.get_host }}{{ product.cover.url }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}">
+{% endblock %}
+
+{% block head_extra %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "{{ product.name|escapejs }}",
+  "image": "{% if product.cover %}{{ request.scheme }}://{{ request.get_host }}{{ product.cover.url }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}",
+  "description": "{{ product.short_desc|default:product.name|escapejs }}",
+  {% if product.brand %}"brand": { "@type": "Brand", "name": "{{ product.brand.name|escapejs }}" },{% endif %}
+  "itemCondition": "{% if product.condition == 'sifir' %}https://schema.org/NewCondition{% else %}https://schema.org/UsedCondition{% endif %}",
+  "offers": {
+    "@type": "Offer",
+    {% if product.price %}"price": "{{ product.price|stringformat:'d' }}", "priceCurrency": "TRY",{% endif %}
+    "availability": "https://schema.org/InStock",
+    "url": "{{ request.build_absolute_uri }}",
+    "seller": { "@type": "Store", "name": "Eskişehir {{ site.brand_name }}", "areaServed": "Eskişehir" }
+  }
+}
+</script>
+{% endblock %}
 
 {% block content %}
-<section class="section" style="padding-top:calc(var(--header-h) + 32px)">
+<section class="section" style="padding-top:calc(var(--header-h) + var(--campaign-h) + 24px)">
   <div class="container-x">
     <!-- Breadcrumb -->
     <nav class="text-sm mb-6 flex items-center gap-2 reveal in" style="color:var(--muted)">

@@ -15,7 +15,7 @@ class Command(BaseCommand):
         s.phone = "0532 123 45 67"
         s.whatsapp_number = "905321234567"
         s.email = "info@baycoteknoloji.com"
-        s.address = "Merkez Mah. Teknoloji Cad. No:12, Sancaktepe / İstanbul"
+        s.address = "Hoşnudiye Mah. Kızılcıklı Mahmut Pehlivan Cad. No:12, Tepebaşı / Eskişehir"
         s.instagram = "https://instagram.com/baycoteknoloji"
         s.google_review_url = "https://g.page/baycoteknoloji"
         s.save()

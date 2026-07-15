@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Teklif Al — {{ site.brand_name }}{% endblock %}
+{% block head_seo %}{% include "partials/seo.html" with title="Telefon Takas & Fiyat Teklifi | Eskişehir Bayço Teknoloji" description="Eskişehir'de telefonunu sat, takas et veya sıfır/ikinci el telefon için fiyat teklifi al. Eskişehir Bayço Teknoloji ile WhatsApp'tan saniyeler içinde teklif." %}{% endblock %}
 
 {% block content %}
-<section class="section" style="padding-top:calc(var(--header-h) + 40px)">
+<section class="section" style="padding-top:calc(var(--header-h) + var(--campaign-h) + 32px)">
   <div class="container-x">
     <div class="text-center max-w-2xl mx-auto mb-10 reveal in">
       <span class="eyebrow mb-3">Teklif Al</span>

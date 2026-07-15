@@ -26,7 +26,13 @@
   --radius: 18px;
 
   --header-h: 76px;
+  /* Kampanya şeridi yüksekliği + header ile arasındaki boşluk.
+     Şerit yoksa 0 (body.has-campaign ile açılır). */
+  --campaign-h: 0px;
 }
+
+body.has-campaign { --campaign-h: 48px; }
+@media (max-width: 640px) { body.has-campaign { --campaign-h: 44px; } }
 
 * { box-sizing: border-box; }
 
@@ -204,10 +210,17 @@ img { max-width: 100%; display: block; }
 }
 .card-line:hover::before { opacity: 1; }
 
+/* ---------- Kampanya şeridi (üstte sabit) ---------- */
+.campaign-strip {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 61;
+}
+
 /* ---------- Header ---------- */
 .site-header {
   position: fixed;
-  top: 0; left: 0; right: 0;
+  top: var(--campaign-h); left: 0; right: 0;
   z-index: 60;
   height: var(--header-h);
   display: flex;
@@ -250,7 +263,7 @@ img { max-width: 100%; display: block; }
   min-height: 100svh;
   display: flex;
   align-items: center;
-  padding-top: calc(var(--header-h) + 32px);
+  padding-top: calc(var(--header-h) + var(--campaign-h) + 32px);
   padding-bottom: 90px;
   overflow: hidden;
 }
@@ -529,7 +542,7 @@ img { max-width: 100%; display: block; }
 @media (max-width: 640px) {
   .hero {
     min-height: auto;
-    padding-top: calc(var(--header-h) + 20px);
+    padding-top: calc(var(--header-h) + var(--campaign-h) + 16px);
     padding-bottom: 44px;
   }
   .hero-title { font-size: clamp(1.85rem, 8.4vw, 3rem); }

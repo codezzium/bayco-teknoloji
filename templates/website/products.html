@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Ürünler — {{ site.brand_name }}{% endblock %}
+{% block head_seo %}{% include "partials/seo.html" with title="Telefon Ürünleri | Eskişehir Bayço Teknoloji – Sıfır & İkinci El" description="Eskişehir Bayço Teknoloji ürünleri: sıfır ve garantili ikinci el iPhone, Samsung, Xiaomi telefonlar. Eskişehir'de uygun fiyat, taksit ve WhatsApp'tan hızlı teklif." %}{% endblock %}
 
 {% block content %}
-<section class="section" style="padding-top:calc(var(--header-h) + 40px)">
+<section class="section" style="padding-top:calc(var(--header-h) + var(--campaign-h) + 32px)">
   <div class="container-x">
     <!-- Sayfa başlığı -->
     <div class="mb-8 reveal in">
