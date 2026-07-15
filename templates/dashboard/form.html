@@ -1,0 +1,40 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <div class="flex items-center gap-2 text-sm mb-5" style="color:var(--muted)">
+    <a href="{% url 'dashboard:crud_list' key=key %}" class="hover:text-white">{{ title }}</a>
+    <span>/</span>
+    <span style="color:var(--ink)">{% if is_edit %}Düzenle{% else %}Yeni {{ singular }}{% endif %}</span>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="card p-6">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="mb-4 text-sm" style="color:#ff8b95">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="grid sm:grid-cols-2 gap-x-5">
+      {% for field in form %}
+      <div class="field {% if field.field.widget.input_type == 'checkbox' %}sm:col-span-2 flex items-center gap-3{% elif field.name in 'description,answer,comment,footer_about,hero_subtitle,maps_embed,short_desc' %}sm:col-span-2{% endif %}">
+        {% if field.field.widget.input_type == 'checkbox' %}
+          <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+            {{ field }}
+            <span class="label" style="margin:0">{{ field.label }}</span>
+          </label>
+        {% else %}
+          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        {% endif %}
+        {% if field.help_text %}<p class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text|safe }}</p>{% endif %}
+        {% if field.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ field.errors|striptags }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex items-center gap-3 mt-4">
+      <button class="btn btn-gradient">Kaydet</button>
+      <a href="{% url 'dashboard:crud_list' key=key %}" class="btn btn-ghost">Vazgeç</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

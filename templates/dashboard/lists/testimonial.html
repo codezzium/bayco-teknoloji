@@ -1,0 +1,25 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% include "dashboard/partials/list_header.html" %}
+
+<div class="space-y-3">
+  {% for item in items %}
+  <div id="item-{{ item.pk }}" class="card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+    <div class="w-11 h-11 rounded-full grid place-items-center font-display font-bold text-white shrink-0" style="background:var(--brand)">{{ item.name|first }}</div>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">{{ item.name }}</span>
+        <span class="text-xs" style="color:#fbbf24">{% for s in item.stars %}★{% endfor %}</span>
+      </div>
+      <p class="text-sm mt-0.5 line-clamp-2" style="color:var(--muted)">{{ item.comment }}</p>
+    </div>
+    <div class="flex items-center gap-2">
+      {% include "dashboard/partials/toggle.html" with obj=item key=key field='is_active' value=item.is_active %}
+    </div>
+    {% include "dashboard/partials/row_actions.html" with obj=item %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

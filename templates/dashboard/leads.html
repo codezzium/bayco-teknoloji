@@ -1,0 +1,96 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}Talepler{% endblock %}
+
+{% block content %}
+<div x-data="{ tab: '{{ tab }}' }">
+  <!-- Sekmeler -->
+  <div class="flex flex-wrap gap-2 mb-6">
+    <button class="tab-btn" style="flex:none;min-width:150px" :class="{active: tab==='quote'}" @click="tab='quote'">📱 Teklif ({{ quotes|length }})</button>
+    <button class="tab-btn" style="flex:none;min-width:150px" :class="{active: tab==='service'}" @click="tab='service'">🛠️ Servis ({{ services|length }})</button>
+    <button class="tab-btn" style="flex:none;min-width:150px" :class="{active: tab==='contact'}" @click="tab='contact'">✉️ İletişim ({{ messages_list|length }})</button>
+  </div>
+
+  <!-- TEKLİF -->
+  <div x-show="tab==='quote'" x-cloak class="space-y-3">
+    {% for q in quotes %}
+    <div id="lead-quote-{{ q.pk }}" class="card p-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold">{{ q.name }}</span>
+            <span class="chip" style="font-size:11px">{{ q.get_kind_display }}</span>
+            {% include "dashboard/partials/lead_handled.html" with obj=q tip='quote' %}
+          </div>
+          <div class="text-sm mt-2 flex flex-wrap gap-x-4 gap-y-1" style="color:var(--muted)">
+            <span>📞 {{ q.phone }}</span>
+            {% if q.brand %}<span>Marka: <b style="color:var(--ink)">{{ q.brand }}</b></span>{% endif %}
+            {% if q.model %}<span>Model: <b style="color:var(--ink)">{{ q.model }}</b></span>{% endif %}
+            {% if q.year %}<span>Yıl: {{ q.year }}</span>{% endif %}
+            {% if q.storage %}<span>Hafıza: {{ q.storage }}</span>{% endif %}
+            {% if q.condition %}<span>Durum: {{ q.condition }}</span>{% endif %}
+          </div>
+          {% if q.note %}<p class="text-sm mt-2" style="color:var(--muted)">📝 {{ q.note }}</p>{% endif %}
+          <div class="text-xs mt-2" style="color:var(--muted)">{{ q.created_at|date:"d.m.Y H:i" }}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <a href="{{ q.wa }}" target="_blank" rel="noopener" class="btn btn-wa btn-sm">WhatsApp'tan Yanıtla</a>
+          <button hx-post="{% url 'dashboard:lead_delete' tip='quote' pk=q.pk %}" hx-target="#lead-quote-{{ q.pk }}" hx-swap="outerHTML" hx-confirm="Silinsin mi?" class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+        </div>
+      </div>
+    </div>
+    {% empty %}<div class="card p-10 text-center" style="color:var(--muted)">Teklif talebi yok.</div>{% endfor %}
+  </div>
+
+  <!-- SERVİS -->
+  <div x-show="tab==='service'" x-cloak class="space-y-3">
+    {% for s in services %}
+    <div id="lead-service-{{ s.pk }}" class="card p-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold">{{ s.device }}</span>
+            {% include "dashboard/partials/lead_handled.html" with obj=s tip='service' %}
+          </div>
+          <div class="text-sm mt-2 flex flex-wrap gap-x-4 gap-y-1" style="color:var(--muted)">
+            <span>👤 {{ s.name }}</span><span>📞 {{ s.phone }}</span>
+            <span>⚠️ Arıza: <b style="color:var(--ink)">{{ s.issue }}</b></span>
+          </div>
+          {% if s.note %}<p class="text-sm mt-2" style="color:var(--muted)">📝 {{ s.note }}</p>{% endif %}
+          <div class="text-xs mt-2" style="color:var(--muted)">{{ s.created_at|date:"d.m.Y H:i" }}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <a href="{{ s.wa }}" target="_blank" rel="noopener" class="btn btn-wa btn-sm">WhatsApp'tan Yanıtla</a>
+          <button hx-post="{% url 'dashboard:lead_delete' tip='service' pk=s.pk %}" hx-target="#lead-service-{{ s.pk }}" hx-swap="outerHTML" hx-confirm="Silinsin mi?" class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+        </div>
+      </div>
+    </div>
+    {% empty %}<div class="card p-10 text-center" style="color:var(--muted)">Servis talebi yok.</div>{% endfor %}
+  </div>
+
+  <!-- İLETİŞİM -->
+  <div x-show="tab==='contact'" x-cloak class="space-y-3">
+    {% for m in messages_list %}
+    <div id="lead-contact-{{ m.pk }}" class="card p-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold">{{ m.name }}</span>
+            {% include "dashboard/partials/lead_handled.html" with obj=m tip='contact' %}
+          </div>
+          <div class="text-sm mt-2 flex flex-wrap gap-x-4 gap-y-1" style="color:var(--muted)">
+            {% if m.phone %}<span>📞 {{ m.phone }}</span>{% endif %}
+            {% if m.email %}<span>✉️ {{ m.email }}</span>{% endif %}
+          </div>
+          <p class="text-sm mt-2">{{ m.message }}</p>
+          <div class="text-xs mt-2" style="color:var(--muted)">{{ m.created_at|date:"d.m.Y H:i" }}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          {% if m.wa %}<a href="{{ m.wa }}" target="_blank" rel="noopener" class="btn btn-wa btn-sm">WhatsApp'tan Yanıtla</a>{% endif %}
+          <button hx-post="{% url 'dashboard:lead_delete' tip='contact' pk=m.pk %}" hx-target="#lead-contact-{{ m.pk }}" hx-swap="outerHTML" hx-confirm="Silinsin mi?" class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+        </div>
+      </div>
+    </div>
+    {% empty %}<div class="card p-10 text-center" style="color:var(--muted)">Mesaj yok.</div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

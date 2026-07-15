@@ -1,0 +1,14 @@
+{% if products %}
+  <div class="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+    {% for product in products %}
+      {% include "website/partials/product_card.html" %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="glass rounded-2xl py-16 text-center">
+    <div class="text-4xl mb-3">🔍</div>
+    <p class="font-display font-bold text-lg">Ürün bulunamadı</p>
+    <p class="text-sm mt-1" style="color:var(--muted)">Farklı bir filtre deneyin ya da bizimle WhatsApp'tan iletişime geçin.</p>
+    <a href="{{ site.whatsapp_link }}" target="_blank" rel="noopener" class="btn btn-wa btn-sm mt-5">WhatsApp'tan Sor</a>
+  </div>
+{% endif %}

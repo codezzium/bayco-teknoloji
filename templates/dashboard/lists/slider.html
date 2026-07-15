@@ -1,0 +1,29 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% include "dashboard/partials/list_header.html" %}
+
+<div class="grid gap-3 sm:grid-cols-2">
+  {% for item in items %}
+  <div id="item-{{ item.pk }}" class="card overflow-hidden">
+    <div class="h-28 relative" style="background:var(--brand)">
+      {% if item.image %}<img src="{{ item.image.url }}" class="w-full h-full object-cover" alt="">{% endif %}
+      <div class="absolute inset-0" style="background:linear-gradient(180deg,transparent,rgba(10,6,18,.7))"></div>
+      {% if item.badge %}<span class="chip badge-brand absolute top-2 left-2" style="font-size:11px">{{ item.badge }}</span>{% endif %}
+      <div class="absolute bottom-2 left-3 right-3">
+        <div class="font-display font-bold text-white truncate">{{ item.title }}</div>
+        {% if item.subtitle %}<div class="text-xs text-white/80 truncate">{{ item.subtitle }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="p-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="chip" style="font-size:11px">Sıra: {{ item.order }}</span>
+        {% include "dashboard/partials/toggle.html" with obj=item key=key field='is_active' value=item.is_active %}
+      </div>
+      {% include "dashboard/partials/row_actions.html" with obj=item %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

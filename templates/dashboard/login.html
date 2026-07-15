@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Girişi — {{ site.brand_name }}</title>
+  <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="min-h-screen grid place-items-center p-5">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-7">
+      <img src="{% static 'img/logo.png' %}" class="w-16 h-16 mx-auto rounded-2xl mb-4" alt="logo">
+      <h1 class="font-display font-extrabold text-2xl">{{ site.brand_name }}</h1>
+      <p class="text-sm mt-1" style="color:var(--muted)">Yönetim Paneli Girişi</p>
+    </div>
+
+    <form method="post" class="glass rounded-2xl p-7">
+      {% csrf_token %}
+      {% if error %}
+      <div class="rounded-xl px-4 py-3 mb-4 text-sm" style="background:rgba(226,58,72,.15);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+        {{ error }}
+      </div>
+      {% endif %}
+      <div class="field">
+        <label class="label">Kullanıcı Adı</label>
+        <input class="input" name="username" autofocus required placeholder="admin">
+      </div>
+      <div class="field">
+        <label class="label">Şifre</label>
+        <input class="input" name="password" type="password" required placeholder="••••••••">
+      </div>
+      <button class="btn btn-gradient btn-block mt-3">Giriş Yap</button>
+    </form>
+
+    <p class="text-center text-xs mt-5" style="color:var(--muted)">
+      © {% now "Y" %} {{ site.brand_name }} · Yalnızca yetkili personel
+    </p>
+  </div>
+</body>
+</html>

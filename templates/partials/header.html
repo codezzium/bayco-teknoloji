@@ -1,0 +1,61 @@
+{% load static %}
+<header class="site-header" x-data="{ open: false }" :class="{ 'scrolled': open }">
+  <div class="container-x w-full flex items-center justify-between gap-4">
+
+    <!-- Logo -->
+    <a href="{% url 'website:home' %}" class="flex items-center gap-3 shrink-0">
+      <img src="{% static 'img/logo.png' %}" alt="{{ site.brand_name }}" class="brand-logo">
+      <span class="font-display font-extrabold text-lg leading-none hidden sm:block">
+        {{ site.brand_name }}
+      </span>
+    </a>
+
+    <!-- Masaüstü menü -->
+    <nav class="hidden lg:flex items-center gap-8">
+      <a href="{% url 'website:home' %}" class="nav-link">Ana Sayfa</a>
+      <a href="{% url 'website:products' %}" class="nav-link">Ürünler</a>
+      <a href="{% url 'website:quote' %}" class="nav-link">Teklif Al</a>
+      <a href="{% url 'website:service' %}" class="nav-link">Servis</a>
+      <a href="{% url 'website:contact' %}" class="nav-link">İletişim</a>
+    </nav>
+
+    <!-- Sağ: telefon + CTA -->
+    <div class="flex items-center gap-3">
+      <a href="tel:{{ site.phone }}" class="hidden md:flex items-center gap-2 glass px-4 py-2 rounded-full">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-magenta"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span class="font-semibold text-sm">{{ site.phone }}</span>
+      </a>
+
+      <a href="{% url 'website:quote' %}" class="btn btn-gradient btn-sm hidden sm:inline-flex">
+        {{ site.hero_cta_text|default:"Teklif Al" }}
+      </a>
+
+      <!-- Mobil menü butonu -->
+      <button @click="open = !open" class="lg:hidden glass w-11 h-11 rounded-xl grid place-items-center" aria-label="Menü">
+        <svg x-show="!open" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg x-show="open" x-cloak width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobil açılır menü -->
+  <div x-show="open" x-cloak x-transition.opacity
+       @click="open=false"
+       class="lg:hidden fixed inset-0 top-0 z-[-1]" style="background:rgba(10,6,18,.6)"></div>
+  <div x-show="open" x-cloak
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0 -translate-y-4"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       class="lg:hidden absolute top-full left-0 right-0 mt-2 mx-3">
+    <div class="glass rounded-2xl p-4 flex flex-col gap-1" style="background:rgba(21,12,34,.96)">
+      <a @click="open=false" href="{% url 'website:home' %}" class="px-4 py-3 rounded-xl hover:bg-white/5 font-medium">Ana Sayfa</a>
+      <a @click="open=false" href="{% url 'website:products' %}" class="px-4 py-3 rounded-xl hover:bg-white/5 font-medium">Ürünler</a>
+      <a @click="open=false" href="{% url 'website:quote' %}" class="px-4 py-3 rounded-xl hover:bg-white/5 font-medium">Teklif Al</a>
+      <a @click="open=false" href="{% url 'website:service' %}" class="px-4 py-3 rounded-xl hover:bg-white/5 font-medium">Servis / Tamir</a>
+      <a @click="open=false" href="{% url 'website:contact' %}" class="px-4 py-3 rounded-xl hover:bg-white/5 font-medium">İletişim</a>
+      <a href="tel:{{ site.phone }}" class="btn btn-ghost btn-block mt-2">📞 {{ site.phone }}</a>
+      <a href="{{ site.whatsapp_link }}" target="_blank" rel="noopener" class="btn btn-wa btn-block">WhatsApp'tan Yaz</a>
+    </div>
+  </div>
+</header>
+<style>[x-cloak]{display:none!important;}</style>

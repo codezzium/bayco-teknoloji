@@ -1,0 +1,52 @@
+{% load static %}
+<div id="catalog">
+  {# ---- Filtre çubuğu ---- #}
+  <div class="glass rounded-2xl p-4 md:p-5 mb-8">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
+
+      {# Durum filtresi #}
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-semibold mr-1" style="color:var(--muted)">Durum:</span>
+        <a class="filter-chip {% if not durum %}active{% endif %}"
+           hx-get="{% url 'website:products' %}?marka={{ marka }}&q={{ q }}"
+           hx-target="#catalog" hx-select="#catalog" hx-swap="outerHTML" hx-push-url="true" style="cursor:pointer">Tümü</a>
+        <a class="filter-chip {% if durum == 'sifir' %}active{% endif %}"
+           hx-get="{% url 'website:products' %}?durum=sifir&marka={{ marka }}&q={{ q }}"
+           hx-target="#catalog" hx-select="#catalog" hx-swap="outerHTML" hx-push-url="true" style="cursor:pointer">Sıfır</a>
+        <a class="filter-chip {% if durum == 'ikinci_el' %}active{% endif %}"
+           hx-get="{% url 'website:products' %}?durum=ikinci_el&marka={{ marka }}&q={{ q }}"
+           hx-target="#catalog" hx-select="#catalog" hx-swap="outerHTML" hx-push-url="true" style="cursor:pointer">İkinci El</a>
+      </div>
+
+      {# Arama #}
+      <div class="relative lg:w-72">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" name="q" value="{{ q }}" placeholder="Model ara..." class="input" style="padding-left:38px"
+               hx-get="{% url 'website:products' %}?durum={{ durum }}&marka={{ marka }}"
+               hx-trigger="keyup changed delay:400ms, search"
+               hx-target="#catalog" hx-select="#catalog" hx-swap="outerHTML" hx-push-url="true">
+      </div>
+    </div>
+
+    {# Marka filtresi #}
+    <div class="flex flex-wrap items-center gap-2 mt-4 pt-4" style="border-top:1px solid var(--line)">
+      <span class="text-xs font-semibold mr-1" style="color:var(--muted)">Marka:</span>
+      <a class="filter-chip {% if not marka %}active{% endif %}"
+         hx-get="{% url 'website:products' %}?durum={{ durum }}&q={{ q }}"
+         hx-target="#catalog" hx-select="#catalog" hx-swap="outerHTML" hx-push-url="true" style="cursor:pointer">Tümü</a>
+      {% for b in brands %}
+      <a class="filter-chip {% if marka == b.slug %}active{% endif %}"
+         hx-get="{% url 'website:products' %}?durum={{ durum }}&marka={{ b.slug }}&q={{ q }}"
+         hx-target="#catalog" hx-select="#catalog" hx-swap="outerHTML" hx-push-url="true" style="cursor:pointer">{{ b.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---- Sonuç sayısı + grid ---- #}
+  <div class="flex items-center justify-between mb-5">
+    <p class="text-sm" style="color:var(--muted)"><strong style="color:var(--ink)">{{ products|length }}</strong> ürün listeleniyor</p>
+    <span class="htmx-indicator text-sm" style="color:var(--muted)">Yükleniyor…</span>
+  </div>
+
+  {% include "website/partials/product_grid.html" %}
+</div>

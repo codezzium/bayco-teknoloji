@@ -1,0 +1,6 @@
+<button hx-post="{% url 'dashboard:crud_toggle' key=key pk=obj.pk field=field %}" hx-swap="outerHTML"
+        class="chip {% if value %}badge-brand{% endif %}" style="cursor:pointer;font-size:11px;border:none">
+  {% if field == 'is_active' %}{% if value %}● Aktif{% else %}○ Pasif{% endif %}
+  {% elif field == 'is_featured' %}{% if value %}★ Öne Çıkan{% else %}☆ Normal{% endif %}
+  {% else %}{{ value|yesno:"Evet,Hayır" }}{% endif %}
+</button>

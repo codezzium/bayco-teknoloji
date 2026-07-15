@@ -1,0 +1,17 @@
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <div>
+    <h2 class="font-display font-extrabold text-xl">{{ title }}</h2>
+    <p class="text-sm" style="color:var(--muted)">{{ items|length }} kayıt</p>
+  </div>
+  <a href="{% url 'dashboard:crud_create' key=key %}" class="btn btn-gradient btn-sm">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Yeni {{ singular }}
+  </a>
+</div>
+{% if not items %}
+<div class="card p-12 text-center">
+  <div class="text-4xl mb-3">📭</div>
+  <p class="font-semibold">Henüz kayıt yok</p>
+  <p class="text-sm mt-1" style="color:var(--muted)">"Yeni {{ singular }}" ile ilk kaydı ekleyin.</p>
+</div>
+{% endif %}

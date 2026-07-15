@@ -1,0 +1,92 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}Genel Bakış{% endblock %}
+
+{% block content %}
+<!-- İstatistik kartları -->
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-8">
+  <a href="{% url 'dashboard:leads' %}?tab=quote" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Bekleyen Teklif Talebi</div>
+        <div class="text-3xl font-display font-extrabold gradient-text mt-1">{{ stats.quotes_new }}</div>
+      </div>
+      <div class="icon-box">📱</div>
+    </div>
+  </a>
+  <a href="{% url 'dashboard:leads' %}?tab=service" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Bekleyen Servis Talebi</div>
+        <div class="text-3xl font-display font-extrabold gradient-text mt-1">{{ stats.services_new }}</div>
+      </div>
+      <div class="icon-box">🛠️</div>
+    </div>
+  </a>
+  <a href="{% url 'dashboard:leads' %}?tab=contact" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Yeni Mesaj</div>
+        <div class="text-3xl font-display font-extrabold gradient-text mt-1">{{ stats.messages_new }}</div>
+      </div>
+      <div class="icon-box">✉️</div>
+    </div>
+  </a>
+  <a href="{% url 'dashboard:crud_list' key='urunler' %}" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div><div class="text-xs" style="color:var(--muted)">Toplam Ürün</div><div class="text-3xl font-display font-extrabold mt-1">{{ stats.products }}</div></div>
+      <div class="icon-box">🏷️</div>
+    </div>
+  </a>
+  <a href="{% url 'dashboard:crud_list' key='duyurular' %}" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div><div class="text-xs" style="color:var(--muted)">Aktif Slayt</div><div class="text-3xl font-display font-extrabold mt-1">{{ stats.sliders }}</div></div>
+      <div class="icon-box">🖼️</div>
+    </div>
+  </a>
+  <a href="{% url 'dashboard:crud_list' key='yorumlar' %}" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div><div class="text-xs" style="color:var(--muted)">Yorum</div><div class="text-3xl font-display font-extrabold mt-1">{{ stats.testimonials }}</div></div>
+      <div class="icon-box">⭐</div>
+    </div>
+  </a>
+</div>
+
+<!-- Son talepler -->
+<div class="grid gap-6 lg:grid-cols-2">
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-display font-bold">Son Teklif Talepleri</h2>
+      <a href="{% url 'dashboard:leads' %}?tab=quote" class="text-sm hover:text-white" style="color:var(--muted)">Tümü →</a>
+    </div>
+    <div class="space-y-2">
+      {% for q in recent_quotes %}
+      <div class="flex items-center justify-between gap-3 py-2 border-b" style="border-color:var(--line)">
+        <div class="min-w-0">
+          <div class="font-semibold text-sm truncate">{{ q.name }} · {{ q.model|default:"—" }}</div>
+          <div class="text-xs" style="color:var(--muted)">{{ q.get_kind_display }} · {{ q.phone }} · {{ q.created_at|date:"d.m H:i" }}</div>
+        </div>
+        {% if q.is_handled %}<span class="chip" style="font-size:11px">Yanıtlandı</span>{% else %}<span class="chip badge-brand" style="font-size:11px">Yeni</span>{% endif %}
+      </div>
+      {% empty %}<p class="text-sm" style="color:var(--muted)">Henüz talep yok.</p>{% endfor %}
+    </div>
+  </div>
+
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-display font-bold">Son Servis Talepleri</h2>
+      <a href="{% url 'dashboard:leads' %}?tab=service" class="text-sm hover:text-white" style="color:var(--muted)">Tümü →</a>
+    </div>
+    <div class="space-y-2">
+      {% for s in recent_services %}
+      <div class="flex items-center justify-between gap-3 py-2 border-b" style="border-color:var(--line)">
+        <div class="min-w-0">
+          <div class="font-semibold text-sm truncate">{{ s.device }} · {{ s.issue }}</div>
+          <div class="text-xs" style="color:var(--muted)">{{ s.name }} · {{ s.phone }} · {{ s.created_at|date:"d.m H:i" }}</div>
+        </div>
+        {% if s.is_handled %}<span class="chip" style="font-size:11px">Yanıtlandı</span>{% else %}<span class="chip badge-brand" style="font-size:11px">Yeni</span>{% endif %}
+      </div>
+      {% empty %}<p class="text-sm" style="color:var(--muted)">Henüz talep yok.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

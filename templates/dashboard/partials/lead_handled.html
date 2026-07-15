@@ -1,0 +1,4 @@
+<button hx-post="{% url 'dashboard:lead_toggle' tip=tip pk=obj.pk %}" hx-swap="outerHTML"
+        class="chip {% if not obj.is_handled %}badge-brand{% endif %}" style="cursor:pointer;font-size:11px;border:none">
+  {% if obj.is_handled %}✓ Yanıtlandı{% else %}● Yeni{% endif %}
+</button>

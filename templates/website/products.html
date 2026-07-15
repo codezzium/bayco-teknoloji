@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Ürünler — {{ site.brand_name }}{% endblock %}
+
+{% block content %}
+<section class="section" style="padding-top:calc(var(--header-h) + 40px)">
+  <div class="container-x">
+    <!-- Sayfa başlığı -->
+    <div class="mb-8 reveal in">
+      <span class="eyebrow mb-3">Vitrin</span>
+      <h1 class="text-3xl md:text-5xl font-display font-extrabold">Ürünler</h1>
+      <p class="mt-2" style="color:var(--muted)">Sıfır ve garantili ikinci el telefonlar. Beğendiğin modele WhatsApp'tan hemen teklif al.</p>
+    </div>
+
+    {% include "website/partials/catalog.html" %}
+  </div>
+</section>
+{% endblock %}

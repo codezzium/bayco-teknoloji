@@ -1,0 +1,42 @@
+{% load static %}
+<article class="card card-hover card-line reveal flex flex-col">
+  <a href="{{ product.get_absolute_url }}" class="block">
+    <div class="product-media">
+      <!-- Rozetler -->
+      <div class="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 flex flex-col gap-1">
+        <span class="chip {% if product.condition == 'sifir' %}badge-brand{% endif %}" style="font-size:11px;padding:4px 10px">
+          {{ product.get_condition_display }}
+        </span>
+        {% if product.discount_percent %}
+          <span class="chip" style="background:#e23a48;color:#fff;border:none;font-size:11px;padding:4px 10px">%{{ product.discount_percent }}</span>
+        {% endif %}
+      </div>
+
+      {% if product.cover %}
+        <img src="{{ product.cover.url }}" alt="{{ product.name }}" loading="lazy">
+      {% else %}
+        {% include "partials/phone_placeholder.html" %}
+      {% endif %}
+    </div>
+  </a>
+
+  <div class="p-3 sm:p-5 flex flex-col flex-1">
+    <div class="flex items-center gap-1.5 mb-1 text-xs" style="color:var(--muted)">
+      {% if product.brand %}<span class="font-semibold">{{ product.brand.name }}</span>{% endif %}
+      {% if product.storage %}<span>· {{ product.storage }}</span>{% endif %}
+    </div>
+    <h3 class="font-display font-bold text-sm sm:text-base leading-snug mb-2 line-clamp-2">
+      <a href="{{ product.get_absolute_url }}" class="hover:opacity-80 transition">{{ product.name }}</a>
+    </h3>
+
+    <div class="flex flex-wrap items-baseline gap-x-2 mt-auto">
+      <span class="price gradient-text" style="font-size:1.05rem">{{ product.price_display }}</span>
+      {% if product.old_price %}<span class="price-old" style="font-size:.8rem;margin:0">{{ product.old_price_display }}</span>{% endif %}
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <a href="{{ product.get_absolute_url }}" class="btn btn-ghost btn-sm hidden sm:inline-flex">İncele</a>
+      <a href="{% url 'website:quote' %}?urun={{ product.id }}&mod=al" class="btn btn-gradient btn-sm col-span-2 sm:col-span-1">Teklif Al</a>
+    </div>
+  </div>
+</article>

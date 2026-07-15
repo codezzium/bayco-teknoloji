@@ -1,0 +1,66 @@
+{% load static %}
+<footer class="relative mt-10 border-t" style="border-color:var(--line); background:rgba(10,6,18,.55)">
+  <div class="container-x py-14">
+    <div class="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+
+      <!-- Marka -->
+      <div class="lg:col-span-1">
+        <div class="flex items-center gap-3 mb-4">
+          <img src="{% static 'img/logo.png' %}" alt="{{ site.brand_name }}" class="brand-logo">
+          <span class="font-display font-extrabold text-lg">{{ site.brand_name }}</span>
+        </div>
+        <p class="text-sm" style="color:var(--muted)">{{ site.footer_about }}</p>
+        <div class="flex items-center gap-3 mt-5">
+          {% if site.instagram %}<a href="{{ site.instagram }}" target="_blank" rel="noopener" class="glass w-10 h-10 rounded-xl grid place-items-center hover:border-white/30" aria-label="Instagram">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg></a>{% endif %}
+          {% if site.facebook %}<a href="{{ site.facebook }}" target="_blank" rel="noopener" class="glass w-10 h-10 rounded-xl grid place-items-center hover:border-white/30" aria-label="Facebook">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 9h3V6h-3c-1.66 0-3 1.34-3 3v2H9v3h2v6h3v-6h2.5l.5-3H14V9z"/></svg></a>{% endif %}
+          {% if site.tiktok %}<a href="{{ site.tiktok }}" target="_blank" rel="noopener" class="glass w-10 h-10 rounded-xl grid place-items-center hover:border-white/30" aria-label="TikTok">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 3v3.2a5 5 0 0 0 3 1v3a8 8 0 0 1-3-.7V15a5 5 0 1 1-5-5v3a2 2 0 1 0 2 2V3h3z"/></svg></a>{% endif %}
+          <a href="{{ site.whatsapp_link }}" target="_blank" rel="noopener" class="glass w-10 h-10 rounded-xl grid place-items-center hover:border-white/30" aria-label="WhatsApp">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#25d366"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.21c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2z"/></svg></a>
+        </div>
+      </div>
+
+      <!-- Hızlı linkler -->
+      <div>
+        <h4 class="font-display text-sm font-bold mb-4 tracking-wide">Keşfet</h4>
+        <ul class="space-y-2.5 text-sm" style="color:var(--muted)">
+          <li><a href="{% url 'website:products' %}" class="hover:text-white transition">Tüm Ürünler</a></li>
+          <li><a href="{% url 'website:products' %}?durum=sifir" class="hover:text-white transition">Sıfır Telefonlar</a></li>
+          <li><a href="{% url 'website:products' %}?durum=ikinci_el" class="hover:text-white transition">İkinci El Telefonlar</a></li>
+          <li><a href="{% url 'website:quote' %}" class="hover:text-white transition">Teklif Al / Takas</a></li>
+          <li><a href="{% url 'website:service' %}" class="hover:text-white transition">Teknik Servis</a></li>
+        </ul>
+      </div>
+
+      <!-- Kurumsal -->
+      <div>
+        <h4 class="font-display text-sm font-bold mb-4 tracking-wide">Kurumsal</h4>
+        <ul class="space-y-2.5 text-sm" style="color:var(--muted)">
+          <li><a href="{% url 'website:home' %}#neden-biz" class="hover:text-white transition">Neden Biz?</a></li>
+          <li><a href="{% url 'website:home' %}#yorumlar" class="hover:text-white transition">Müşteri Yorumları</a></li>
+          <li><a href="{% url 'website:home' %}#sss" class="hover:text-white transition">Sık Sorulan Sorular</a></li>
+          <li><a href="{% url 'website:contact' %}" class="hover:text-white transition">İletişim</a></li>
+        </ul>
+      </div>
+
+      <!-- İletişim -->
+      <div>
+        <h4 class="font-display text-sm font-bold mb-4 tracking-wide">İletişim</h4>
+        <ul class="space-y-3 text-sm" style="color:var(--muted)">
+          <li class="flex gap-2.5"><span>📍</span><span>{{ site.address }}</span></li>
+          <li class="flex gap-2.5"><span>📞</span><a href="tel:{{ site.phone }}" class="hover:text-white transition">{{ site.phone }}</a></li>
+          {% if site.email %}<li class="flex gap-2.5"><span>✉️</span><a href="mailto:{{ site.email }}" class="hover:text-white transition">{{ site.email }}</a></li>{% endif %}
+          {% if site.working_hours %}<li class="flex gap-2.5"><span>🕑</span><span>{{ site.working_hours }}</span></li>{% endif %}
+        </ul>
+      </div>
+    </div>
+
+    <hr class="hr-glow my-8">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-3 text-xs" style="color:var(--muted)">
+      <p>© {% now "Y" %} {{ site.brand_name }}. Tüm hakları saklıdır.</p>
+      <p>Sıfır & İkinci El Telefon · Aksesuar · Teknik Servis</p>
+    </div>
+  </div>
+</footer>

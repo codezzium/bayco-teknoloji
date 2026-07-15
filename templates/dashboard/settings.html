@@ -1,0 +1,31 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}Site Ayarları{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+  <p class="text-sm mb-6" style="color:var(--muted)">İletişim bilgileri, hero görseli, kampanya şeridi, sosyal medya ve daha fazlası. Değişiklikler anında siteye yansır.</p>
+
+  <form method="post" enctype="multipart/form-data" class="card p-6">
+    {% csrf_token %}
+    <div class="grid sm:grid-cols-2 gap-x-5">
+      {% for field in form %}
+      <div class="field {% if field.field.widget.input_type == 'checkbox' %}sm:col-span-2 flex items-center gap-3{% elif field.name in 'hero_subtitle,footer_about,maps_embed,hero_title' %}sm:col-span-2{% endif %}">
+        {% if field.field.widget.input_type == 'checkbox' %}
+          <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+            {{ field }} <span class="label" style="margin:0">{{ field.label }}</span>
+          </label>
+        {% else %}
+          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        {% endif %}
+        {% if field.help_text %}<p class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text|safe }}</p>{% endif %}
+        {% if field.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ field.errors|striptags }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-gradient">Ayarları Kaydet</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

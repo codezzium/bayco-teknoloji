@@ -1,0 +1,71 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{% block title %}{{ site.brand_name }} — Telefon & Teknoloji{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}{{ site.tagline }}. Sıfır ve ikinci el telefon satışı, takas, aksesuar ve teknik servis. {{ site.brand_name }}.{% endblock %}">
+  <meta name="theme-color" content="#150c22">
+
+  <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Swiper -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+
+  <!-- Tailwind (dev: Play CDN). Prod için CLI derlemesine geçilebilir. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            plum: { 950:'#150c22', 900:'#1e1330', 800:'#2a1b40', 700:'#3a2352', 600:'#4b2d67' },
+            brand: { purple:'#7a3ea6', magenta:'#b4357f', red:'#e23a48' },
+          },
+          fontFamily: {
+            sans: ['Inter','system-ui','sans-serif'],
+            display: ['Sora','Inter','sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+
+  <!-- htmx + Alpine -->
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  {% block head_extra %}{% endblock %}
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+  {% if site.campaign_active and site.campaign_text %}
+    {% include "partials/campaign_strip.html" %}
+  {% endif %}
+
+  {% include "partials/header.html" %}
+
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include "partials/footer.html" %}
+  {% include "partials/mobile_nav.html" %}
+
+  <!-- WhatsApp FAB -->
+  <a class="wa-fab" href="{{ site.whatsapp_link }}" target="_blank" rel="noopener" aria-label="WhatsApp">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="#072b16"><path d="M17.47 14.38c-.29-.15-1.7-.84-1.97-.93-.26-.1-.46-.15-.65.14-.19.29-.74.93-.91 1.12-.17.19-.34.21-.63.07-.29-.15-1.22-.45-2.33-1.44-.86-.77-1.44-1.72-1.61-2.01-.17-.29-.02-.45.13-.59.13-.13.29-.34.44-.51.15-.17.19-.29.29-.48.1-.19.05-.36-.02-.51-.07-.15-.65-1.56-.89-2.14-.23-.56-.47-.48-.65-.49l-.55-.01c-.19 0-.5.07-.76.36-.26.29-1 .98-1 2.38s1.02 2.76 1.17 2.95c.15.19 2.02 3.08 4.9 4.32.68.29 1.22.47 1.63.6.69.22 1.31.19 1.8.12.55-.08 1.7-.7 1.94-1.37.24-.67.24-1.25.17-1.37-.07-.12-.26-.19-.55-.34z"/><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.13c-1.53 0-3.03-.41-4.34-1.19l-.31-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.35c0-4.54 3.7-8.23 8.24-8.23 4.54 0 8.23 3.69 8.23 8.23s-3.69 8.24-8.23 8.24z"/></svg>
+  </a>
+
+  <script src="{% static 'js/app.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

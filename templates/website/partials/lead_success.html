@@ -1,0 +1,12 @@
+<div class="glass rounded-2xl p-8 text-center" x-data x-init="setTimeout(() => { try { window.open('{{ wa|escapejs }}', '_blank'); } catch(e){} }, 400)">
+  <div class="w-16 h-16 mx-auto rounded-full grid place-items-center mb-4" style="background:#25d366">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#072b16" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <h3 class="font-display font-extrabold text-xl mb-2">{{ title }}</h3>
+  <p class="text-sm mb-6" style="color:var(--muted)">{{ desc }}</p>
+  <a href="{{ wa }}" target="_blank" rel="noopener" class="btn btn-wa btn-block">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="#072b16"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.21c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2z"/></svg>
+    WhatsApp'ta Mesajı Aç ve Gönder
+  </a>
+  <p class="text-xs mt-4" style="color:var(--muted)">Talebiniz kaydedildi. En kısa sürede size dönüş yapılacaktır.</p>
+</div>

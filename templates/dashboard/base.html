@@ -1,0 +1,93 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Panel — {{ site.brand_name }}{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { plum:{950:'#150c22',900:'#1e1330',800:'#2a1b40',700:'#3a2352'}, brand:{purple:'#7a3ea6',magenta:'#b4357f',red:'#e23a48'} },
+      fontFamily: { sans:['Inter','sans-serif'], display:['Sora','sans-serif'] } } } };
+  </script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>[x-cloak]{display:none!important}</style>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data="{ sidebar:false }">
+
+<div class="min-h-screen lg:grid" style="grid-template-columns:264px 1fr">
+
+  <!-- Sidebar -->
+  <aside class="fixed lg:static inset-y-0 left-0 z-50 w-64 transition-transform lg:translate-x-0"
+         :class="sidebar ? 'translate-x-0' : '-translate-x-full'"
+         style="background:rgba(21,12,34,.96);border-right:1px solid var(--line);backdrop-filter:blur(12px)">
+    <div class="p-5 flex items-center gap-3 border-b" style="border-color:var(--line)">
+      <img src="{% static 'img/logo.png' %}" class="brand-logo" alt="logo">
+      <div>
+        <div class="font-display font-extrabold leading-none">{{ site.brand_name }}</div>
+        <div class="text-xs" style="color:var(--muted)">Yönetim Paneli</div>
+      </div>
+    </div>
+
+    <nav class="p-3 flex flex-col gap-1 text-sm">
+      {% include "dashboard/partials/nav_link.html" with url='dashboard:home' key='home' label='Genel Bakış' icon='grid' %}
+      {% include "dashboard/partials/nav_link.html" with url='dashboard:leads' key='talepler' label='Talepler' icon='inbox' %}
+      <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">İÇERİK</div>
+      {% include "dashboard/partials/nav_link.html" with key='duyurular' label='Duyurular / Slider' icon='image' crud=1 %}
+      {% include "dashboard/partials/nav_link.html" with key='urunler' label='Ürünler' icon='phone' crud=1 %}
+      {% include "dashboard/partials/nav_link.html" with key='yorumlar' label='Yorumlar' icon='star' crud=1 %}
+      {% include "dashboard/partials/nav_link.html" with key='sss' label='S.S.S.' icon='help' crud=1 %}
+      {% include "dashboard/partials/nav_link.html" with key='markalar' label='Markalar' icon='tag' crud=1 %}
+      <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">SİSTEM</div>
+      {% include "dashboard/partials/nav_link.html" with url='dashboard:settings' key='ayarlar' label='Site Ayarları' icon='settings' %}
+    </nav>
+
+    <div class="p-3 mt-auto absolute bottom-0 left-0 right-0">
+      <a href="{% url 'website:home' %}" target="_blank" class="btn btn-ghost btn-sm btn-block mb-2">↗ Siteyi Gör</a>
+      <a href="{% url 'dashboard:logout' %}" class="btn btn-sm btn-block" style="background:rgba(226,58,72,.15);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Çıkış Yap</a>
+    </div>
+  </aside>
+
+  <!-- Overlay (mobil) -->
+  <div x-show="sidebar" x-cloak @click="sidebar=false" class="fixed inset-0 z-40 lg:hidden" style="background:rgba(0,0,0,.5)"></div>
+
+  <!-- İçerik -->
+  <div class="min-w-0">
+    <!-- Topbar -->
+    <header class="sticky top-0 z-30 flex items-center justify-between gap-4 px-5 py-4 border-b"
+            style="background:rgba(21,12,34,.85);backdrop-filter:blur(12px);border-color:var(--line)">
+      <div class="flex items-center gap-3">
+        <button @click="sidebar=!sidebar" class="lg:hidden glass w-10 h-10 rounded-xl grid place-items-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="font-display font-bold text-lg">{% block page_title %}Panel{% endblock %}</h1>
+      </div>
+      <div class="flex items-center gap-3 text-sm">
+        <span class="hidden sm:block" style="color:var(--muted)">👤 {{ request.user.username }}</span>
+      </div>
+    </header>
+
+    <!-- Mesajlar -->
+    {% if messages %}
+    <div class="px-5 pt-4 space-y-2">
+      {% for m in messages %}
+      <div class="glass rounded-xl px-4 py-3 text-sm flex items-center gap-2" style="border-color:rgba(37,211,102,.3)">
+        <span style="color:#25d366">✓</span> {{ m }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="p-5">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>
