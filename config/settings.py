@@ -25,6 +25,10 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(",") if o
 ]
 
+# nginx TLS'i origin'de sonlandırıp X-Forwarded-Proto gönderiyor. Bu olmadan
+# request.scheme "http" kalır ve robots.txt / sitemap.xml http:// URL üretir.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 # Application definition
 
@@ -147,7 +151,6 @@ LOGOUT_REDIRECT_URL = "dashboard:login"
 # TLS sonlandıran bir proxy (Caddy/nginx) arkasında SECURE_PROXY_SSL_HEADER
 # ayarlanmadan SECURE_SSL_REDIRECT açılırsa sonsuz yönlendirme döngüsü olur.
 if not DEBUG:
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
