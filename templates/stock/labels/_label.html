@@ -1,0 +1,14 @@
+<div class="lbl">
+  <div class="lbl-top">
+    <div class="qr">{{ lbl.qr|safe }}</div>
+    <div class="meta">
+      {% if lbl.brand %}<div class="s">{{ lbl.brand }}</div>{% endif %}
+      <div class="m">{{ lbl.name }}</div>
+      {% if lbl.price %}<div class="p">{{ lbl.price }}</div>{% endif %}
+    </div>
+  </div>
+  <div>
+    {% if lbl.bar %}<div class="b128">{{ lbl.bar|safe }}</div>{% endif %}
+    <div class="hri">{{ lbl.code }}</div>
+  </div>
+</div>

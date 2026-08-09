@@ -1,0 +1,26 @@
+{% load stock_extras %}
+{# Kendi id'sini taşır: outerHTML swap'ının çalışması için zorunlu. #}
+<div id="device-results" class="space-y-3">
+  {% for device in page %}
+    {% include "stock/partials/device_row.html" %}
+  {% empty %}
+  <div class="card p-12 text-center">
+    <div class="text-4xl mb-3">📭</div>
+    <p class="font-semibold">Sonuç yok</p>
+    <p class="text-sm mt-1" style="color:var(--muted)">
+      {% if q %}"{{ q }}" için kayıt bulunamadı.{% else %}"Yeni Cihaz" ile ilk kaydı ekleyin.{% endif %}
+    </p>
+  </div>
+  {% endfor %}
+
+  {% if page.has_next %}
+  {% comment %} Numaralı sayfalama yerine "daha fazla": birkaç yüz cihazda "7. sayfaya
+     git" anlamsız, telefonda doğru etkileşim budur. {% endcomment %}
+  <button class="btn btn-ghost btn-block"
+          hx-get="{% url 'stock:device_list' %}?{{ qs }}&sayfa={{ page.next_page_number }}"
+          hx-target="#device-results" hx-swap="outerHTML"
+          hx-push-url="true" hx-indicator="#list-spin">
+    Daha Fazla Yükle ({{ page.number }}/{{ page.paginator.num_pages }} · {{ total }} kayıt)
+  </button>
+  {% endif %}
+</div>

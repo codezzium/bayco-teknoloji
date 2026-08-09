@@ -1,0 +1,41 @@
+{% load stock_extras %}
+<div id="expense-results" class="space-y-3">
+  {% for expense in page %}
+  <div id="expense-{{ expense.pk }}" class="card p-4 flex items-center justify-between gap-3">
+    <div class="min-w-0">
+      <div class="font-semibold truncate">{{ expense.title }}</div>
+      <div class="text-xs flex flex-wrap gap-x-3 mt-1" style="color:var(--muted)">
+        <span>{{ expense.get_kind_display }}</span>
+        <span>{{ expense.spent_on|date:"d.m.Y" }}</span>
+        {% if expense.device %}
+        <a href="{% url 'stock:device_detail' pk=expense.device.pk %}" class="hover:underline">
+          {{ expense.device.stock_code }}
+        </a>
+        {% else %}<span>Genel gider</span>{% endif %}
+        {% if expense.supplier %}<span>{{ expense.supplier.full_name }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      <span class="font-display font-extrabold">{{ expense.amount|tl }}</span>
+      <a href="{% url 'stock:expense_edit' pk=expense.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
+      <button hx-post="{% url 'stock:expense_delete' pk=expense.pk %}"
+              hx-target="#expense-{{ expense.pk }}" hx-swap="outerHTML"
+              hx-confirm="Gider silinsin mi?" class="btn btn-sm"
+              style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+    </div>
+  </div>
+  {% empty %}
+  <div class="card p-12 text-center">
+    <div class="text-4xl mb-3">💸</div>
+    <p class="font-semibold">Gider kaydı yok</p>
+  </div>
+  {% endfor %}
+
+  {% if page.has_next %}
+  <button class="btn btn-ghost btn-block"
+          hx-get="{% url 'stock:expense_list' %}?{{ qs }}&sayfa={{ page.next_page_number }}"
+          hx-target="#expense-results" hx-swap="outerHTML" hx-push-url="true">
+    Daha Fazla Yükle ({{ page.number }}/{{ page.paginator.num_pages }} · {{ total }} kayıt)
+  </button>
+  {% endif %}
+</div>

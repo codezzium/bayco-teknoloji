@@ -1,0 +1,24 @@
+{% comment %} Toplu etiket baskısı çubuğu.
+   method="get" + target="_blank": panel durumu ve çalışan kamera hayatta kalır,
+   window.print() htmx ile çakışmaz. {% endcomment %}
+<form id="lblform" method="get" action="{% url 'stock:label_print' %}" target="_blank"
+      class="fixed bottom-0 inset-x-0 z-40 glass p-3 flex flex-wrap items-center gap-2"
+      style="border-top:1px solid var(--line)"
+      x-show="sel > 0" x-cloak>
+  <span class="text-sm font-semibold" x-text="sel + ' seçili'"></span>
+  <select name="format" class="select" style="width:auto">
+    {% for key, fmt in formats.items %}
+    <option value="{{ key }}">{{ fmt.label }}</option>
+    {% endfor %}
+  </select>
+  <label class="text-sm flex items-center gap-2" style="color:var(--muted)">
+    Kopya
+    <input type="number" name="copies" value="1" min="1" max="10" class="input"
+           style="width:72px;padding:6px 10px">
+  </label>
+  <label class="text-sm flex items-center gap-2 cursor-pointer" style="color:var(--muted)">
+    <input type="checkbox" name="fiyat" value="1" class="toggle-check" checked> Fiyat yaz
+  </label>
+  <input type="hidden" name="auto" value="1">
+  <button class="btn btn-gradient btn-sm ml-auto">🖨️ Etiket Yazdır</button>
+</form>

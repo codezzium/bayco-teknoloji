@@ -1,0 +1,75 @@
+{% comment %} Yeniden kullanılabilir tarayıcı bileşeni.
+
+   Kullanım:
+     {% include "stock/partials/scanner.html" with mode='sale' target='#cart' %}
+
+   Parametreler: mode (lookup|sale|intake|count), target (htmx hedefi),
+                 swap (varsayılan outerHTML), autostart, placeholder
+
+   YERLEŞİM KURALI: bu bileşen htmx hedefinin ATASI OLAMAZ. #cart bu div'in
+   içinde olursa her swap <video> elemanını yok eder, MediaStream ölür ve her
+   üründen sonra "Kamerayı Aç"a basmak gerekir. Hedef KARDEŞ olarak render
+   edilmelidir. {% endcomment %}
+<div class="card p-4 transition"
+     x-data="baycoScanner({ autostart: {{ autostart|default_if_none:0|yesno:'true,false' }} })"
+     @bayco:scan.document="fire($event.detail.code)"
+     :style="ok ? 'box-shadow:0 0 0 3px rgba(37,211,102,.55)' : ''">
+
+  <form x-ref="form"
+        hx-post="{% url 'stock:scan_resolve' %}"
+        hx-target="{{ target|default:'#scan-result' }}"
+        hx-swap="{{ swap|default:'outerHTML' }}"
+        hx-trigger="submit, scan"
+        hx-indicator="#scan-spin"
+        @htmx:after-request="$refs.manual.value=''; $refs.code.value=''">
+    <input type="hidden" name="mode" value="{{ mode|default:'lookup' }}">
+    <input type="hidden" name="code" x-ref="code">
+    <div class="flex gap-2">
+      <input type="text" name="manual" x-ref="manual" class="input flex-1"
+             autocomplete="off" autocorrect="off" autocapitalize="characters"
+             spellcheck="false" enterkeyhint="search"
+             placeholder="{{ placeholder|default:'Stok kodu, IMEI veya barkod…' }}">
+      <button class="btn btn-gradient btn-sm shrink-0">Bul</button>
+    </div>
+  </form>
+
+  <div class="mt-3 rounded-2xl overflow-hidden relative" style="background:#000;aspect-ratio:4/3"
+       x-show="on" x-cloak>
+    <video x-ref="video" class="w-full h-full object-cover" playsinline muted autoplay></video>
+    {% comment %} Nişangâh GENİŞ ve alçaktır: EAN-13 kısa ve geniştir, kare bir çerçeve
+       1D barkodda okuma oranını belirgin biçimde düşürür. {% endcomment %}
+    <div class="absolute inset-x-6 top-1/2 -translate-y-1/2 h-24 rounded-xl pointer-events-none"
+         style="border:2px solid rgba(255,255,255,.85);box-shadow:0 0 0 9999px rgba(0,0,0,.35)"></div>
+    <div class="absolute inset-x-0 bottom-2 text-center text-xs" style="color:rgba(255,255,255,.8)">
+      Barkodu çerçeveye getirin
+    </div>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-2 mt-3">
+    <button type="button" class="btn btn-gradient btn-sm" x-show="!on" @click="start()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Kamerayı Aç
+    </button>
+    <button type="button" class="btn btn-ghost btn-sm" x-show="on" x-cloak @click="stop()">Kamerayı Kapat</button>
+    {% comment %} iOS Safari'de torch YOKTUR (getCapabilities().torch daima false) —
+       ölü kontrol göstermemek için tamamen gizlenir. {% endcomment %}
+    <button type="button" class="btn btn-ghost btn-sm" x-show="on && torchable" x-cloak
+            @click="toggleTorch()" :class="torchOn ? 'badge-brand' : ''">🔦 Işık</button>
+    <select class="select" style="width:auto;padding:6px 32px 6px 10px"
+            x-show="on && cams.length > 1" x-cloak
+            x-model="camId" @change="pickCam(camId)">
+      <template x-for="cam in cams" :key="cam.deviceId">
+        <option :value="cam.deviceId" x-text="cam.label || 'Kamera'"></option>
+      </template>
+    </select>
+    <span id="scan-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Aranıyor…</span>
+  </div>
+
+  <p class="text-sm mt-3 rounded-xl px-3 py-2" x-show="err" x-cloak x-text="err"
+     style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)"></p>
+
+  <p class="text-xs mt-2" style="color:var(--muted)">
+    USB/Bluetooth barkod okuyucu doğrudan çalışır — okutmanız yeterli, kutuya
+    tıklamanıza gerek yok.
+  </p>
+</div>

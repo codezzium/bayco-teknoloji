@@ -1,0 +1,58 @@
+{% load stock_extras %}
+<div id="device-{{ device.pk }}" class="card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+  {% comment %} form="lblform" sayesinde bu kutu htmx ile değişen bölgenin İÇİNDE durup
+     dışarıdaki etiket formuna ait olabilir. {% endcomment %}
+  <label class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
+    <input type="checkbox" name="ids" value="{{ device.pk }}" form="lblform"
+           class="toggle-check shrink-0">
+    <div class="min-w-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="font-mono text-xs px-2 py-0.5 rounded-md"
+              style="background:var(--brand-soft);color:var(--ink)">{{ device.stock_code }}</span>
+        {% include "stock/partials/status_badge.html" %}
+        {% if device.published_product.is_active %}
+        <span class="chip" style="font-size:10px">🌐 Sitede</span>
+        {% endif %}
+      </div>
+      <a href="{% url 'stock:device_detail' pk=device.pk %}"
+         class="font-semibold hover:underline block truncate mt-1">{{ device.label }}</a>
+      <div class="text-xs flex flex-wrap gap-x-3 gap-y-1 mt-1" style="color:var(--muted)">
+        <span>{{ device.get_condition_display }}</span>
+        {% if device.imei1 %}<span class="font-mono">IMEI {{ device.imei1 }}</span>{% endif %}
+        {% if device.battery_health %}<span>🔋 %{{ device.battery_health }}</span>{% endif %}
+        {% if device.shelf %}<span>📍 {{ device.shelf }}</span>{% endif %}
+        {% if device.status == 'stokta' %}<span>{{ device.age_in_days }} gündür stokta</span>{% endif %}
+        <span title="{{ device.updated_at|date:'d.m.Y H:i' }}">🕐 {{ device.updated_at|timesince }} önce</span>
+      </div>
+    </div>
+  </label>
+
+  <div class="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+    <div class="text-right">
+      {% if device.status == 'satildi' %}
+        <div class="text-sm font-semibold gradient-text">{{ device.sold_price|tl0 }}</div>
+        <div class="text-xs" style="color:var(--muted)">{{ device.sold_at|date:"d.m.Y" }}</div>
+      {% else %}
+        <div class="text-sm font-semibold gradient-text">{{ device.list_price|tl0 }}</div>
+        {% if perms.stock.view_money %}
+        <div class="text-xs" style="color:var(--muted)">Maliyet {{ device.purchase_price|tl0 }}</div>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      {% if device.is_available %}
+      <form method="post" action="{% url 'stock:sell_device' pk=device.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-gradient btn-sm" title="Sepete ekle ve kasaya git">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+          Sat
+        </button>
+      </form>
+      {% elif device.status == 'satildi' %}
+      <a href="{% url 'stock:device_detail' pk=device.pk %}#satis"
+         class="chip" style="font-size:11px">Satıldı</a>
+      {% endif %}
+      <a href="{% url 'stock:device_detail' pk=device.pk %}" class="btn btn-ghost btn-sm">Aç</a>
+    </div>
+  </div>
+</div>

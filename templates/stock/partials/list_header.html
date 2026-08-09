@@ -1,0 +1,18 @@
+{% comment %} dashboard/partials/list_header.html YENİDEN KULLANILAMAZ: o dosya
+   dashboard:crud_create URL'ini sabitliyor ve {{ items|length }} ile queryset'i
+   zorla değerlendirip sayfalamayı bozuyor. Burada sayı paginator.count'tan gelir. {% endcomment %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div>
+    <h2 class="font-display font-extrabold text-xl">{{ title }}</h2>
+    <p class="text-sm" style="color:var(--muted)">{{ total }} kayıt</p>
+  </div>
+  <div class="flex items-center gap-2">
+    {% block header_actions %}{% endblock %}
+    {% if create_url %}
+    <a href="{{ create_url }}" class="btn btn-gradient btn-sm">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Yeni {{ singular }}
+    </a>
+    {% endif %}
+  </div>
+</div>

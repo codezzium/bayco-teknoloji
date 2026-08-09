@@ -1,3 +1,10 @@
 Django>=5.1,<5.2
 Pillow>=10.0
 whitenoise>=6.6
+
+# Stok modülü — etiket üretimi (ikisi de saf Python, transitive bağımlılık yok)
+segno>=1.6,<2
+python-barcode>=0.16,<0.17
+# TruncMonth + USE_TZ: sistem tz veritabanı olmayan slim imajlarda sessizce
+# UTC'ye düşer ve akşam satışları yanlış aya yazılır.
+tzdata

@@ -1,0 +1,7 @@
+{% load stock_extras %}
+{% comment %} Cihaz durumu boolean değil, bu yüzden dashboard/partials/toggle.html
+   kullanılamaz (o dosya dashboard:crud_toggle URL'ini sabitliyor). {% endcomment %}
+{% status_tone device.status as tone %}
+<span class="chip" style="font-size:11px;background:{{ tone.0 }};color:{{ tone.1 }};border-color:{{ tone.2 }}">
+  {{ device.get_status_display }}
+</span>

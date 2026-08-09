@@ -35,7 +35,7 @@ def home(request):
         ).select_related("brand")[:4],
         "testimonials": Testimonial.objects.filter(is_active=True),
         "faqs": FAQ.objects.filter(is_active=True),
-        "brands": Brand.objects.all(),
+        "brands": Brand.objects.filter(is_public=True),
     }
     return render(request, "website/home.html", ctx)
 
@@ -60,7 +60,7 @@ def products(request):
     qs, durum, marka, q = _filtered_products(request)
     ctx = {
         "products": qs,
-        "brands": Brand.objects.all(),
+        "brands": Brand.objects.filter(is_public=True),
         "durum": durum,
         "marka": marka,
         "q": q,
@@ -100,7 +100,7 @@ def quote(request):
     if urun_id:
         prefill_product = Product.objects.filter(pk=urun_id, is_active=True).first()
     ctx = {
-        "brands": Brand.objects.all(),
+        "brands": Brand.objects.filter(is_public=True),
         "prefill_product": prefill_product,
         "default_kind": request.GET.get("mod", "sat"),
     }

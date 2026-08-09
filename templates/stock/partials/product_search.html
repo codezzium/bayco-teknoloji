@@ -1,0 +1,38 @@
+{% load stock_extras %}
+<div id="product-search" class="space-y-2">
+  {% for device in devices %}
+  <form hx-post="{% url 'stock:cart_add' %}" hx-target="#cart" hx-swap="outerHTML"
+        class="flex items-center justify-between gap-2 glass rounded-xl px-3 py-2">
+    <input type="hidden" name="kind" value="cihaz">
+    <input type="hidden" name="id" value="{{ device.pk }}">
+    <div class="min-w-0">
+      <div class="font-semibold text-sm truncate">{{ device.label }}</div>
+      <div class="text-xs font-mono" style="color:var(--muted)">{{ device.stock_code }}</div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-sm gradient-text font-semibold">{{ device.list_price|tl0 }}</span>
+      <button class="btn btn-gradient btn-sm" style="padding:4px 12px">+</button>
+    </div>
+  </form>
+  {% endfor %}
+
+  {% for accessory in accessories %}
+  <form hx-post="{% url 'stock:cart_add' %}" hx-target="#cart" hx-swap="outerHTML"
+        class="flex items-center justify-between gap-2 glass rounded-xl px-3 py-2">
+    <input type="hidden" name="kind" value="aksesuar">
+    <input type="hidden" name="id" value="{{ accessory.pk }}">
+    <div class="min-w-0">
+      <div class="font-semibold text-sm truncate">{{ accessory }}</div>
+      <div class="text-xs" style="color:var(--muted)">Stok: {{ accessory.stock_qty }} adet</div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-sm gradient-text font-semibold">{{ accessory.price|tl0 }}</span>
+      <button class="btn btn-gradient btn-sm" style="padding:4px 12px">+</button>
+    </div>
+  </form>
+  {% endfor %}
+
+  {% if q and not devices and not accessories %}
+  <p class="text-sm text-center py-3" style="color:var(--muted)">"{{ q }}" için sonuç yok.</p>
+  {% endif %}
+</div>

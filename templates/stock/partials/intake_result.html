@@ -1,0 +1,39 @@
+{% load stock_extras %}
+<div id="intake-result" class="card p-4">
+  {% if flash %}
+  <div class="rounded-xl px-3 py-2 mb-3 text-sm"
+       style="background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3)">{{ flash }}</div>
+  {% endif %}
+
+  <h3 class="font-display font-bold mb-3">Bu Oturumda Girilenler</h3>
+  {% if not recent %}
+  <p class="text-sm text-center py-8" style="color:var(--muted)">
+    Henüz ürün okutulmadı.
+  </p>
+  {% else %}
+  <div class="space-y-2">
+    {% for accessory in recent %}
+    <div class="flex items-center justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+      <div class="min-w-0">
+        <a href="{% url 'stock:accessory_detail' pk=accessory.pk %}"
+           class="font-semibold text-sm hover:underline block truncate">{{ accessory }}</a>
+        <div class="text-xs font-mono" style="color:var(--muted)">{{ accessory.barcode|default:accessory.sku }}</div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <form hx-post="{% url 'stock:intake_add' %}" hx-target="#intake-result" hx-swap="outerHTML">
+          <input type="hidden" name="accessory" value="{{ accessory.pk }}">
+          <input type="hidden" name="delta" value="-1">
+          <button class="btn btn-ghost btn-sm" style="padding:4px 10px">−</button>
+        </form>
+        <span class="font-display font-extrabold" style="min-width:36px;text-align:center">{{ accessory.stock_qty }}</span>
+        <form hx-post="{% url 'stock:intake_add' %}" hx-target="#intake-result" hx-swap="outerHTML">
+          <input type="hidden" name="accessory" value="{{ accessory.pk }}">
+          <input type="hidden" name="delta" value="1">
+          <button class="btn btn-ghost btn-sm" style="padding:4px 10px">+</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

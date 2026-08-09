@@ -8,6 +8,10 @@ class Brand(models.Model):
     slug = models.SlugField("Slug", max_length=90, unique=True, blank=True)
     logo = models.ImageField("Logo", upload_to="brands/", blank=True, null=True)
     order = models.PositiveIntegerField("Sıra", default=0)
+    is_public = models.BooleanField(
+        "Sitede Göster", default=True,
+        help_text="Kapalıysa marka yalnızca stok/panelde görünür (örn. aksesuar markaları).",
+    )
 
     class Meta:
         verbose_name = "Marka"

@@ -1,0 +1,13 @@
+{% comment %} dashboard/partials/row_actions.html kullanılamaz: dashboard:crud_edit ve
+   dashboard:crud_delete URL'lerini sabitliyor -> NoReverseMatch. {% endcomment %}
+<div class="flex items-center gap-2 shrink-0">
+  {% if edit_url %}
+  <a href="{{ edit_url }}" class="btn btn-ghost btn-sm">Düzenle</a>
+  {% endif %}
+  {% if delete_url %}
+  <button hx-post="{{ delete_url }}" hx-target="#{{ row_id }}" hx-swap="outerHTML"
+          hx-confirm="{{ confirm|default:'Silmek istediğinize emin misiniz?' }}"
+          class="btn btn-sm"
+          style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+  {% endif %}
+</div>

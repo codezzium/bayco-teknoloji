@@ -1,0 +1,13 @@
+{% comment %} dashboard/home.html'deki kart işaretlemesinden çıkarıldı.
+   Parametreler: label, value, icon, href (ops.), hint (ops.), tone (ops.) {% endcomment %}
+{% if href %}<a href="{{ href }}" class="card card-hover p-5 block">{% else %}<div class="card p-5">{% endif %}
+  <div class="flex items-center justify-between gap-3">
+    <div class="min-w-0">
+      <div class="text-xs" style="color:var(--muted)">{{ label }}</div>
+      <div class="text-2xl sm:text-3xl font-display font-extrabold mt-1 {% if tone == 'brand' %}gradient-text{% endif %}"
+           {% if tone == 'danger' %}style="color:#ff8b95"{% elif tone == 'ok' %}style="color:#7ff0ab"{% endif %}>{{ value }}</div>
+      {% if hint %}<div class="text-xs mt-1" style="color:var(--muted)">{{ hint }}</div>{% endif %}
+    </div>
+    <div class="icon-box shrink-0">{{ icon }}</div>
+  </div>
+{% if href %}</a>{% else %}</div>{% endif %}

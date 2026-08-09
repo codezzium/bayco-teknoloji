@@ -1,0 +1,181 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}{{ sale.receipt_no|default:"Satış" }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-2 text-sm mb-5" style="color:var(--muted)">
+  <a href="{% url 'stock:sale_list' %}" class="hover:text-white">Satışlar</a>
+  <span>/</span><span style="color:var(--ink)">{{ sale.receipt_no }}</span>
+</div>
+
+{% if sale.status == 'iptal' %}
+<div class="rounded-xl px-4 py-3 mb-5 text-sm"
+     style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+  Bu fiş {{ sale.voided_at|date:"d.m.Y H:i" }} tarihinde iptal edildi.
+  {% if sale.void_reason %}Sebep: {{ sale.void_reason }}{% endif %}
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-5">
+  <div class="lg:col-span-2 space-y-5">
+    <div class="card p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 class="font-display font-extrabold text-2xl">{{ sale.receipt_no }}</h2>
+          <p class="text-sm mt-1" style="color:var(--muted)">
+            {{ sale.sold_at|date:"d.m.Y H:i" }}
+            {% if sale.cashier %}· {{ sale.cashier.username }}{% endif %}
+          </p>
+        </div>
+        <a href="{% url 'stock:receipt' pk=sale.pk %}?auto=1" target="_blank"
+           class="btn btn-gradient btn-sm">🧾 Fiş Yazdır</a>
+      </div>
+
+      {% if sale.customer %}
+      <div class="glass rounded-xl px-4 py-3 mb-4">
+        <div class="text-xs" style="color:var(--muted)">Müşteri</div>
+        <a href="{% url 'stock:contact_detail' pk=sale.customer.pk %}"
+           class="font-semibold hover:underline">{{ sale.customer.full_name }}</a>
+        <span class="text-sm" style="color:var(--muted)"> · {{ sale.customer.phone }}</span>
+      </div>
+      {% endif %}
+
+      <div class="space-y-2">
+        {% for item in items %}
+        <div class="flex items-start justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm {% if item.returned_at %}line-through opacity-60{% endif %}">
+              {{ item.item_name }}{% if item.quantity > 1 %} × {{ item.quantity }}{% endif %}
+            </div>
+            <div class="text-xs font-mono" style="color:var(--muted)">
+              {{ item.item_code }}{% if item.item_imei %} · IMEI {{ item.item_imei }}{% endif %}
+            </div>
+            {% if item.returned_at %}
+            <div class="text-xs" style="color:#ff8b95">
+              İade: {{ item.returned_at|date:"d.m.Y" }}{% if item.return_reason %} — {{ item.return_reason }}{% endif %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="text-right shrink-0">
+            <div class="font-semibold">{{ item.line_total|tl }}</div>
+            {% if show_money %}
+            <div class="text-xs" style="color:var(--muted)">kâr {{ item.line_profit|tl0 }}</div>
+            {% endif %}
+            {% if not item.returned_at and sale.status != 'iptal' %}
+            <form method="post" action="{% url 'stock:sale_item_return' pk=sale.pk item_id=item.pk %}"
+                  class="mt-1" onsubmit="return confirm('{{ item.item_name }} iade edilsin mi?')">
+              {% csrf_token %}
+              <input type="hidden" name="refund" value="1">
+              <button class="text-xs hover:underline" style="color:#ff8b95">İade et</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+
+        {% for trade in trade_ins %}
+        <div class="flex items-center justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm">↩️ Takas alınan cihaz</div>
+            <a href="{% url 'stock:device_detail' pk=trade.device.pk %}"
+               class="text-xs hover:underline" style="color:var(--muted)">
+              {{ trade.device.stock_code }} · {{ trade.device.label }}
+            </a>
+          </div>
+          <span class="font-semibold" style="color:#ffd48a">− {{ trade.amount|tl }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-4 pt-4 space-y-1.5 text-sm" style="border-top:1px solid var(--line)">
+        <div class="flex justify-between">
+          <span style="color:var(--muted)">Fiş tutarı (ciro)</span><span>{{ sale.grand_total|tl }}</span>
+        </div>
+        {% if sale.trade_in_total %}
+        <div class="flex justify-between">
+          <span style="color:var(--muted)">Takas mahsubu</span>
+          <span style="color:#ffd48a">− {{ sale.trade_in_total|tl }}</span>
+        </div>
+        {% endif %}
+        <div class="flex justify-between font-semibold">
+          <span>Tahsil edilecek</span><span>{{ sale.payable_total|tl }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span style="color:var(--muted)">Tahsil edilen</span><span>{{ sale.paid_total|tl }}</span>
+        </div>
+        <div class="flex justify-between text-lg font-display font-extrabold pt-2"
+             style="border-top:1px solid var(--line)">
+          <span>Kalan Borç</span>
+          <span style="color:{% if sale.balance > 0 %}#ffd48a{% elif sale.balance < 0 %}#ff8b95{% else %}#7ff0ab{% endif %}">
+            {{ sale.balance|tl }}
+          </span>
+        </div>
+        {% if show_money %}
+        <div class="flex justify-between text-xs pt-1" style="color:var(--muted)">
+          <span>Brüt kâr</span><span>{{ sale.gross_profit|tl }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-5">
+    <!-- Tahsilat -->
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Tahsilat / İade</h3>
+      <div class="space-y-2 text-sm mb-4">
+        {% for payment in payments %}
+        <div class="flex items-center justify-between gap-2 py-1.5" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <span class="font-semibold" style="color:{% if payment.kind == 'iade' %}#ff8b95{% else %}#7ff0ab{% endif %}">
+              {% if payment.kind == 'iade' %}−{% else %}+{% endif %}{{ payment.amount|tl0 }}
+            </span>
+            <span class="text-xs ml-1" style="color:var(--muted)">{{ payment.get_method_display }}</span>
+          </div>
+          <span class="text-xs shrink-0" style="color:var(--muted)">{{ payment.paid_at|date:"d.m.Y" }}</span>
+        </div>
+        {% empty %}<p style="color:var(--muted)">Ödeme kaydı yok.</p>{% endfor %}
+      </div>
+
+      {% if sale.status != 'iptal' %}
+      <form method="post" action="{% url 'stock:sale_payment' pk=sale.pk %}" class="space-y-2">
+        {% csrf_token %}
+        {% for field in payment_form %}
+        <div class="field" style="margin:0">
+          <label class="label">{{ field.label }}</label>
+          {{ field }}
+        </div>
+        {% endfor %}
+        <button class="btn btn-gradient btn-sm btn-block">Ödeme Kaydet</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if sale.due_date %}
+    <div class="card p-5 text-sm">
+      <span style="color:var(--muted)">Vade Tarihi</span>
+      <div class="font-semibold {% if sale.is_overdue %}text-red-300{% endif %}"
+           {% if sale.is_overdue %}style="color:#ff8b95"{% endif %}>
+        {{ sale.due_date|date:"d.m.Y" }}{% if sale.is_overdue %} · Vadesi geçti{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if sale.status != 'iptal' and perms.stock.view_money %}
+    <form method="post" action="{% url 'stock:sale_void' pk=sale.pk %}" class="card p-5"
+          onsubmit="return confirm('Fiş iptal edilecek: tüm kalemler iade olacak, cihazlar stoğa dönecek, tahsilat geri ödenecek. Emin misiniz?')">
+      {% csrf_token %}
+      <h3 class="font-display font-bold mb-2">Fişi İptal Et</h3>
+      <p class="text-xs mb-3" style="color:var(--muted)">
+        Fiş silinmez, iptal işaretlenir. Tüm stok ve para hareketleri geri alınır.
+      </p>
+      <input type="text" name="reason" class="input mb-2" placeholder="İptal sebebi">
+      <button class="btn btn-sm btn-block"
+              style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+        Fişi İptal Et
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

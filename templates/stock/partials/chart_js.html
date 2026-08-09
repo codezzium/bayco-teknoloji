@@ -1,0 +1,75 @@
+{% comment %} Chart.js YALNIZCA bu iki sayfada yüklenir; diğer 8 panel sayfası
+   kullanmadığı bir grafik için ~68 KB ödememelidir. {% endcomment %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  function draw() {
+    var canvas = document.getElementById("revenue-chart");
+    var dataEl = document.getElementById("stock-chart-data");
+    if (!canvas || !dataEl || typeof Chart === "undefined") return;
+
+    // htmx swap'ından sonra eski örnek koparılmış canvas'a bağlı kalır ve
+    // hover işleyicileri birikir; yeniden çizmeden önce mutlaka yok edilmeli.
+    var existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
+
+    var d = JSON.parse(dataEl.textContent);
+
+    Chart.defaults.color = "#b9a9cf";                     // --muted
+    Chart.defaults.borderColor = "rgba(255,255,255,.09)"; // --line
+    Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+
+    var ctx = canvas.getContext("2d");
+    var fill = ctx.createLinearGradient(0, 0, 0, 300);
+    fill.addColorStop(0, "rgba(180,53,127,.45)");
+    fill.addColorStop(1, "rgba(180,53,127,0)");
+    var TRY = new Intl.NumberFormat("tr-TR",
+      { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
+
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: d.labels,
+        datasets: [
+          // --brand bir GRADIENT'tir, renk değil; seriler ham duraklarla çizilir.
+          { label: "Ciro", data: d.revenue, borderColor: "#b4357f",
+            backgroundColor: fill, fill: true, tension: .35, borderWidth: 2,
+            pointRadius: 3, pointHoverRadius: 6 },
+          { label: "Kâr", data: d.profit, borderColor: "#7a3ea6",
+            backgroundColor: "transparent", fill: false, tension: .35,
+            borderWidth: 2, borderDash: [5, 4], pointRadius: 0, pointHoverRadius: 5 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { usePointStyle: true, boxWidth: 8 } },
+          tooltip: {
+            backgroundColor: "rgba(21,12,34,.95)",
+            borderColor: "rgba(255,255,255,.12)", borderWidth: 1,
+            padding: 10, cornerRadius: 12,
+            callbacks: {
+              label: function (c) { return c.dataset.label + ": " + TRY.format(c.parsed.y); }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, border: { display: false },
+               ticks: { callback: function (v) { return TRY.format(v); } } }
+        }
+      }
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", draw);
+  // static/js/app.js panelde yüklü olmadığı için yeniden çizim dinleyicisi
+  // burada kaydedilir.
+  document.body.addEventListener("htmx:afterSwap", function (e) {
+    if (e.target && e.target.querySelector && e.target.querySelector("#revenue-chart")) {
+      draw();
+    }
+  });
+})();
+</script>

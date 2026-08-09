@@ -23,10 +23,12 @@
 <div class="min-h-screen lg:grid" style="grid-template-columns:264px 1fr">
 
   <!-- Sidebar -->
-  <aside class="fixed lg:static inset-y-0 left-0 z-50 w-64 transition-transform lg:translate-x-0"
+  {% comment %} flex-col + overflow-y-auto: MAĞAZA bölümüyle birlikte menü uzadı, sabit
+     konumlu alt blok kullanılırsa son maddeler ekrandan taşar. {% endcomment %}
+  <aside class="fixed lg:sticky lg:top-0 inset-y-0 left-0 z-50 w-64 lg:h-screen flex flex-col transition-transform lg:translate-x-0"
          :class="sidebar ? 'translate-x-0' : '-translate-x-full'"
          style="background:rgba(21,12,34,.96);border-right:1px solid var(--line);backdrop-filter:blur(12px)">
-    <div class="p-5 flex items-center gap-3 border-b" style="border-color:var(--line)">
+    <div class="p-5 flex items-center gap-3 border-b shrink-0" style="border-color:var(--line)">
       <img src="{% static 'img/logo.png' %}" class="brand-logo" alt="logo">
       <div>
         <div class="font-display font-extrabold leading-none">{{ site.brand_name }}</div>
@@ -34,9 +36,26 @@
       </div>
     </div>
 
-    <nav class="p-3 flex flex-col gap-1 text-sm">
+    <nav class="p-3 flex-1 min-h-0 overflow-y-auto flex flex-col gap-1 text-sm">
       {% include "dashboard/partials/nav_link.html" with url='dashboard:home' key='home' label='Genel Bakış' icon='grid' %}
       {% include "dashboard/partials/nav_link.html" with url='dashboard:leads' key='talepler' label='Talepler' icon='inbox' %}
+
+      {% comment %} Stok modülü: nav_link'in url= biçimi kullanılır. crud=1 dashboard'un
+         CRUD kayıt defterine bakar ve stok rotaları orada değildir. {% endcomment %}
+      <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">MAĞAZA</div>
+      {% include "dashboard/partials/nav_link.html" with url='stock:scan' key='tara' label='Barkod Tara' icon='scan' %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:pos' key='satis' label='Satış (Kasa)' icon='cart' %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:device_list' key='cihazlar' label='Cihazlar' icon='box' %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:accessory_list' key='aksesuarlar' label='Aksesuarlar' icon='layers' %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:sale_list' key='satislar' label='Satışlar' icon='receipt' %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:contact_list' key='cariler' label='Cariler' icon='users' %}
+      {% if perms.stock.view_money %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:expense_list' key='giderler' label='Giderler' icon='wallet' %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:reports' key='rapor' label='Raporlar' icon='chart' %}
+      {% endif %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:intake' key='giris' label='Stok Girişi' icon='download' %}
+      {% include "dashboard/partials/nav_link.html" with url='stock:stocktake' key='sayim' label='Sayım' icon='clipboard' %}
+
       <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">İÇERİK</div>
       {% include "dashboard/partials/nav_link.html" with key='duyurular' label='Duyurular / Slider' icon='image' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='urunler' label='Ürünler' icon='phone' crud=1 %}
@@ -47,7 +66,7 @@
       {% include "dashboard/partials/nav_link.html" with url='dashboard:settings' key='ayarlar' label='Site Ayarları' icon='settings' %}
     </nav>
 
-    <div class="p-3 mt-auto absolute bottom-0 left-0 right-0">
+    <div class="p-3 shrink-0 border-t" style="border-color:var(--line)">
       <a href="{% url 'website:home' %}" target="_blank" class="btn btn-ghost btn-sm btn-block mb-2">↗ Siteyi Gör</a>
       <a href="{% url 'dashboard:logout' %}" class="btn btn-sm btn-block" style="background:rgba(226,58,72,.15);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Çıkış Yap</a>
     </div>

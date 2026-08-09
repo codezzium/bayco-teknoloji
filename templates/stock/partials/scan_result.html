@@ -1,0 +1,32 @@
+{% load stock_extras %}
+{% comment %} Bulunamadı durumunda view 404 DEĞİL 200 döner: htmx 1.9 2xx dışındaki
+   yanıtları swap etmez ve kullanıcı ekranda hiçbir şeyin olmadığını görür. {% endcomment %}
+<div id="scan-result">
+  {% if found %}
+    <div class="card p-4 flex items-start gap-3"
+         style="border-color:rgba(37,211,102,.35)">
+      <span class="text-2xl">✅</span>
+      <div class="min-w-0 flex-1">
+        <div class="font-semibold">{{ code }}</div>
+        {% if message %}<p class="text-sm mt-1" style="color:var(--muted)">{{ message }}</p>{% endif %}
+        {% if device %}
+        <a href="{% url 'stock:device_detail' pk=device.pk %}" class="btn btn-ghost btn-sm mt-3">
+          Cihaz kartını aç
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="card p-5 text-center" style="border-color:rgba(226,58,72,.35)">
+      <div class="text-3xl mb-2">🔍</div>
+      <p class="font-semibold">Bu kodla kayıt bulunamadı</p>
+      <p class="text-sm mt-1 font-mono" style="color:var(--muted)">{{ code|default:"(boş)" }}</p>
+      <div class="flex flex-wrap gap-2 justify-center mt-4">
+        <a href="{% url 'stock:device_create' %}?imei={{ code|urlencode }}"
+           class="btn btn-gradient btn-sm">Bu IMEI ile cihaz ekle</a>
+        <a href="{% url 'stock:accessory_create' %}?barkod={{ code|urlencode }}"
+           class="btn btn-ghost btn-sm">Bu barkodla aksesuar ekle</a>
+      </div>
+    </div>
+  {% endif %}
+</div>

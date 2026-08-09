@@ -1,0 +1,98 @@
+{% load static stock_extras %}<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Fiş {{ sale.receipt_no }}</title>
+{% comment %} Bağımsız sayfa — dashboard/base.html extend EDİLMEZ: o şablonun koyu arka
+   planı ve tam ekran gradient'i siyah sayfa bastırır. {% endcomment %}
+<style>
+  @page { size: 58mm auto; margin: 0; }
+  html, body { margin:0; padding:0; background:#fff; color:#000;
+               font-family: "Courier New", monospace; font-size: 10pt; }
+  .receipt { width: 58mm; padding: 3mm; box-sizing: border-box; }
+  h1 { font-size: 12pt; text-align:center; margin:0 0 1mm; letter-spacing:.5px; }
+  .sub { text-align:center; font-size:8pt; margin-bottom:2mm; }
+  hr { border:0; border-top:1px dashed #000; margin:2mm 0; }
+  .row { display:flex; justify-content:space-between; gap:2mm; font-size:9pt; }
+  .row .r { text-align:right; white-space:nowrap; }
+  .item { margin-bottom:1.5mm; }
+  .item .name { font-size:9pt; }
+  .item .meta { font-size:7.5pt; }
+  .total { font-size:11pt; font-weight:bold; }
+  .foot { text-align:center; font-size:7.5pt; margin-top:3mm; }
+  @media screen {
+    body { background:#2a1b40; padding:24px; }
+    .receipt { background:#fff; margin:0 auto; box-shadow:0 10px 40px rgba(0,0,0,.55); }
+    .bar { text-align:center; margin-bottom:16px; }
+    .bar button, .bar a { font:600 14px system-ui,sans-serif; padding:9px 18px;
+      border-radius:999px; border:0; cursor:pointer; text-decoration:none;
+      background:#b4357f; color:#fff; margin:0 4px; display:inline-block; }
+    .bar a { background:rgba(255,255,255,.15); }
+  }
+  @media print { .no-print { display:none !important; } }
+</style>
+</head>
+<body>
+<div class="bar no-print">
+  <button onclick="window.print()">Yazdır</button>
+  <a href="{% url 'stock:sale_detail' pk=sale.pk %}">Geri</a>
+</div>
+
+<div class="receipt">
+  <h1>{{ site.brand_name|default:"BAYÇO TEKNOLOJİ" }}</h1>
+  <div class="sub">
+    {% if site.phone %}{{ site.phone }}<br>{% endif %}
+    {% if site.address %}{{ site.address }}{% endif %}
+  </div>
+  <hr>
+  <div class="row"><span>Fiş No</span><span class="r">{{ sale.receipt_no }}</span></div>
+  <div class="row"><span>Tarih</span><span class="r">{{ sale.sold_at|date:"d.m.Y H:i" }}</span></div>
+  {% if sale.customer %}
+  <div class="row"><span>Müşteri</span><span class="r">{{ sale.customer.full_name }}</span></div>
+  {% endif %}
+  <hr>
+
+  {% for item in items %}
+  <div class="item">
+    <div class="name">{{ item.item_name }}</div>
+    <div class="row meta">
+      <span>{% if item.quantity > 1 %}{{ item.quantity }} × {{ item.unit_price|tl }}{% else %}{{ item.item_code }}{% endif %}</span>
+      <span class="r">{{ item.line_total|tl }}</span>
+    </div>
+    {% if item.item_imei %}<div class="meta">IMEI: {{ item.item_imei }}</div>{% endif %}
+  </div>
+  {% endfor %}
+
+  <hr>
+  <div class="row"><span>Ara Toplam</span><span class="r">{{ sale.grand_total|tl }}</span></div>
+  {% for trade in trade_ins %}
+  <div class="row"><span>Takas ({{ trade.device.stock_code }})</span>
+    <span class="r">- {{ trade.amount|tl }}</span></div>
+  {% endfor %}
+  <div class="row total"><span>TOPLAM</span><span class="r">{{ sale.payable_total|tl }}</span></div>
+
+  {% for payment in payments %}
+  <div class="row"><span>{{ payment.get_method_display }}{% if payment.kind == 'iade' %} (iade){% endif %}</span>
+    <span class="r">{% if payment.kind == 'iade' %}-{% endif %}{{ payment.amount|tl }}</span></div>
+  {% endfor %}
+  {% if sale.balance > 0 %}
+  <div class="row total"><span>KALAN</span><span class="r">{{ sale.balance|tl }}</span></div>
+  {% if sale.due_date %}
+  <div class="row"><span>Vade</span><span class="r">{{ sale.due_date|date:"d.m.Y" }}</span></div>
+  {% endif %}
+  {% endif %}
+
+  <hr>
+  <div class="foot">
+    {% for item in items %}{% if item.item_imei %}
+      {{ item.item_name }} — garanti kapsamı için bu fişi saklayınız.<br>
+    {% endif %}{% endfor %}
+    Bizi tercih ettiğiniz için teşekkürler.
+  </div>
+</div>
+
+{% if auto %}
+<script>window.addEventListener("load", function () { setTimeout(window.print, 250); });</script>
+{% endif %}
+</body>
+</html>

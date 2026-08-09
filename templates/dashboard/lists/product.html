@@ -12,11 +12,24 @@
       {% if item.cover %}<img src="{{ item.cover.url }}" class="w-full h-full object-cover" alt="">{% else %}<span class="text-2xl">📱</span>{% endif %}
     </div>
     <div class="min-w-0 flex-1">
-      <div class="font-semibold truncate">{{ item.name }}</div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="font-semibold truncate">{{ item.name }}</span>
+        {% if item.source_device %}
+        <a href="{% url 'stock:device_detail' pk=item.source_device.pk %}"
+           class="chip" style="font-size:10px;background:var(--brand-soft)"
+           title="Bu ilan stoktaki bir cihazdan üretildi">
+          📦 {{ item.source_device.stock_code }}
+        </a>
+        {% endif %}
+      </div>
       <div class="text-xs flex flex-wrap gap-2 mt-1" style="color:var(--muted)">
         <span>{{ item.brand.name|default:"Markasız" }}</span>·
         <span>{{ item.get_condition_display }}</span>·
         <span class="gradient-text font-semibold">{{ item.price_display }}</span>
+        {% if item.source_device %}·
+        <span style="color:#ffd48a">Stoktan yönetiliyor — buradaki düzenleme
+          cihaz yeniden yayınlanınca geri yazılır</span>
+        {% endif %}
       </div>
     </div>
     <div class="flex items-center gap-2 flex-wrap">

@@ -1,0 +1,70 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% comment %} dashboard/form.html yeniden kullanılamaz: breadcrumb ve "Vazgeç" bağlantısı
+   dashboard:crud_list URL'ini sabitliyor. Geniş alan tespiti de burada string
+   içerme hilesi yerine widget tipine bakar. {% endcomment %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <div class="flex items-center gap-2 text-sm mb-5" style="color:var(--muted)">
+    <a href="{{ back_url }}" class="hover:text-white">{{ title }}</a>
+    <span>/</span>
+    <span style="color:var(--ink)">{% if is_edit %}Düzenle{% else %}Yeni {{ singular }}{% endif %}</span>
+  </div>
+
+  {% if duplicate %}
+  <div class="card p-4 mb-4" style="border-color:rgba(245,180,60,.4)">
+    <p class="text-sm" style="color:#ffd48a">
+      Bu telefon numarası zaten kayıtlı:
+      <a href="{% url 'stock:contact_detail' pk=duplicate.pk %}" class="underline">{{ duplicate.full_name }}</a>.
+      Aynı kişiyse yeni kayıt açmak yerine mevcut kaydı kullanın.
+    </p>
+  </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="card p-6" novalidate>
+    {% csrf_token %}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+    {% if form.non_field_errors %}
+    <div class="rounded-xl px-4 py-3 mb-4 text-sm"
+         style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+      {{ form.non_field_errors|striptags }}
+    </div>
+    {% endif %}
+
+    <div class="grid sm:grid-cols-2 gap-x-5">
+      {% for field in form %}
+        {% if field|is_hidden_widget %}
+          {{ field }}
+        {% else %}
+        <div class="field {% if field|is_checkbox %}flex items-center gap-3{% elif field|is_wide %}sm:col-span-2{% endif %}">
+          {% if field|is_checkbox %}
+            <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+              {{ field }}
+              <span class="label" style="margin:0">{{ field.label }}</span>
+            </label>
+          {% else %}
+            <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+          {% endif %}
+          {% if field.help_text %}<p class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text|safe }}</p>{% endif %}
+          {% if field.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ field.errors|striptags }}</p>{% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <datalist id="garanti-onerileri">
+      <option value="0"><option value="3"><option value="6">
+      <option value="12"><option value="18"><option value="24"><option value="36">
+    </datalist>
+
+    <div class="flex items-center gap-3 mt-5 pt-5" style="border-top:1px solid var(--line)">
+      <button class="btn btn-gradient">Kaydet</button>
+      <a href="{{ back_url }}" class="btn btn-ghost">Vazgeç</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

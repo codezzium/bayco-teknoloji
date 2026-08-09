@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "apps.leads",
     "apps.website",
     "apps.dashboard",
+    "apps.stock",
 ]
 
 MIDDLEWARE = [
@@ -78,10 +79,20 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
+#
+# transaction_mode="IMMEDIATE" stok modülü için zorunlu: her servis fonksiyonu
+# transaction içinde oku-sonra-yaz yapıyor ve SQLite'ın DEFERRED varsayılanında
+# iki eşzamanlı okutma "database is locked" üretir. IMMEDIATE yazma kilidini
+# BEGIN anında alır. WAL, panel yazarken sitenin okumaya devam etmesini sağlar.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        "OPTIONS": {
+            "init_command": "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
+            "transaction_mode": "IMMEDIATE",
+            "timeout": 20,
+        },
     }
 }
 
@@ -127,3 +138,23 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "dashboard:login"
 LOGIN_REDIRECT_URL = "dashboard:home"
 LOGOUT_REDIRECT_URL = "dashboard:login"
+
+
+# Güvenlik (üretim)
+#
+# Kamera ile barkod okutma YALNIZCA güvenli bağlamda (https:// veya localhost)
+# çalışır — http://192.168.x.x üzerinde navigator.mediaDevices tanımsızdır.
+# TLS sonlandıran bir proxy (Caddy/nginx) arkasında SECURE_PROXY_SSL_HEADER
+# ayarlanmadan SECURE_SSL_REDIRECT açılırsa sonsuz yönlendirme döngüsü olur.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"

@@ -1,0 +1,114 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Stok Genel Bakış{% endblock %}
+
+{% block content %}
+{% comment %} URL'ler {% url %} ile çözülür; sabit "/panel/stok/…" yazılırsa montaj
+   noktası değiştiğinde sessizce kırılır. {% endcomment %}
+{% url 'stock:device_list' as devices_url %}
+{% url 'stock:accessory_list' as accessories_url %}
+{% url 'stock:sale_list' as sales_url %}
+
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+  {% include "stock/partials/kpi_card.html" with label="Stoktaki Cihaz" value=kpis.devices_in_stock icon="📱" href=devices_url|add:"?durum=stokta" %}
+  {% include "stock/partials/kpi_card.html" with label="Aksesuar Adedi" value=kpis.accessory_units icon="📦" href=accessories_url %}
+  {% if show_money %}
+  {% include "stock/partials/kpi_card.html" with label="Bugünkü Ciro" value=kpis.revenue_today|tl0 icon="💰" tone="brand" hint=kpis.sales_today|stringformat:"s"|add:" satış" %}
+  {% include "stock/partials/kpi_card.html" with label="Bu Ay Net Kâr" value=kpis.net_month|tl0 icon="📈" tone="brand" hint=kpis.margin_month|pct|add:" net marj" %}
+  {% else %}
+  {% include "stock/partials/kpi_card.html" with label="Bugünkü Satış" value=kpis.sales_today icon="🧾" href=sales_url %}
+  {% include "stock/partials/kpi_card.html" with label="Kritik Stok" value=kpis.low_stock_count icon="⚠️" href=accessories_url|add:"?filtre=kritik" %}
+  {% endif %}
+</div>
+
+{% if show_money %}
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+  {% include "stock/partials/kpi_card.html" with label="Bağlı Sermaye" value=kpis.capital|tl0 icon="🏦" hint="Stoktaki malın maliyeti" %}
+  {% include "stock/partials/kpi_card.html" with label="Tahsil Edilmemiş" value=kpis.receivables|tl0 icon="⏳" tone="danger" href=sales_url|add:"?filtre=acik" hint=kpis.overdue_count|stringformat:"s"|add:" fiş vadesi geçmiş" %}
+  {% include "stock/partials/kpi_card.html" with label="Kritik Stok" value=kpis.low_stock_count icon="⚠️" href=accessories_url|add:"?filtre=kritik" %}
+  {% include "stock/partials/kpi_card.html" with label="Garantisi Bitiyor" value=kpis.expiring_warranty_count icon="🛡️" hint="30 gün içinde" %}
+</div>
+
+<div class="card p-5 mb-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-display font-bold">Ciro ve Kâr (12 Ay)</h2>
+    <a href="{% url 'stock:reports' %}" class="text-sm hover:text-white" style="color:var(--muted)">Detaylı rapor →</a>
+  </div>
+  <div style="height:300px"><canvas id="revenue-chart"></canvas></div>
+</div>
+{% endif %}
+
+<div class="grid gap-5 lg:grid-cols-{% if show_money %}3{% else %}2{% endif %}">
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-display font-bold">Kritik Stok</h2>
+      <a href="{% url 'stock:accessory_list' %}?filtre=kritik" class="text-sm" style="color:var(--muted)">Tümü →</a>
+    </div>
+    <div class="space-y-2 text-sm">
+      {% for accessory in low_stock %}
+      <a href="{% url 'stock:accessory_detail' pk=accessory.pk %}"
+         class="flex items-center justify-between gap-2 py-1.5 block" style="border-bottom:1px solid var(--line)">
+        <span class="truncate">{{ accessory }}</span>
+        <span class="shrink-0 font-semibold" style="color:#ffd48a">{{ accessory.stock_qty }}</span>
+      </a>
+      {% empty %}<p style="color:var(--muted)">Kritik seviyede ürün yok. 👍</p>{% endfor %}
+    </div>
+    {% if negative_stock %}
+    <div class="mt-4 pt-3" style="border-top:1px solid var(--line)">
+      <p class="text-xs mb-2" style="color:#ff8b95">Eksiye düşmüş — düzeltilmeli</p>
+      {% for accessory in negative_stock %}
+      <a href="{% url 'stock:accessory_detail' pk=accessory.pk %}"
+         class="flex items-center justify-between gap-2 py-1 text-sm block">
+        <span class="truncate">{{ accessory }}</span>
+        <span style="color:#ff8b95">{{ accessory.stock_qty }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-3">Garantisi Bitmek Üzere</h2>
+    <div class="space-y-2 text-sm">
+      {% for device in expiring %}
+      <a href="{% url 'stock:device_detail' pk=device.pk %}"
+         class="flex items-center justify-between gap-2 py-1.5 block" style="border-bottom:1px solid var(--line)">
+        <div class="min-w-0">
+          <div class="truncate">{{ device.label }}</div>
+          <div class="text-xs" style="color:var(--muted)">{{ device.sold_to.full_name|default:"—" }}</div>
+        </div>
+        <span class="shrink-0 text-xs">{{ device.warranty_end|date:"d.m.Y" }}</span>
+      </a>
+      {% empty %}<p style="color:var(--muted)">Yaklaşan garanti bitişi yok.</p>{% endfor %}
+    </div>
+  </div>
+
+  {% if show_money %}
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-display font-bold">Vadesi Geçen</h2>
+      <a href="{% url 'stock:sale_list' %}?filtre=vadesi" class="text-sm" style="color:var(--muted)">Tümü →</a>
+    </div>
+    <div class="space-y-2 text-sm">
+      {% for sale in overdue %}
+      <a href="{% url 'stock:sale_detail' pk=sale.pk %}"
+         class="flex items-center justify-between gap-2 py-1.5 block" style="border-bottom:1px solid var(--line)">
+        <div class="min-w-0">
+          <div class="truncate">{{ sale.customer.full_name|default:"—" }}</div>
+          <div class="text-xs" style="color:var(--muted)">{{ sale.due_date|date:"d.m.Y" }}</div>
+        </div>
+        <span class="shrink-0 font-semibold" style="color:#ff8b95">{{ sale.balance|tl0 }}</span>
+      </a>
+      {% empty %}<p style="color:var(--muted)">Vadesi geçen borç yok. 👍</p>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block stock_scripts %}
+{% if show_money %}
+{{ chart|json_script:"stock-chart-data" }}
+{% include "stock/partials/chart_js.html" %}
+{% endif %}
+{% endblock %}

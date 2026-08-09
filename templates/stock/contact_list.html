@@ -1,0 +1,40 @@
+{% extends "stock/base_stock.html" %}
+{% block page_title %}Cariler{% endblock %}
+
+{% block content %}
+{% include "stock/partials/list_header.html" %}
+
+<div id="contact-filters" class="glass rounded-2xl p-4 mb-5" x-data="{ rol: '{{ rol }}' }">
+  <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+    <div class="lg:w-96">
+      <input type="search" name="q" value="{{ q }}" class="input"
+             placeholder="Ad, telefon, firma, TCKN ara…" autocomplete="off"
+             hx-get="{% url 'stock:contact_list' %}"
+             hx-trigger="keyup changed delay:350ms, search"
+             hx-include="#contact-filters"
+             hx-target="#contact-results" hx-swap="outerHTML"
+             hx-push-url="true" hx-indicator="#list-spin">
+    </div>
+    <span id="list-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Yükleniyor…</span>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 mt-4 pt-4" style="border-top:1px solid var(--line)">
+    <label class="filter-chip cursor-pointer" :class="rol === '' ? 'active' : ''" @click="rol=''">
+      <input type="radio" name="rol" value="" class="sr-only" {% if not rol %}checked{% endif %}
+             hx-get="{% url 'stock:contact_list' %}" hx-include="#contact-filters"
+             hx-target="#contact-results" hx-swap="outerHTML" hx-push-url="true"> Tümü
+    </label>
+    <label class="filter-chip cursor-pointer" :class="rol === 'musteri' ? 'active' : ''" @click="rol='musteri'">
+      <input type="radio" name="rol" value="musteri" class="sr-only" {% if rol == 'musteri' %}checked{% endif %}
+             hx-get="{% url 'stock:contact_list' %}" hx-include="#contact-filters"
+             hx-target="#contact-results" hx-swap="outerHTML" hx-push-url="true"> Müşteriler
+    </label>
+    <label class="filter-chip cursor-pointer" :class="rol === 'tedarikci' ? 'active' : ''" @click="rol='tedarikci'">
+      <input type="radio" name="rol" value="tedarikci" class="sr-only" {% if rol == 'tedarikci' %}checked{% endif %}
+             hx-get="{% url 'stock:contact_list' %}" hx-include="#contact-filters"
+             hx-target="#contact-results" hx-swap="outerHTML" hx-push-url="true"> Tedarikçiler
+    </label>
+  </div>
+</div>
+
+{% include "stock/partials/contact_rows.html" %}
+{% endblock %}

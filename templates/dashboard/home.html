@@ -1,8 +1,72 @@
 {% extends "dashboard/base.html" %}
+{% load stock_extras %}
 {% block page_title %}Genel Bakış{% endblock %}
 
 {% block content %}
-<!-- İstatistik kartları -->
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+  <a href="{% url 'stock:pos' %}" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Kasa</div>
+        <div class="text-xl font-display font-extrabold gradient-text mt-1">Satış Yap</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">Barkod okut, sat</div>
+      </div>
+      <div class="icon-box">🛒</div>
+    </div>
+  </a>
+  <a href="{% url 'stock:device_list' %}?durum=stokta" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Stoktaki Cihaz</div>
+        <div class="text-3xl font-display font-extrabold mt-1">{{ stock.devices_in_stock }}</div>
+      </div>
+      <div class="icon-box">📱</div>
+    </div>
+  </a>
+  {% if show_money %}
+  <a href="{% url 'stock:reports' %}" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Bugünkü Ciro</div>
+        <div class="text-3xl font-display font-extrabold gradient-text mt-1">{{ stock.revenue_today|tl0 }}</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">{{ stock.sales_today }} satış</div>
+      </div>
+      <div class="icon-box">💰</div>
+    </div>
+  </a>
+  <a href="{% url 'stock:sale_list' %}?filtre=acik" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Tahsil Edilmemiş</div>
+        <div class="text-3xl font-display font-extrabold mt-1" style="color:#ffd48a">{{ stock.receivables|tl0 }}</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">{{ stock.overdue_count }} fiş vadesi geçmiş</div>
+      </div>
+      <div class="icon-box">⏳</div>
+    </div>
+  </a>
+  {% else %}
+  <a href="{% url 'stock:accessory_list' %}?filtre=kritik" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Kritik Stok</div>
+        <div class="text-3xl font-display font-extrabold mt-1">{{ stock.low_stock_count }}</div>
+      </div>
+      <div class="icon-box">⚠️</div>
+    </div>
+  </a>
+  <a href="{% url 'stock:scan' %}" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Barkod</div>
+        <div class="text-xl font-display font-extrabold mt-1">Tara</div>
+      </div>
+      <div class="icon-box">📷</div>
+    </div>
+  </a>
+  {% endif %}
+</div>
+
+<div class="text-xs font-semibold mb-3" style="color:var(--muted)">SİTE İÇERİĞİ</div>
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-8">
   <a href="{% url 'dashboard:leads' %}?tab=quote" class="card card-hover p-5">
     <div class="flex items-center justify-between">

@@ -1,0 +1,167 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Raporlar{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div>
+    <h2 class="font-display font-extrabold text-xl">Raporlar</h2>
+    <p class="text-sm" style="color:var(--muted)">{{ start|date:"d.m.Y" }} — {{ end|date:"d.m.Y" }}</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    {% for key, item in periods.items %}
+    <a href="?donem={{ key }}" class="filter-chip {% if period == key %}active{% endif %}">{{ item.0 }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+  {% include "stock/partials/kpi_card.html" with label="Ciro" value=totals.revenue|tl0 icon="💰" tone="brand" hint=totals.lines|stringformat:"s"|add:" kalem" %}
+  {% include "stock/partials/kpi_card.html" with label="Brüt Kâr" value=totals.gross|tl0 icon="📊" hint=totals.margin|pct|add:" brüt marj" %}
+  {% include "stock/partials/kpi_card.html" with label="Net Kâr" value=totals.net|tl0 icon="📈" tone="brand" hint=totals.net_margin|pct|add:" net marj" %}
+  {% include "stock/partials/kpi_card.html" with label="Giderler" value=totals.expenses.total|tl0 icon="💸" tone="danger" hint="Tamir + genel" %}
+</div>
+
+<div class="card p-5 mb-6">
+  <h2 class="font-display font-bold mb-4">Ciro ve Kâr (12 Ay)</h2>
+  <div style="height:320px"><canvas id="revenue-chart"></canvas></div>
+</div>
+
+<div class="grid gap-5 lg:grid-cols-2 mb-6">
+  <!-- Kâr dökümü -->
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-3">Kâr Dökümü</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span style="color:var(--muted)">Ciro</span><span>{{ totals.revenue|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Ürün maliyeti</span><span>− {{ totals.cost|tl }}</span></div>
+      <div class="flex justify-between font-semibold pt-2" style="border-top:1px solid var(--line)">
+        <span>Brüt kâr</span><span>{{ totals.gross|tl }}</span>
+      </div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Cihaz tamir/parça gideri</span><span>− {{ totals.expenses.device|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Genel giderler</span><span>− {{ totals.expenses.overhead|tl }}</span></div>
+      <div class="flex justify-between text-lg font-display font-extrabold pt-2" style="border-top:1px solid var(--line)">
+        <span>Net kâr</span>
+        <span style="color:{% if totals.net > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ totals.net|tl }}</span>
+      </div>
+    </div>
+    <p class="text-xs mt-3 pt-3" style="color:var(--muted);border-top:1px solid var(--line)">
+      Cihaza bağlı giderler, cihazın <strong>satıldığı</strong> döneme yazılır
+      (eşleştirme ilkesi): Mart'ta yapılan tamir, Nisan'daki satışın marjına aittir.
+      Genel giderler kendi harcama tarihine yazılır.
+    </p>
+  </div>
+
+  <!-- Kasa -->
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-1">Kasa (Tahsilat)</h2>
+    <p class="text-xs mb-3" style="color:var(--muted)">
+      Ciro değil, dönemde fiilen kasaya giren para. Veresiye satışlar burada
+      görünmez; iade ve geri ödemeler düşülmüştür.
+    </p>
+    <div class="space-y-2 text-sm">
+      {% for row in cash %}
+      <div class="flex justify-between py-1.5" style="border-bottom:1px solid var(--line)">
+        <span style="color:var(--muted)">{{ row.method }}</span>
+        <span class="font-semibold">{{ row.total|tl }}</span>
+      </div>
+      {% empty %}<p style="color:var(--muted)">Bu dönemde tahsilat yok.</p>{% endfor %}
+    </div>
+    <div class="mt-4 pt-3" style="border-top:1px solid var(--line)">
+      <div class="flex justify-between text-sm">
+        <span style="color:var(--muted)">Tahsil edilmemiş toplam</span>
+        <span class="font-semibold" style="color:#ffd48a">{{ receivables_total|tl }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid gap-5 lg:grid-cols-2 mb-6">
+  <!-- Sermaye & devir -->
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-3">Bağlı Sermaye ve Devir</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span style="color:var(--muted)">Stoktaki cihazlar</span><span>{{ capital.devices|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Satılmamış cihaz giderleri</span><span>{{ capital.device_expenses|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Aksesuar stoğu</span><span>{{ capital.accessories|tl }}</span></div>
+      <div class="flex justify-between font-semibold pt-2" style="border-top:1px solid var(--line)">
+        <span>Toplam bağlı para</span><span>{{ capital.total|tl }}</span>
+      </div>
+      <div class="flex justify-between pt-3"><span style="color:var(--muted)">Ortalama stokta kalma</span>
+        <span>{% if turnover.avg_days is not None %}{{ turnover.avg_days }} gün{% else %}—{% endif %}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Satılan cihaz</span><span>{{ turnover.sold_count }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Devir hızı</span><span>{{ turnover.ratio }}×</span></div>
+    </div>
+  </div>
+
+  <!-- Yaşlandırma -->
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-1">Stok Yaşlandırma</h2>
+    <p class="text-xs mb-3" style="color:var(--muted)">
+      Sermayenin ne kadarı ne süredir dönmüyor?
+    </p>
+    <div class="space-y-2 text-sm">
+      {% for bucket in aging %}
+      <div class="flex items-center justify-between gap-3 py-1.5" style="border-bottom:1px solid var(--line)">
+        <span style="color:var(--muted)">{{ bucket.label }}</span>
+        <div class="text-right">
+          <span class="font-semibold">{{ bucket.value|tl0 }}</span>
+          <span class="text-xs ml-2" style="color:var(--muted)">{{ bucket.count }} cihaz</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- En çok satan modeller -->
+<div class="card p-5 mb-6">
+  <h2 class="font-display font-bold mb-3">En Çok Satan Modeller</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm" style="min-width:520px">
+      <thead>
+        <tr style="color:var(--muted)">
+          <th class="text-left py-2 font-medium">Model</th>
+          <th class="text-right py-2 font-medium">Adet</th>
+          <th class="text-right py-2 font-medium">Ciro</th>
+          <th class="text-right py-2 font-medium">Kâr</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in top_models %}
+        <tr style="border-top:1px solid var(--line)">
+          <td class="py-2">{{ row.brand }} {{ row.model }}</td>
+          <td class="py-2 text-right">{{ row.count }}</td>
+          <td class="py-2 text-right">{{ row.revenue|tl0 }}</td>
+          <td class="py-2 text-right" style="color:{% if row.profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ row.profit|tl0 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="py-6 text-center" style="color:var(--muted)">Bu dönemde cihaz satışı yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if overdue %}
+<div class="card p-5">
+  <h2 class="font-display font-bold mb-3">Vadesi Geçen Alacaklar</h2>
+  <div class="space-y-2 text-sm">
+    {% for sale in overdue %}
+    <a href="{% url 'stock:sale_detail' pk=sale.pk %}"
+       class="flex items-center justify-between gap-3 py-2 block" style="border-bottom:1px solid var(--line)">
+      <div class="min-w-0">
+        <div class="font-semibold truncate">{{ sale.customer.full_name|default:"—" }}</div>
+        <div class="text-xs" style="color:var(--muted)">{{ sale.receipt_no }} · vade {{ sale.due_date|date:"d.m.Y" }}</div>
+      </div>
+      <span class="font-semibold shrink-0" style="color:#ff8b95">{{ sale.balance|tl }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block stock_scripts %}
+{{ chart|json_script:"stock-chart-data" }}
+{% include "stock/partials/chart_js.html" %}
+{% endblock %}

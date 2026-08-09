@@ -1,16 +1,15 @@
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import user_passes_test
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
-from django.utils.decorators import method_decorator
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from apps.catalog.models import Brand, Product
 from apps.leads.models import ContactMessage, QuoteRequest, ServiceRequest
 from apps.leads.utils import customer_wa
 from apps.sitecore.models import FAQ, SiteSettings, Slider, Testimonial
+from apps.stock.permissions import can_see_money, in_panel, panel_required
 
 from .forms import (
     BrandForm,
@@ -21,7 +20,10 @@ from .forms import (
     TestimonialForm,
 )
 
-staff_required = user_passes_test(lambda u: u.is_staff, login_url="dashboard:login")
+# Panel girişi is_staff'a DEĞİL grup üyeliğine bağlıdır: is_staff aynı zamanda
+# /yonetim/ (Django admin) anahtarıdır ve Personel oradan Device list_display'i
+# üzerinden alış fiyatını görebilirdi. Bkz. apps/stock/permissions.py.
+staff_required = panel_required
 
 
 # CRUD kayıt defteri: URL slug -> yapılandırma
@@ -35,6 +37,7 @@ CRUD = {
         "model": Product, "form": ProductForm, "title": "Ürünler",
         "singular": "Ürün", "template": "dashboard/lists/product.html",
         "toggles": ["is_active", "is_featured"],
+        "select": ["brand", "source_device__device_model__brand"],
     },
     "yorumlar": {
         "model": Testimonial, "form": TestimonialForm, "title": "Müşteri Yorumları",
@@ -64,7 +67,7 @@ def _cfg(key):
 # ---------- Auth ----------
 
 def login_view(request):
-    if request.user.is_authenticated and request.user.is_staff:
+    if in_panel(request.user):
         return redirect("dashboard:home")
     error = None
     if request.method == "POST":
@@ -73,9 +76,17 @@ def login_view(request):
             username=request.POST.get("username", "").strip(),
             password=request.POST.get("password", ""),
         )
-        if user and user.is_staff:
+        if user and in_panel(user):
             login(request, user)
-            return redirect(request.GET.get("next") or "dashboard:home")
+            nxt = request.GET.get("next", "")
+            # ?next= doğrulanmadan kullanılırsa açık yönlendirme (open redirect)
+            # açığı olur: saldırgan panel giriş bağlantısıyla kullanıcıyı kendi
+            # sitesine düşürebilir.
+            if nxt and url_has_allowed_host_and_scheme(
+                nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+            ):
+                return redirect(nxt)
+            return redirect("dashboard:home")
         error = "Kullanıcı adı veya şifre hatalı ya da yetkiniz yok."
     return render(request, "dashboard/login.html", {"error": error})
 
@@ -89,6 +100,8 @@ def logout_view(request):
 
 @staff_required
 def home(request):
+    from apps.stock import reports as stock_reports
+
     ctx = {
         "active": "home",
         "stats": {
@@ -99,6 +112,8 @@ def home(request):
             "sliders": Slider.objects.filter(is_active=True).count(),
             "testimonials": Testimonial.objects.count(),
         },
+        "stock": stock_reports.dashboard_kpis(request.user),
+        "show_money": can_see_money(request.user),
         "recent_quotes": QuoteRequest.objects.all()[:6],
         "recent_services": ServiceRequest.objects.all()[:4],
     }
@@ -111,6 +126,8 @@ def home(request):
 def crud_list(request, key):
     cfg = _cfg(key)
     items = cfg["model"].objects.all()
+    if cfg.get("select"):
+        items = items.select_related(*cfg["select"])
     return render(request, cfg["template"], {
         "active": key, "items": items, "key": key,
         "title": cfg["title"], "singular": cfg["singular"],

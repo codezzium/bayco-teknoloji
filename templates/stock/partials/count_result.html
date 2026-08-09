@@ -1,0 +1,63 @@
+{% load l10n %}
+<div id="count-result" class="card p-4">
+  {% if flash %}
+  <div class="rounded-xl px-3 py-2 mb-3 text-sm glass">{{ flash }}</div>
+  {% endif %}
+
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="font-display font-bold">Sayılanlar ({{ total_counted }})</h3>
+    {% if rows %}
+    <button class="btn btn-ghost btn-sm"
+            hx-post="{% url 'stock:stocktake_clear' %}" hx-target="#count-result"
+            hx-swap="outerHTML" hx-confirm="Sayım listesi temizlensin mi?">Temizle</button>
+    {% endif %}
+  </div>
+
+  {% if not rows %}
+  <p class="text-sm text-center py-8" style="color:var(--muted)">
+    Henüz ürün okutulmadı.
+  </p>
+  {% else %}
+  <div class="space-y-2">
+    {% for row in rows %}
+    <div class="flex items-center justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+      <div class="min-w-0">
+        <div class="font-semibold text-sm truncate">{{ row.accessory }}</div>
+        <div class="text-xs" style="color:var(--muted)">
+          Sistemde {{ row.system }} adet
+          {% if row.diff > 0 %}
+            · <span style="color:#7ff0ab">{{ row.diff }} fazla</span>
+          {% elif row.diff < 0 %}
+            · <span style="color:#ff8b95">{{ row.diff }} eksik</span>
+          {% else %}
+            · <span style="color:#7ff0ab">tutuyor</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <form hx-post="{% url 'stock:stocktake_mark' %}" hx-target="#count-result"
+              hx-swap="outerHTML" hx-trigger="change">
+          <input type="hidden" name="accessory" value="{{ row.accessory.pk }}">
+          <input type="number" name="counted" min="0" value="{{ row.counted|unlocalize }}"
+                 class="input text-center" style="width:72px;padding:5px 4px">
+        </form>
+        <form hx-post="{% url 'stock:stocktake_mark' %}" hx-target="#count-result" hx-swap="outerHTML">
+          <input type="hidden" name="accessory" value="{{ row.accessory.pk }}">
+          <input type="hidden" name="remove" value="1">
+          <button class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3);padding:4px 10px">✕</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="{% url 'stock:stocktake_finish' %}" class="mt-4">
+    {% csrf_token %}
+    <button class="btn btn-gradient btn-block"
+            onclick="return confirm('{{ diff_count }} üründe fark var. Stok düzeltmeleri uygulansın mı?')">
+      Sayımı Bitir ve Uygula
+      {% if diff_count %}({{ diff_count }} düzeltme){% endif %}
+    </button>
+  </form>
+  {% endif %}
+</div>

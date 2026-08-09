@@ -1,0 +1,28 @@
+{% extends "stock/base_stock.html" %}
+{% block page_title %}Barkod Tara{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto space-y-4">
+  <div>
+    <h2 class="font-display font-extrabold text-xl">Barkod / QR Tara</h2>
+    <p class="text-sm mt-1" style="color:var(--muted)">
+      Okutulan kod cihaz veya aksesuar kartına götürür.
+    </p>
+  </div>
+
+  {# Tarayıcı ve sonuç KARDEŞ — tarayıcı hedefi sarmalamaz. #}
+  {% include "stock/partials/scanner.html" with mode='lookup' target='#scan-result' autostart=1 %}
+
+  <div id="scan-result"></div>
+
+  <div class="card p-4 text-sm" style="color:var(--muted)">
+    <p class="font-semibold mb-2" style="color:var(--ink)">Kamera açılmıyorsa</p>
+    <ul class="space-y-1 list-disc pl-5">
+      <li>Adres çubuğunda <strong>https://</strong> yazmalı. Yerel ağ adresinde
+        (http://192.168…) tarayıcılar kamerayı tamamen kapatır.</li>
+      <li>Bağlantıyı WhatsApp/Instagram içinden açtıysanız Safari veya Chrome'da açın.</li>
+      <li>USB barkod okuyucu her durumda çalışır — okutmanız yeterli.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

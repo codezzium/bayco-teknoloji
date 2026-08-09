@@ -1,0 +1,23 @@
+{% load stock_extras %}
+<div id="accessory-results" class="space-y-3">
+  {% for accessory in page %}
+    {% include "stock/partials/accessory_row.html" %}
+  {% empty %}
+  <div class="card p-12 text-center">
+    <div class="text-4xl mb-3">📦</div>
+    <p class="font-semibold">Sonuç yok</p>
+    <p class="text-sm mt-1" style="color:var(--muted)">
+      {% if q %}"{{ q }}" için kayıt bulunamadı.{% else %}"Yeni Aksesuar" ile ilk kaydı ekleyin.{% endif %}
+    </p>
+  </div>
+  {% endfor %}
+
+  {% if page.has_next %}
+  <button class="btn btn-ghost btn-block"
+          hx-get="{% url 'stock:accessory_list' %}?{{ qs }}&sayfa={{ page.next_page_number }}"
+          hx-target="#accessory-results" hx-swap="outerHTML"
+          hx-push-url="true" hx-indicator="#list-spin">
+    Daha Fazla Yükle ({{ page.number }}/{{ page.paginator.num_pages }} · {{ total }} kayıt)
+  </button>
+  {% endif %}
+</div>

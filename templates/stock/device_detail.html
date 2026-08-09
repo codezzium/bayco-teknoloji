@@ -1,0 +1,283 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}{{ device.stock_code }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-2 text-sm mb-5" style="color:var(--muted)">
+  <a href="{% url 'stock:device_list' %}" class="hover:text-white">Cihazlar</a>
+  <span>/</span><span style="color:var(--ink)">{{ device.stock_code }}</span>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-5">
+  <!-- Ana kart -->
+  <div class="lg:col-span-2 space-y-5">
+    <div class="card p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-2">
+            <span class="font-mono text-xs px-2 py-1 rounded-md"
+                  style="background:var(--brand-soft)">{{ device.stock_code }}</span>
+            {% include "stock/partials/status_badge.html" %}
+            <span class="chip" style="font-size:11px">{{ device.get_condition_display }}</span>
+            {% if device.published_product.is_active %}<span class="chip" style="font-size:11px">🌐 Sitede yayında</span>{% endif %}
+          </div>
+          <h2 class="font-display font-extrabold text-2xl">{{ device.label }}</h2>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          {% if device.is_available %}
+          <form method="post" action="{% url 'stock:sell_device' pk=device.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-gradient btn-sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+              Bu Cihazı Sat
+            </button>
+          </form>
+          {% endif %}
+          <a href="{% url 'stock:device_edit' pk=device.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
+          <a href="{% url 'stock:label_print' %}?ids={{ device.pk }}&format=termal-40x30&auto=1"
+             target="_blank" class="btn btn-ghost btn-sm">🖨️ Etiket</a>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-x-6 gap-y-3 mt-5 pt-5 text-sm"
+           style="border-top:1px solid var(--line)">
+        {% if device.imei1 %}<div><span style="color:var(--muted)">IMEI 1</span><div class="font-mono">{{ device.imei1 }}</div></div>{% endif %}
+        {% if device.imei2 %}<div><span style="color:var(--muted)">IMEI 2</span><div class="font-mono">{{ device.imei2 }}</div></div>{% endif %}
+        {% if device.serial_no %}<div><span style="color:var(--muted)">Seri No</span><div class="font-mono">{{ device.serial_no }}</div></div>{% endif %}
+        {% if device.storage %}<div><span style="color:var(--muted)">Hafıza</span><div>{{ device.storage }}</div></div>{% endif %}
+        {% if device.color %}<div><span style="color:var(--muted)">Renk</span><div>{{ device.color }}</div></div>{% endif %}
+        {% if device.battery_health %}<div><span style="color:var(--muted)">Pil Sağlığı</span><div>%{{ device.battery_health }}</div></div>{% endif %}
+        <div><span style="color:var(--muted)">Kutu / Fatura</span>
+          <div>{{ device.has_box|yesno:"Kutulu,Kutusuz" }} · {{ device.has_invoice|yesno:"Faturalı,Faturasız" }}</div></div>
+        {% if device.shelf %}<div><span style="color:var(--muted)">Raf / Konum</span><div>{{ device.shelf }}</div></div>{% endif %}
+        <div><span style="color:var(--muted)">Giriş Şekli</span><div>{{ device.get_acquisition_display }}</div></div>
+        <div><span style="color:var(--muted)">Alış Tarihi</span><div>{{ device.purchase_date|date:"d.m.Y" }}</div></div>
+        {% if device.supplier %}
+        <div><span style="color:var(--muted)">Alındığı Kişi</span>
+          <div><a href="{% url 'stock:contact_detail' pk=device.supplier.pk %}" class="hover:underline">{{ device.supplier.full_name }}</a></div></div>
+        {% endif %}
+        <div><span style="color:var(--muted)">Stokta Bekleme</span><div>{{ device.age_in_days }} gün</div></div>
+      </div>
+
+      {% if device.defect_note %}
+      <div class="mt-4 pt-4 text-sm" style="border-top:1px solid var(--line)">
+        <span style="color:var(--muted)">Hasar / Arıza Notu</span>
+        <p class="mt-1">{{ device.defect_note|linebreaksbr }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Garanti -->
+      <div class="mt-4 pt-4" style="border-top:1px solid var(--line)">
+        <span class="text-sm" style="color:var(--muted)">Garanti</span>
+        {% if device.warranty_months %}
+          <div class="flex items-center gap-3 mt-1 flex-wrap">
+            <span class="font-semibold">{{ device.warranty_label }}</span>
+            {% if device.warranty_end %}
+              <span class="text-sm" style="color:var(--muted)">
+                {{ device.warranty_start|date:"d.m.Y" }} → {{ device.warranty_end|date:"d.m.Y" }}
+              </span>
+              {% if device.warranty_days_left >= 0 %}
+              <span class="chip" style="font-size:11px;background:rgba(37,211,102,.15);color:#7ff0ab;border-color:rgba(37,211,102,.3)">
+                {{ device.warranty_days_left }} gün kaldı
+              </span>
+              {% else %}
+              <span class="chip" style="font-size:11px;background:rgba(226,58,72,.12);color:#ff8b95;border-color:rgba(226,58,72,.3)">Süresi doldu</span>
+              {% endif %}
+            {% else %}
+              <span class="text-sm" style="color:var(--muted)">Satışta başlatılacak</span>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="mt-1" style="color:var(--muted)">Garantisiz</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Satış geçmişi -->
+    {% if sale_items %}
+    <div class="card p-5" id="satis">
+      <h3 class="font-display font-bold mb-3">Satış Geçmişi</h3>
+      <div class="space-y-2">
+        {% for item in sale_items %}
+        <div class="flex items-center justify-between gap-3 py-2 text-sm"
+             style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <a href="{% url 'stock:sale_detail' pk=item.sale_id %}"
+               class="font-semibold hover:underline">{{ item.sale.receipt_no }}</a>
+            <div class="text-xs" style="color:var(--muted)">
+              {{ item.sale.sold_at|date:"d.m.Y H:i" }}
+              {% if item.sale.customer %}· {{ item.sale.customer.full_name }}{% endif %}
+              {% if item.returned_at %}· <span style="color:#ff8b95">İade edildi</span>{% endif %}
+            </div>
+          </div>
+          <span class="font-semibold">{{ item.line_total|tl }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Durum geçmişi -->
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Hareket Geçmişi</h3>
+      <div class="space-y-2 text-sm">
+        {% for log in logs %}
+        <div class="flex items-start justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <span>{% if log.from_status %}{{ log.from_status }} → {% endif %}<strong>{{ log.to_status }}</strong></span>
+            {% if log.note %}<div class="text-xs" style="color:var(--muted)">{{ log.note }}</div>{% endif %}
+          </div>
+          <span class="text-xs shrink-0" style="color:var(--muted)">
+            {{ log.created_at|date:"d.m.Y H:i" }}{% if log.created_by %} · {{ log.created_by.username }}{% endif %}
+          </span>
+        </div>
+        {% empty %}<p style="color:var(--muted)">Kayıt yok.</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Yan sütun -->
+  <div class="space-y-5">
+    {% if device.is_available %}
+    <div class="card p-5" style="border-color:rgba(180,53,127,.45)">
+      <h3 class="font-display font-bold mb-1">Satış</h3>
+      <div class="text-3xl font-display font-extrabold gradient-text mb-1">
+        {{ device.list_price|tl0 }}
+      </div>
+      <p class="text-xs mb-3" style="color:var(--muted)">
+        {% if device.list_price %}
+          Etiket fiyatı. Kasada değiştirebilirsiniz.
+        {% else %}
+          Etiket fiyatı girilmemiş — kasada elle yazabilirsiniz.
+        {% endif %}
+      </p>
+      <form method="post" action="{% url 'stock:sell_device' pk=device.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-gradient btn-block">Sepete Ekle ve Kasaya Git</button>
+      </form>
+      <p class="text-xs mt-2" style="color:var(--muted)">
+        Kasada müşteri seçip aksesuar ekleyebilir, takas ve tahsilat girebilirsiniz.
+      </p>
+    </div>
+    {% elif device.status == 'satildi' %}
+    <div class="card p-5" style="border-color:rgba(122,62,166,.45)">
+      <h3 class="font-display font-bold mb-1">Satıldı</h3>
+      <div class="text-3xl font-display font-extrabold gradient-text mb-1">
+        {{ device.sold_price|tl0 }}
+      </div>
+      <p class="text-sm" style="color:var(--muted)">
+        {{ device.sold_at|date:"d.m.Y" }}
+        {% if device.sold_to %}· {{ device.sold_to.full_name }}{% endif %}
+      </p>
+      {% with item=sale_items.first %}
+      {% if item %}
+      <a href="{% url 'stock:sale_detail' pk=item.sale_id %}"
+         class="btn btn-ghost btn-sm btn-block mt-3">Fişi Aç ({{ item.sale.receipt_no }})</a>
+      {% endif %}
+      {% endwith %}
+    </div>
+    {% endif %}
+
+    {% if perms.stock.view_money %}
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Finans</h3>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between"><span style="color:var(--muted)">Alış Fiyatı</span><span>{{ device.purchase_price|tl }}</span></div>
+        {% if device.total_expense %}
+        <div class="flex justify-between"><span style="color:var(--muted)">Giderler</span><span>{{ device.total_expense|tl }}</span></div>
+        <div class="flex justify-between font-semibold"><span>Toplam Maliyet</span><span>{{ device.cost_basis|tl }}</span></div>
+        {% endif %}
+        <div class="flex justify-between"><span style="color:var(--muted)">Etiket Fiyatı</span><span>{{ device.list_price|tl }}</span></div>
+        {% if device.sold_price %}
+        <div class="pt-2 mt-2" style="border-top:1px solid var(--line)">
+          <div class="flex justify-between"><span style="color:var(--muted)">Satış Bedeli</span><span>{{ device.sold_price|tl }}</span></div>
+          <div class="flex justify-between mt-1">
+            <span style="color:var(--muted)">Net Kâr <span class="text-xs">(hesaplanan)</span></span>
+            <span class="font-semibold" style="color:{% if device.net_profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">
+              {{ device.net_profit|tl }}
+            </span>
+          </div>
+          <div class="flex justify-between text-xs mt-1" style="color:var(--muted)">
+            <span>Marj</span><span>{{ device.profit_margin|pct }}</span>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      <a href="{% url 'stock:expense_create' %}?cihaz={{ device.pk }}"
+         class="btn btn-ghost btn-sm btn-block mt-4">+ Gider / Tamir Ekle</a>
+    </div>
+
+    {% if expenses %}
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Giderler</h3>
+      <div class="space-y-2 text-sm">
+        {% for expense in expenses %}
+        <div class="flex items-center justify-between gap-2 py-1.5" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <div class="truncate">{{ expense.title }}</div>
+            <div class="text-xs" style="color:var(--muted)">{{ expense.get_kind_display }} · {{ expense.spent_on|date:"d.m.Y" }}</div>
+          </div>
+          <span class="shrink-0">{{ expense.amount|tl }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Durum değiştir -->
+    {% if next_statuses %}
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Durum Değiştir</h3>
+      <form method="post" action="{% url 'stock:device_status' pk=device.pk %}" class="space-y-3">
+        {% csrf_token %}
+        <select name="status" class="select">
+          {% for value, label in next_statuses %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="note" class="input" placeholder="Not (opsiyonel)">
+        <button class="btn btn-ghost btn-sm btn-block">Uygula</button>
+      </form>
+      <p class="text-xs mt-2" style="color:var(--muted)">
+        "Satıldı" ve "İade" yalnızca kasa ekranından değiştirilir.
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- Site vitrini -->
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-2">Site Vitrini</h3>
+      <p class="text-xs mb-3" style="color:var(--muted)">
+        İlan yalnızca vitrindir — site üzerinden satış/ödeme yapılmaz,
+        müşteri WhatsApp'a yönlenir. Cihaz satılınca ilan otomatik kalkar.
+      </p>
+      <form method="post" action="{% url 'stock:device_publish' pk=device.pk %}">
+        {% csrf_token %}
+        {% if device.published_product.is_active %}
+          <a href="{{ device.published_product.get_absolute_url }}" target="_blank"
+             class="btn btn-ghost btn-sm btn-block mb-2">İlanı Gör ↗</a>
+          <button class="btn btn-sm btn-block"
+                  style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+            Vitrinden Kaldır
+          </button>
+        {% else %}
+          <button class="btn btn-gradient btn-sm btn-block"
+                  {% if device.status != 'stokta' %}disabled title="Yalnızca stoktaki cihazlar yayınlanabilir"{% endif %}>
+            Siteye Çıkar
+          </button>
+        {% endif %}
+      </form>
+    </div>
+
+    <form method="post" action="{% url 'stock:device_delete' pk=device.pk %}"
+          onsubmit="return confirm('{{ device.stock_code }} silinsin mi? Bu işlem geri alınamaz.')">
+      {% csrf_token %}
+      <button class="btn btn-sm btn-block"
+              style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+        Cihazı Sil
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

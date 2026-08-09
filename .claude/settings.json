@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/bin/python manage.py test apps)",
+      "Bash(venv/bin/python manage.py check --deploy)"
+    ]
+  }
+}

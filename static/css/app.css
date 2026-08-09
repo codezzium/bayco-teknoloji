@@ -576,3 +576,37 @@ img { max-width: 100%; display: block; }
   color: #e7b9d6;
 }
 .card-hover:hover .icon-box { background: var(--brand); color: #fff; }
+
+/* ---------- Stok modülü ---------- */
+.scan-fab {
+  position: fixed; right: 22px; bottom: 22px; z-index: 45;
+  width: 60px; height: 60px; border-radius: 50%;
+  display: none; place-items: center;
+  background: var(--brand); color: #fff;
+  box-shadow: var(--shadow-glow); border: 0;
+}
+.scan-fab:active { transform: scale(.94); }
+
+.stock-nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 44;
+  display: none; grid-template-columns: repeat(5, 1fr);
+  background: rgba(21, 12, 34, .96); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+.stock-nav a {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 4px 8px; font-size: 10px; font-weight: 600;
+  color: var(--muted); text-decoration: none;
+}
+.stock-nav a.active { color: #fff; }
+.stock-nav a.active svg { color: var(--magenta); }
+
+@media (max-width: 900px) {
+  .scan-fab { display: grid; }
+  .stock-nav { display: grid; }
+  body:has(.stock-nav) { padding-bottom: 68px; }
+}
+
+.htmx-indicator { opacity: 0; transition: opacity .15s; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { opacity: 1; }

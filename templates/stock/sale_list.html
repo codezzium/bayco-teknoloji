@@ -1,0 +1,36 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Satışlar{% endblock %}
+
+{% block content %}
+{% include "stock/partials/list_header.html" %}
+
+<div id="sale-filters" class="glass rounded-2xl p-4 mb-5" x-data="{ filtre: '{{ filtre }}' }">
+  <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+    <div class="lg:w-96">
+      <input type="search" name="q" value="{{ q }}" class="input"
+             placeholder="Fiş no, müşteri, IMEI, stok kodu…" autocomplete="off"
+             hx-get="{% url 'stock:sale_list' %}"
+             hx-trigger="keyup changed delay:350ms, search"
+             hx-include="#sale-filters"
+             hx-target="#sale-results" hx-swap="outerHTML"
+             hx-push-url="true" hx-indicator="#list-spin">
+    </div>
+    <span id="list-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Yükleniyor…</span>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 mt-4 pt-4" style="border-top:1px solid var(--line)">
+    {% for value, label in filter_options %}
+    <label class="filter-chip cursor-pointer" :class="filtre === '{{ value }}' ? 'active' : ''"
+           @click="filtre='{{ value }}'">
+      <input type="radio" name="filtre" value="{{ value }}" class="sr-only"
+             {% if filtre == value %}checked{% endif %}
+             hx-get="{% url 'stock:sale_list' %}" hx-include="#sale-filters"
+             hx-target="#sale-results" hx-swap="outerHTML" hx-push-url="true">
+      {{ label }}
+    </label>
+    {% endfor %}
+  </div>
+</div>
+
+{% include "stock/partials/sale_rows.html" %}
+{% endblock %}

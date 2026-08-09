@@ -1,0 +1,263 @@
+{% load l10n stock_extras %}
+{% comment %} Sepetin TAMAMI her mutasyonda yeniden render edilir ve toplamlar sunucuda
+   hesaplanır. Tarayıcıda hiç para aritmetiği yapılmaz. {% endcomment %}
+<div id="cart" class="space-y-4">
+
+  {% if completed_sale %}
+  <div class="card p-5 text-center" style="border-color:rgba(37,211,102,.4)">
+    <div class="text-4xl mb-2">✅</div>
+    <h3 class="font-display font-extrabold text-xl">{{ completed_sale.receipt_no }}</h3>
+    <p class="text-sm mt-1" style="color:var(--muted)">
+      Toplam {{ completed_sale.grand_total|tl }}
+      {% if completed_sale.balance > 0 %} · Kalan borç
+        <strong style="color:#ffd48a">{{ completed_sale.balance|tl }}</strong>{% endif %}
+    </p>
+    <div class="flex flex-wrap gap-2 justify-center mt-4">
+      <a href="{% url 'stock:receipt' pk=completed_sale.pk %}?auto=1" target="_blank"
+         class="btn btn-gradient btn-sm">🧾 Fiş Yazdır</a>
+      <a href="{% url 'stock:sale_detail' pk=completed_sale.pk %}" class="btn btn-ghost btn-sm">Satışı Aç</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if flash %}
+  <div class="rounded-xl px-4 py-3 text-sm glass">{{ flash }}</div>
+  {% endif %}
+
+  {% if price_changes %}
+  <div class="card p-4" style="border-color:rgba(245,180,60,.4)">
+    <h4 class="font-semibold mb-2" style="color:#ffd48a">⚠️ Fiyat değişmiş</h4>
+    <ul class="text-sm space-y-1">
+      {% for change in price_changes %}
+      <li>{{ change.name }}: <s>{{ change.old|tl }}</s> → <strong>{{ change.new|tl }}</strong></li>
+      {% endfor %}
+    </ul>
+    <p class="text-xs mt-2" style="color:var(--muted)">
+      Sepetteki fiyatla devam etmek için "Onayla ve Sat"a basın.
+    </p>
+  </div>
+  {% endif %}
+
+  <div class="card p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-display font-bold">Sepet</h3>
+      {% if cart.count or cart.trade_ins %}
+      <button class="btn btn-ghost btn-sm"
+              hx-post="{% url 'stock:cart_clear' %}" hx-target="#cart" hx-swap="outerHTML"
+              hx-confirm="Sepet temizlensin mi?">Temizle</button>
+      {% endif %}
+    </div>
+
+    {% if not cart.lines and not cart.trade_ins %}
+    <div class="text-center py-10">
+      <div class="text-4xl mb-2">🛒</div>
+      <p class="font-semibold">Sepet boş</p>
+      <p class="text-sm mt-1" style="color:var(--muted)">Barkod okutarak ürün ekleyin.</p>
+    </div>
+    {% else %}
+
+    <div class="space-y-2">
+      {% for line in cart.lines %}
+      <div class="flex items-start gap-3 py-2" style="border-bottom:1px solid var(--line)">
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold text-sm truncate">{{ line.name }}</div>
+          <div class="text-xs font-mono" style="color:var(--muted)">
+            {{ line.code }}{% if line.imei %} · IMEI {{ line.imei }}{% endif %}
+          </div>
+          <form class="flex items-center gap-2 mt-2"
+                hx-post="{% url 'stock:cart_price' lid=line.lid %}"
+                hx-target="#cart" hx-swap="outerHTML" hx-trigger="change">
+            <input type="number" name="price" step="0.01" min="0" value="{{ line.unit|unlocalize }}"
+                   class="input" style="width:110px;padding:5px 8px;font-size:13px">
+            <span class="text-xs" style="color:var(--muted)">₺ birim</span>
+            {% if line.discount != "0.00" %}
+            <input type="number" name="discount" step="0.01" min="0" value="{{ line.discount|unlocalize }}"
+                   class="input" style="width:90px;padding:5px 8px;font-size:13px">
+            <span class="text-xs" style="color:var(--muted)">₺ ind.</span>
+            {% endif %}
+          </form>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          {% if line.kind == 'aksesuar' %}
+          <form hx-post="{% url 'stock:cart_qty' lid=line.lid %}" hx-target="#cart"
+                hx-swap="outerHTML" hx-trigger="change" class="flex items-center">
+            <input type="number" name="qty" min="1" value="{{ line.qty|unlocalize }}"
+                   class="input text-center" style="width:64px;padding:5px 4px">
+          </form>
+          {% else %}
+          <span class="chip" style="font-size:11px">1 adet</span>
+          {% endif %}
+          <div class="text-right" style="min-width:88px">
+            <div class="font-semibold text-sm">{{ line.total|tl }}</div>
+            {% if show_money %}
+            <div class="text-xs" style="color:var(--muted)">kâr {{ line.profit|tl0 }}</div>
+            {% endif %}
+          </div>
+          <button class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3);padding:4px 10px"
+                  hx-post="{% url 'stock:cart_remove' lid=line.lid %}"
+                  hx-target="#cart" hx-swap="outerHTML">✕</button>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% for trade in cart.trade_ins %}
+      <div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--line)">
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold text-sm">↩️ Takas: {{ trade.label }}</div>
+          <div class="text-xs" style="color:var(--muted)">
+            {% if trade.imei1 %}IMEI {{ trade.imei1 }} · {% endif %}Stoğa maliyetle girecek
+          </div>
+        </div>
+        <span class="font-semibold text-sm" style="color:#ffd48a">− {{ trade.amount|tl }}</span>
+        <form hx-post="{% url 'stock:cart_trade_in' %}" hx-target="#cart" hx-swap="outerHTML">
+          <input type="hidden" name="remove" value="{{ trade.tid }}">
+          <button class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3);padding:4px 10px">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Toplamlar -->
+    <div class="mt-4 pt-4 space-y-1.5 text-sm" style="border-top:1px solid var(--line)">
+      <div class="flex justify-between">
+        <span style="color:var(--muted)">Ara toplam (ciro)</span>
+        <span>{{ cart.subtotal|tl }}</span>
+      </div>
+      {% if cart.trade_in_total %}
+      <div class="flex justify-between">
+        <span style="color:var(--muted)">Takas mahsubu</span>
+        <span style="color:#ffd48a">− {{ cart.trade_in_total|tl }}</span>
+      </div>
+      {% endif %}
+      <div class="flex justify-between text-lg font-display font-extrabold pt-2"
+           style="border-top:1px solid var(--line)">
+        <span>Tahsil Edilecek</span>
+        <span class="gradient-text">{{ cart.payable|tl }}</span>
+      </div>
+      {% if show_money %}
+      <div class="flex justify-between text-xs" style="color:var(--muted)">
+        <span>Tahmini kâr</span><span>{{ cart.profit|tl }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Müşteri: yalnızca sepette cihaz varsa gösterilir. Bu tamamen sepet
+       içeriğinin bir fonksiyonu olduğu için sunucuda karar verilir. -->
+  {% if cart.has_device or cart.trade_ins %}
+  <div class="card p-4">
+    <h3 class="font-display font-bold text-sm mb-1">Müşteri
+      <span style="color:#ff8b95">*</span></h3>
+    <p class="text-xs mb-3" style="color:var(--muted)">
+      Cihaz satışında zorunludur (garanti ve satış geçmişi için).
+      Aksesuar satışında sorulmaz.
+    </p>
+    {% if customer %}
+    <div class="flex items-center justify-between gap-2 glass rounded-xl px-3 py-2">
+      <div class="min-w-0">
+        <div class="font-semibold text-sm truncate">{{ customer.full_name }}</div>
+        <div class="text-xs" style="color:var(--muted)">{{ customer.phone }}</div>
+      </div>
+      <form hx-post="{% url 'stock:cart_customer' %}" hx-target="#cart" hx-swap="outerHTML">
+        <input type="hidden" name="customer" value="">
+        <button class="btn btn-ghost btn-sm">Değiştir</button>
+      </form>
+    </div>
+    {% else %}
+    <input type="search" class="input" placeholder="Müşteri adı veya telefon ara…"
+           autocomplete="off" name="q"
+           hx-get="{% url 'stock:contact_search' %}"
+           hx-trigger="keyup changed delay:300ms, search"
+           hx-target="#contact-search" hx-swap="outerHTML">
+    <div id="contact-search" class="mt-2"></div>
+    <a href="{% url 'stock:contact_create' %}?next={% url 'stock:pos' %}"
+       class="btn btn-ghost btn-sm btn-block mt-2">+ Yeni Müşteri</a>
+    {% endif %}
+  </div>
+
+  <!-- Takas -->
+  <div class="card p-4" x-data="{ open: false }">
+    <button class="flex items-center justify-between w-full" @click="open = !open" type="button">
+      <h3 class="font-display font-bold text-sm">↩️ Takas Ekle</h3>
+      <span x-text="open ? '−' : '+'"></span>
+    </button>
+    <form x-show="open" x-cloak class="space-y-2 mt-3"
+          hx-post="{% url 'stock:cart_trade_in' %}" hx-target="#cart" hx-swap="outerHTML">
+      <select name="device_model" class="select" required>
+        <option value="">— Alınan cihazın modeli —</option>
+        {% for model in device_models %}
+        <option value="{{ model.pk }}">{{ model }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="amount" step="0.01" min="0" class="input"
+             placeholder="Takas bedeli (₺)" required>
+      <input type="text" name="imei1" class="input" placeholder="IMEI (opsiyonel)"
+             inputmode="numeric">
+      <div class="grid grid-cols-2 gap-2">
+        <input type="text" name="storage" class="input" placeholder="Hafıza">
+        <input type="text" name="color" class="input" placeholder="Renk">
+      </div>
+      <input type="text" name="note" class="input" placeholder="Durum notu">
+      <button class="btn btn-ghost btn-sm btn-block">Takası Sepete Ekle</button>
+      <p class="text-xs" style="color:var(--muted)">
+        Ciro düşmez — takas bir indirim değil, ayni ödemedir. Alınan cihaz
+        satış anında maliyetiyle stoğa girer.
+      </p>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Ödeme ve tamamla -->
+  {% if cart.lines or cart.trade_ins %}
+  <form class="card p-4 space-y-3"
+        hx-post="{% url 'stock:checkout' %}" hx-target="#cart" hx-swap="outerHTML"
+        x-data="{ payable: {{ cart.payable|unlocalize }}, paid: {{ cart.payable|unlocalize }} }">
+    {% csrf_token %}
+    <h3 class="font-display font-bold text-sm">Ödeme</h3>
+    <div class="grid grid-cols-2 gap-2">
+      <div class="field" style="margin:0">
+        <label class="label">Tahsil Edilen (₺)</label>
+        <input type="number" name="paid_amount" step="0.01" min="0" class="input"
+               required x-model.number="paid"
+               value="{{ cart.payable|unlocalize }}">
+        <button type="button" class="text-xs mt-1 hover:underline" style="color:var(--muted)"
+                @click="paid = payable">Tamamını yaz</button>
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label">Ödeme Şekli</label>
+        <select name="payment_method" class="select">
+          {% for value, label in payment_methods %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="rounded-xl px-3 py-2 text-sm" x-show="paid < payable" x-cloak
+         style="background:rgba(245,180,60,.12);color:#ffd48a;border:1px solid rgba(245,180,60,.3)">
+      Kalan <strong x-text="(payable - paid).toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺'"></strong>
+      veresiye olarak takip edilecek.
+    </div>
+    <div class="rounded-xl px-3 py-2 text-sm" x-show="paid > payable" x-cloak
+         style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+      Tahsilat fiş tutarından fazla — müşteriye
+      <strong x-text="(paid - payable).toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺'"></strong>
+      iade borcu doğar.
+    </div>
+
+    <div class="field" style="margin:0" x-show="paid < payable" x-cloak>
+      <label class="label">Vade Tarihi</label>
+      <input type="date" name="due_date" class="input">
+    </div>
+    {% if price_changes %}<input type="hidden" name="confirm_prices" value="1">{% endif %}
+    <button class="btn btn-gradient btn-block">
+      {% if price_changes %}Onayla ve Sat{% else %}Satışı Tamamla{% endif %}
+    </button>
+    <p class="text-xs text-center" style="color:var(--muted)">
+      Tahsil edilen tutar toplamdan azsa kalan borç veresiye olarak takip edilir.
+    </p>
+  </form>
+  {% endif %}
+</div>

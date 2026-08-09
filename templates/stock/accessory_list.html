@@ -1,0 +1,76 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Aksesuarlar{% endblock %}
+
+{% block content %}
+<div x-data="{ sel: 0 }" @sel-change.window="sel = $event.detail">
+  {% include "stock/partials/list_header.html" %}
+
+  <div id="accessory-filters" class="glass rounded-2xl p-4 mb-5"
+       x-data="{ filtre: '{{ filtre }}' }">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+      <div class="lg:w-96">
+        <input type="search" name="q" value="{{ q }}" class="input"
+               placeholder="Ürün adı, barkod, marka ara…" autocomplete="off"
+               hx-get="{% url 'stock:accessory_list' %}"
+               hx-trigger="keyup changed delay:350ms, search"
+               hx-include="#accessory-filters"
+               hx-target="#accessory-results" hx-swap="outerHTML"
+               hx-push-url="true" hx-indicator="#list-spin">
+      </div>
+      <div class="flex items-center gap-2">
+        <select name="kategori" class="select" style="width:auto"
+                hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
+                hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true">
+          <option value="">Tüm kategoriler</option>
+          {% for c in categories %}
+          <option value="{{ c.pk }}" {% if kategori == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <span id="list-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Yükleniyor…</span>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 mt-4 pt-4" style="border-top:1px solid var(--line)">
+      <label class="filter-chip cursor-pointer" :class="filtre === '' ? 'active' : ''" @click="filtre=''">
+        <input type="radio" name="filtre" value="" class="sr-only" {% if not filtre %}checked{% endif %}
+               hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
+               hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true"> Aktif ürünler
+      </label>
+      <label class="filter-chip cursor-pointer" :class="filtre === 'kritik' ? 'active' : ''" @click="filtre='kritik'">
+        <input type="radio" name="filtre" value="kritik" class="sr-only" {% if filtre == 'kritik' %}checked{% endif %}
+               hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
+               hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true"> ⚠️ Kritik stok
+      </label>
+      <label class="filter-chip cursor-pointer" :class="filtre === 'eksi' ? 'active' : ''" @click="filtre='eksi'">
+        <input type="radio" name="filtre" value="eksi" class="sr-only" {% if filtre == 'eksi' %}checked{% endif %}
+               hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
+               hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true"> Eksiye düşen
+      </label>
+      <label class="filter-chip cursor-pointer" :class="filtre === 'pasif' ? 'active' : ''" @click="filtre='pasif'">
+        <input type="radio" name="filtre" value="pasif" class="sr-only" {% if filtre == 'pasif' %}checked{% endif %}
+               hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
+               hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true"> Pasif
+      </label>
+    </div>
+  </div>
+
+  {% include "stock/partials/accessory_rows.html" %}
+  {% include "stock/partials/label_bar.html" %}
+</div>
+{% endblock %}
+
+{% block stock_scripts %}
+<script>
+  (function () {
+    function count() {
+      var n = document.querySelectorAll('input[name="acc"]:checked').length;
+      window.dispatchEvent(new CustomEvent("sel-change", { detail: n }));
+    }
+    document.addEventListener("change", function (e) {
+      if (e.target && e.target.name === "acc") count();
+    });
+    document.body.addEventListener("htmx:afterSwap", count);
+  })();
+</script>
+{% endblock %}

@@ -15,6 +15,10 @@ sitemaps = {"static": StaticSitemap, "products": ProductSitemap}
 
 urlpatterns = [
     path("yonetim/", admin.site.urls),
+    # SIRA KRİTİK: apps/dashboard/urls.py bir `<str:key>/` yakalayıcısıyla biter.
+    # `panel/stok/` bu satırdan sonra gelirse tek segmentli /panel/stok/ isteği
+    # crud_list(key="stok") ile eşleşip "Bölüm bulunamadı" 404'ü döner.
+    path("panel/stok/", include("apps.stock.urls")),
     path("panel/", include("apps.dashboard.urls")),
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="sitemap"),
     path("robots.txt", website_views.robots_txt, name="robots"),

@@ -1,0 +1,101 @@
+{% load static %}<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Etiket · {{ fmt.label }}</title>
+{% comment %} BAĞIMSIZ SAYFA — dashboard/base.html extend EDİLMEZ. O şablon koyu arka plan
+   ve position:fixed tam ekran gradient uygular; yazdırıldığında sayfa simsiyah
+   çıkar ve tonerı boşa harcar. {% endcomment %}
+<style>
+  @page { size: {{ fmt.page_w }}mm {{ fmt.page_h }}mm; margin: 0; }
+
+  html, body { margin:0; padding:0; background:#fff; color:#000;
+               font-family: Arial, "Helvetica Neue", sans-serif;
+               -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .sheet { width:{{ fmt.page_w }}mm; padding:{{ fmt.mt }}mm {{ fmt.ml }}mm;
+           box-sizing:border-box; display:grid;
+           grid-template-columns: repeat({{ fmt.cols }}, {{ fmt.w }}mm);
+           grid-auto-rows: {{ fmt.h }}mm; }
+
+  .lbl { width:{{ fmt.w }}mm; height:{{ fmt.h }}mm; padding:{{ fmt.pad }}mm;
+         box-sizing:border-box; overflow:hidden; break-inside:avoid;
+         display:flex; flex-direction:column; justify-content:space-between; }
+
+  .lbl-top { display:flex; gap:{{ fmt.pad }}mm; align-items:flex-start; }
+  .qr      { width:{{ fmt.qr }}mm; height:{{ fmt.qr }}mm; flex:none; }
+  .qr svg  { width:100%; height:100%; display:block; shape-rendering:crispEdges; }
+  .meta    { min-width:0; line-height:1.15; }
+  .meta .s { font-size:5.5pt; }
+  .meta .m { font-size:7pt; font-weight:700; overflow:hidden;
+             display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .meta .p { font-size:9pt; font-weight:700; margin-top:.6mm; }
+
+  /* 1D barkod KENDİ mm genişliğini korumalı. width:100% verilirse modüller
+     203 dpi kafanın nokta ızgarasından kayar ve barkod okunmaz olur. */
+  .b128     { text-align:center; }
+  .b128 svg { display:inline-block; height:{{ fmt.bh }}mm; width:auto; }
+  .hri      { text-align:center; font-size:6.5pt; letter-spacing:.04em; margin-top:.3mm; }
+
+  {% if fmt.kind == "roll" %}
+  .lbl { break-after: page; }
+  .lbl:last-child { break-after: auto; }
+  {% endif %}
+
+  @media screen {
+    body { background:#2a1b40; padding:24px; font-family:Inter,system-ui,sans-serif; }
+    .sheet { background:#fff; margin:0 auto 20px; box-shadow:0 10px 40px rgba(0,0,0,.55); }
+    .lbl { outline:.2mm dashed #c9c9c9; outline-offset:-.2mm; }
+    .bar { position:sticky; top:0; z-index:9; display:flex; flex-wrap:wrap; gap:8px;
+           justify-content:center; align-items:center; padding:12px;
+           margin:-24px -24px 24px; background:rgba(21,12,34,.94); color:#fff; }
+    .bar button, .bar a { font:600 14px Inter,system-ui,sans-serif; padding:9px 18px;
+      border-radius:999px; border:0; cursor:pointer; text-decoration:none;
+      background:#b4357f; color:#fff; }
+    .bar a { background:rgba(255,255,255,.15); }
+    .bar .hint { font:400 12px Inter,system-ui,sans-serif; color:#b9a9cf;
+                 flex-basis:100%; text-align:center; }
+  }
+  @media print {
+    .no-print { display:none !important; }
+    .lbl { outline:none; }
+    .sheet { box-shadow:none; margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bar no-print">
+  <button onclick="window.print()">Yazdır</button>
+  <a href="{{ back_url }}">Geri</a>
+  <span style="font:400 13px Inter,system-ui,sans-serif;color:#b9a9cf">
+    {{ count }} etiket · {{ fmt.label }}
+  </span>
+  <div class="hint">
+    Yazdırma penceresinde <strong>Kenar boşluğu: Yok</strong> ve
+    <strong>Ölçek: %100</strong> seçin, üstbilgi/altbilgiyi kapatın.
+    Safari <code>@page</code> ölçüsünü yok sayar — etiket için Chrome kullanın.
+  </div>
+</div>
+
+{% if truncated %}
+<div class="bar no-print" style="background:rgba(226,58,72,.9)">
+  En fazla {{ max_labels }} etiket basılabilir; fazlası atlandı.
+</div>
+{% endif %}
+
+{% if not pages %}
+<div class="bar no-print">Seçili ürün yok.</div>
+{% endif %}
+
+{% for page in pages %}
+  <div class="sheet">
+    {% for lbl in page %}{% include "stock/labels/_label.html" %}{% endfor %}
+  </div>
+{% endfor %}
+
+{% if auto and pages %}
+<script>window.addEventListener("load", function () { setTimeout(window.print, 300); });</script>
+{% endif %}
+</body>
+</html>

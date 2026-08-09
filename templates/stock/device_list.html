@@ -1,0 +1,84 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Cihazlar{% endblock %}
+
+{% block content %}
+<div x-data="{ sel: 0 }" @sel-change.window="sel = $event.detail">
+  {% include "stock/partials/list_header.html" %}
+
+  {% comment %} Filtre çubuğu SWAP HEDEFİNİN DIŞINDA: içinde olsaydı her tuş vuruşunda
+     <input> yeniden oluşur, imleç konumu ve IME durumu kaybolurdu. {% endcomment %}
+  <div id="device-filters" class="glass rounded-2xl p-4 mb-5"
+       x-data="{ durum: '{{ durum }}' }">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+      <div class="lg:w-96">
+        <input type="search" name="q" value="{{ q }}" class="input"
+               placeholder="IMEI, stok kodu, model, renk ara…"
+               autocomplete="off"
+               hx-get="{% url 'stock:device_list' %}"
+               hx-trigger="keyup changed delay:350ms, search"
+               hx-include="#device-filters"
+               hx-target="#device-results" hx-swap="outerHTML"
+               hx-push-url="true" hx-indicator="#list-spin">
+      </div>
+      <div class="flex items-center gap-2">
+        <select name="marka" class="select" style="width:auto"
+                hx-get="{% url 'stock:device_list' %}" hx-include="#device-filters"
+                hx-target="#device-results" hx-swap="outerHTML" hx-push-url="true">
+          <option value="">Tüm markalar</option>
+          {% for b in brands %}
+          <option value="{{ b.slug }}" {% if marka == b.slug %}selected{% endif %}>{{ b.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="sirala" class="select" style="width:auto"
+                hx-get="{% url 'stock:device_list' %}" hx-include="#device-filters"
+                hx-target="#device-results" hx-swap="outerHTML" hx-push-url="true">
+          {% for value, label in orderings.items %}
+          <option value="{{ value }}" {% if sirala == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <span id="list-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Yükleniyor…</span>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 mt-4 pt-4" style="border-top:1px solid var(--line)">
+      <label class="filter-chip cursor-pointer" :class="durum === '' ? 'active' : ''" @click="durum=''">
+        <input type="radio" name="durum" value="" class="sr-only" {% if not durum %}checked{% endif %}
+               hx-get="{% url 'stock:device_list' %}" hx-include="#device-filters"
+               hx-target="#device-results" hx-swap="outerHTML" hx-push-url="true">
+        Tümü
+      </label>
+      {% for value, label in status_choices %}
+      <label class="filter-chip cursor-pointer" :class="durum === '{{ value }}' ? 'active' : ''"
+             @click="durum='{{ value }}'">
+        <input type="radio" name="durum" value="{{ value }}" class="sr-only"
+               {% if durum == value %}checked{% endif %}
+               hx-get="{% url 'stock:device_list' %}" hx-include="#device-filters"
+               hx-target="#device-results" hx-swap="outerHTML" hx-push-url="true">
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "stock/partials/device_rows.html" %}
+  {% include "stock/partials/label_bar.html" with target="ids" %}
+</div>
+{% endblock %}
+
+{% block stock_scripts %}
+<script>
+  // Etiket barındaki seçili sayacı: satırlar htmx ile değiştiği için sayım
+  // her değişimde belgeden yeniden okunur.
+  (function () {
+    function count() {
+      var n = document.querySelectorAll('input[name="ids"]:checked').length;
+      window.dispatchEvent(new CustomEvent("sel-change", { detail: n }));
+    }
+    document.addEventListener("change", function (e) {
+      if (e.target && e.target.name === "ids") count();
+    });
+    document.body.addEventListener("htmx:afterSwap", count);
+  })();
+</script>
+{% endblock %}
