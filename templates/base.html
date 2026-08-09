@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   {% block head_seo %}
-    {% include "partials/seo.html" with title="Eskişehir Bayço Teknoloji | Sıfır & İkinci El Telefon, Takas ve Teknik Servis" description="Eskişehir Bayço Teknoloji: sıfır ve ikinci el telefon satışı, telefon takas, aksesuar ve teknik servis. Eskişehir'de güvenilir, garantili telefon mağazası." %}
+    {% include "partials/seo.html" with title=site.seo_title description=site.seo_description %}
   {% endblock %}
 
   <meta name="theme-color" content="#150c22">
@@ -14,39 +14,28 @@
   <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
   <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
 
-  {# Yerel işletme yapısal verisi (Google için) #}
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "ElectronicsStore",
-    "name": "Eskişehir {{ site.brand_name }}",
-    "image": "{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}",
-    "url": "{{ request.scheme }}://{{ request.get_host }}/",
-    "telephone": "{{ site.phone }}",
-    "description": "Eskişehir'de sıfır ve ikinci el telefon satışı, telefon takas, aksesuar ve teknik servis.",
-    "priceRange": "₺₺",
-    "areaServed": { "@type": "City", "name": "Eskişehir" },
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "{{ site.address }}",
-      "addressLocality": "Eskişehir",
-      "addressRegion": "Eskişehir",
-      "addressCountry": "TR"
-    }{% if site.instagram or site.facebook %},
-    "sameAs": [{% if site.instagram %}"{{ site.instagram }}"{% endif %}{% if site.instagram and site.facebook %}, {% endif %}{% if site.facebook %}"{{ site.facebook }}"{% endif %}]{% endif %}
-  }
-  </script>
+  {# Yerel işletme + site yapısal verisi (Google için) #}
+  {% include "partials/structured_data.html" %}
+  {% include "partials/breadcrumbs.html" %}
 
-  <!-- Fonts -->
+  {% comment %} Yazı tipleri render'ı ENGELLEMEZ. Normal <link rel=stylesheet>
+     ilk boyamayı fonts.googleapis.com yanıtlayana kadar bekletir; bu doğrudan
+     LCP'yi (Google'ın sıralama sinyali olan Core Web Vitals metriği) geciktirir.
+     media=print → yüklenince all: sayfa hemen sistem yazı tipiyle çizilir. {% endcomment %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
 
   <!-- Swiper -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
 
-  <!-- Tailwind (dev: Play CDN). Prod için CLI derlemesine geçilebilir. -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  {% comment %} Tailwind CDN'den DEĞİL kendi statiklerimizden gelir: üçüncü taraf
+     DNS+TLS turu ilk boyamaya doğrudan gecikme ekler ve cdn.tailwindcss.com TR'de
+     zaman zaman erişilemiyor — düştüğünde sayfa cssiz dökülür, Google da onu öyle
+     tarar. (Kalıcı çözüm: Tailwind CLI ile derlenmiş statik css — README'ye bkz.) {% endcomment %}
+  <script src="{% static 'vendor/tailwind/tailwind.play.js' %}"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -92,6 +81,19 @@
   </a>
 
   <script src="{% static 'js/app.js' %}"></script>
+
+  {% comment %} Google Analytics 4 — ölçüm kimliği panelden girilmemişse hiç
+     yüklenmez. En sonda ve async: ölçüm kodu sayfanın çizilmesini bekletmemeli. {% endcomment %}
+  {% if site.google_analytics_id %}
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ site.google_analytics_id }}"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '{{ site.google_analytics_id }}');
+  </script>
+  {% endif %}
+
   {% block scripts %}{% endblock %}
 </body>
 </html>

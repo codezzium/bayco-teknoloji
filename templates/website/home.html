@@ -1,6 +1,25 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block head_extra %}
+{% comment %} SSS yapısal verisi: Google bu soruları arama sonucunda açılır
+   panel olarak gösterebilir — sonuç alanı büyür, tıklama oranı artar.
+   Sorular panelden (Site Ayarları > SSS) yönetiliyor. {% endcomment %}
+{% if faqs %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [{% for f in faqs %}{
+    "@type": "Question",
+    "name": "{{ f.question|escapejs }}",
+    "acceptedAnswer": { "@type": "Answer", "text": "{{ f.answer|striptags|escapejs }}" }
+  }{% if not forloop.last %}, {% endif %}{% endfor %}]
+}
+</script>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 
 <!-- ============ HERO (header ile birleşik) ============ -->

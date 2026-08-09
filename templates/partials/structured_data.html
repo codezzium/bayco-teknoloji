@@ -1,0 +1,92 @@
+{% load static %}
+{% comment %}
+Site geneli yapısal veri (JSON-LD). Google'ın işletme kartı, site linki arama
+kutusu ve gezinti izi zengin sonuçları bunu okur.
+
+`base.html`den yalnızca bir kez dahil edilir. Sayfaya özel şemalar (Product,
+FAQPage, Service) ilgili şablonun `head_extra` bloğunda durur.
+{% endcomment %}
+{% with origin=request.scheme|add:"://"|add:request.get_host %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "ElectronicsStore",
+      "@id": "{{ origin }}/#store",
+      "name": "Eskişehir {{ site.brand_name|escapejs }}",
+      "image": "{{ origin }}{% static 'img/logo.png' %}",
+      "logo": "{{ origin }}{% static 'img/logo.png' %}",
+      "url": "{{ origin }}/",
+      "telephone": "{{ site.phone|escapejs }}",
+      {% if site.email %}"email": "{{ site.email|escapejs }}",{% endif %}
+      "description": "{{ site.seo_description|default:site.footer_about|escapejs }}",
+      "priceRange": "{{ site.price_range|default:'₺₺' }}",
+      "currenciesAccepted": "TRY",
+      "paymentAccepted": "Nakit, Kredi Kartı, Havale/EFT",
+      "areaServed": { "@type": "City", "name": "Eskişehir" },
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "{{ site.address|escapejs }}",
+        "addressLocality": "Eskişehir",
+        "addressRegion": "Eskişehir",
+        {% if site.postal_code %}"postalCode": "{{ site.postal_code|escapejs }}",{% endif %}
+        "addressCountry": "TR"
+      }{% if site.latitude and site.longitude %},
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "{{ site.latitude|stringformat:'s' }}",
+        "longitude": "{{ site.longitude|stringformat:'s' }}"
+      }{% endif %}{% if site.opening_hours_spec %},
+      "openingHoursSpecification": [{% for row in site.opening_hours_spec %}{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": [{% for d in row.days %}"{{ d }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
+        "opens": "{{ row.opens }}",
+        "closes": "{{ row.closes }}"
+      }{% if not forloop.last %}, {% endif %}{% endfor %}]{% endif %}{% comment %}
+      Puan yapısal verisi YALNIZCA Google yorum linki girilmişse yazılır.
+      Google, doğrulanamayan/uydurma aggregateRating'i politika ihlali sayar ve
+      sitenin TÜM zengin sonuçlarını kaldırabilir. Modeldeki 4.9/128 gerçek veri
+      değil, kurulum varsayılanıdır; yorum linki girilmişse puanın arkasında
+      gerçek bir Google işletme kaydı var demektir.
+      {% endcomment %}{% if site.google_review_url and site.google_rating and site.google_review_count %},
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "{{ site.google_rating|stringformat:'s' }}",
+        "reviewCount": "{{ site.google_review_count }}",
+        "bestRating": "5",
+        "worstRating": "1"
+      }{% endif %}{% if site.social_links %},
+      "sameAs": [{% for url in site.social_links %}"{{ url|escapejs }}"{% if not forloop.last %}, {% endif %}{% endfor %}]{% endif %},
+
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Eskişehir telefon ve teknik servis hizmetleri",
+        "itemListElement": [
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Sıfır telefon satışı" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "İkinci el telefon satışı" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Telefon takas ve yerinde değerlendirme" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Telefon tamiri ve teknik servis" } }
+        ]
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "{{ origin }}/#website",
+      "url": "{{ origin }}/",
+      "name": "Eskişehir {{ site.brand_name|escapejs }}",
+      "inLanguage": "tr-TR",
+      "publisher": { "@id": "{{ origin }}/#store" },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "{{ origin }}{% url 'website:products' %}?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+  ]
+}
+</script>
+{% endwith %}

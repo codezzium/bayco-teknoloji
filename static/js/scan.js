@@ -15,20 +15,6 @@
     maxNumberOfSymbols: 1, binarizer: "LocalAverage", textMode: "Plain"
   };
 
-  // Kamerayı otomatik açma tercihi TÜM akışlarda ortaktır: kasiyer ayarı
-  // satışta kapatıp sayımda kamerayla karşılaşırsa "kaydedilmemiş" sanır.
-  var AUTO_KEY = "bayco.autostart";
-
-  function autoPref(fallback) {
-    try {
-      var v = localStorage.getItem(AUTO_KEY);
-      return v === null ? !!fallback : v === "1";
-    } catch (e) { return !!fallback; }        // Safari gizli sekme
-  }
-  function saveAutoPref(on) {
-    try { localStorage.setItem(AUTO_KEY, on ? "1" : "0"); } catch (e) {}
-  }
-
   function emit(code, source) {
     document.dispatchEvent(new CustomEvent("bayco:scan", {
       detail: { code: String(code).trim(), source: source }
@@ -45,9 +31,6 @@
         c: Object.assign({ fps: 8, sample: 720, dedupeMs: 2500, autostart: false },
                          cfg || {}),
         on: false, err: "", hint: "", ok: false, busyUi: false,
-        // auto = kullanıcı tercihi; cfg.autostart yalnızca ilk ziyaretteki
-        // varsayılandır (satış/sayım gibi sayfalarda 1).
-        auto: autoPref(cfg && cfg.autostart),
         torchable: false, torchOn: false,
         cams: [], camId: localStorage.getItem("bayco.camId") || "",
         _stream: null, _raf: 0, _busy: false, _last: "", _lastAt: 0,
@@ -64,7 +47,7 @@
               if (self.on) { self._autoPaused = true; self.stop(); }
             } else if (self._autoPaused) {
               self._autoPaused = false;
-              if (self.auto) self.start();
+              if (self.c.autostart) self.start();
             }
           };
           // pagehide'da document.hidden false olabilir — ayrı tutulur, yoksa
@@ -78,15 +61,7 @@
             self.beep(ok);
           };
           document.body.addEventListener("bayco:scanned", this._scanned);
-          if (this.auto) this.start(true);
-        },
-
-        setAuto: function (on) {
-          this.auto = !!on;
-          saveAutoPref(this.auto);
-          // Açıldığında hemen başlat: tercih zaten kullanıcı dokunuşu içinde
-          // değiştiği için iOS izin/ses akışı sorunsuz çalışır.
-          if (this.auto && !this.on) this.start();
+          if (this.c.autostart) this.start(true);
         },
 
         destroy: function () {

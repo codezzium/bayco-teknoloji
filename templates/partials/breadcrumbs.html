@@ -1,0 +1,20 @@
+{% comment %}
+Gezinti izi yapısal verisi. Google arama sonucunda çıplak URL yerine
+"baycoteknoloji.com > Ürünler > iPhone 13" yolunu gösterir.
+
+View'den `breadcrumbs` = [{"name": ..., "url": mutlak}] gelince otomatik çizilir.
+{% endcomment %}
+{% if breadcrumbs %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [{% for c in breadcrumbs %}{
+    "@type": "ListItem",
+    "position": {{ forloop.counter }},
+    "name": "{{ c.name|escapejs }}",
+    "item": "{{ c.url|escapejs }}"
+  }{% if not forloop.last %}, {% endif %}{% endfor %}]
+}
+</script>
+{% endif %}

@@ -4,17 +4,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% comment %} robots.txt taramayı engeller ama DİZİNE EKLEMEYİ engellemez:
+     bir yerden link verilen /panel/ adresi Google'a "açıklama yok" başlığıyla
+     düşebilir. noindex bunu kesin olarak keser. {% endcomment %}
+  <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Panel — {{ site.brand_name }}{% endblock %}</title>
   <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
+  {% comment %} Yazı tipleri render'ı ENGELLEMEZ: fonts.googleapis.com'a
+     ulaşılamayan bir bağlantıda normal <link rel=stylesheet> ilk boyamayı
+     zaman aşımına kadar bekletir ve panel saniyelerce bomboş/bozuk görünür.
+     media=print → yüklenince all: sayfa hemen sistem yazı tipiyle çizilir. {% endcomment %}
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
+  {% comment %} Tailwind/htmx/Alpine KENDİ statiklerimizden gelir, CDN'den değil.
+     Dükkân wifi'si güvenilmez ve unpkg/jsDelivr TR'de zaman zaman erişilemiyor;
+     Tailwind düşerse yerleşim sınıfları (fixed, -translate-x-full, lg:hidden)
+     kaybolur ve sol menü sayfanın içine cssiz olarak dökülür, Alpine düşerse
+     barkod tarayıcı hiç açılmaz. zxing zaten aynı sebeple vendor'landı. {% endcomment %}
+  <script src="{% static 'vendor/tailwind/tailwind.play.js' %}"></script>
   <script>
     tailwind.config = { theme: { extend: {
       colors: { plum:{950:'#150c22',900:'#1e1330',800:'#2a1b40',700:'#3a2352'}, brand:{purple:'#7a3ea6',magenta:'#b4357f',red:'#e23a48'} },
       fontFamily: { sans:['Inter','sans-serif'], display:['Sora','sans-serif'] } } } };
   </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
-  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script src="{% static 'vendor/htmx/htmx.min.js' %}" defer></script>
   <style>[x-cloak]{display:none!important}</style>
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data="{ sidebar:false }">
@@ -115,6 +130,6 @@
    alpine:init dinleyicisi hiç tetiklenmez, Alpine.data("baycoScanner") kayıtlı
    olmaz ve tarayıcı bileşeninin TAMAMI ölür (x-cloak kalkmaz → video hiç
    görünmez, "Kamerayı Aç" hiçbir şey yapmaz). {% endcomment %}
-<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="{% static 'vendor/alpine/alpine.min.js' %}" defer></script>
 </body>
 </html>

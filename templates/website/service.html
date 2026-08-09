@@ -1,7 +1,41 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block head_seo %}{% include "partials/seo.html" with title="Eskişehir Telefon Tamiri & Teknik Servis | Bayço Teknoloji" description="Eskişehir telefon tamiri ve teknik servis: ekran değişimi, batarya, şarj soketi ve yazılım. Eskişehir Bayço Teknoloji'de orijinal parça, garantili işçilik, aynı gün servis." %}{% endblock %}
+{% block head_seo %}{% include "partials/seo.html" with title="Eskişehir Telefon Tamiri & Teknik Servis | Bayço Teknoloji" description="Eskişehir telefon tamiri ve teknik servis: ekran değişimi, batarya, şarj soketi ve yazılım. Eskişehir Bayço Teknoloji'de orijinal parça, garantili işçilik, aynı gün servis." keywords="telefon tamiri Eskişehir, Eskişehir teknik servis, ekran değişimi Eskişehir, batarya değişimi Eskişehir, iPhone tamiri Eskişehir" %}{% endblock %}
+
+{% block head_extra %}
+{% comment %} Yerel hizmet araması ("yakınımdaki telefon tamircisi") için hizmet
+   şeması. Sağlayıcı base.html'deki işletme kaydına @id ile bağlanır. {% endcomment %}
+{% with origin=request.scheme|add:"://"|add:request.get_host %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "serviceType": "Telefon tamiri ve teknik servis",
+  "name": "Eskişehir Telefon Tamiri ve Teknik Servis",
+  "description": "Ekran değişimi, batarya, şarj soketi, kamera ve yazılım onarımı. Orijinal parça, garantili işçilik, aynı gün servis.",
+  "url": "{{ origin }}{{ request.path }}",
+  "provider": { "@id": "{{ origin }}/#store" },
+  "areaServed": { "@type": "City", "name": "Eskişehir" },
+  "availableChannel": {
+    "@type": "ServiceChannel",
+    "serviceUrl": "{{ origin }}{{ request.path }}",
+    "servicePhone": "{{ site.phone|escapejs }}"
+  },
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Teknik servis hizmetleri",
+    "itemListElement": [
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Ekran değişimi" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Batarya değişimi" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Şarj soketi onarımı" } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Yazılım ve işletim sistemi onarımı" } }
+    ]
+  }
+}
+</script>
+{% endwith %}
+{% endblock %}
 
 {% block content %}
 <section class="section" style="padding-top:calc(var(--header-h) + var(--campaign-h) + 32px)">

@@ -1,13 +1,36 @@
 {% load static %}
-{% comment %}Yeniden kullanılabilir SEO başlık bloğu. title / description ile çağrılır.{% endcomment %}
+{% comment %}
+Yeniden kullanılabilir SEO başlık bloğu. title / description ile çağrılır.
+
+İsteğe bağlı parametreler:
+  keywords  — virgüllü liste (varsayılan: panelden gelen site.seo_keywords)
+  og_type   — website | product | article
+  og_image  — site köküne göreli görsel yolu (örn. product.cover.url)
+  noindex   — dolu ise sayfa Google'a "dizine ekleme" der (filtreli listeler vb.)
+{% endcomment %}
+{% with origin=request.scheme|add:"://"|add:request.get_host %}
 <title>{{ title }}</title>
 <meta name="description" content="{{ description }}">
-<meta name="keywords" content="{{ keywords|default:'Eskişehir telefon, Eskişehir ikinci el telefon, Eskişehir sıfır telefon, telefon takas Eskişehir, telefon tamiri Eskişehir, teknik servis Eskişehir, Bayço Teknoloji' }}">
-<link rel="canonical" href="{{ request.build_absolute_uri }}">
-<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="keywords" content="{{ keywords|default:site.seo_keywords }}">
+
+{% comment %} Canonical'da SORGU DİZESİ OLMAMALI: /urunler/?marka=apple&durum=sifir
+   ile /urunler/ Google için iki ayrı sayfadır; filtre kombinasyonları yüzlerce
+   kopya URL üretip listeleme sayfasının sıralama gücünü böler. request.path
+   filtreleri dışarıda bırakıp hepsini tek kanonik adrese toplar. {% endcomment %}
+<link rel="canonical" href="{{ origin }}{{ request.path }}">
+
+{% if noindex %}
+<meta name="robots" content="noindex, follow">
+{% else %}
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+{% endif %}
+
 <meta name="author" content="{{ site.brand_name }}">
 <meta name="geo.region" content="TR-26">
 <meta name="geo.placename" content="Eskişehir">
+{% if site.latitude and site.longitude %}<meta name="geo.position" content="{{ site.latitude|stringformat:'s' }};{{ site.longitude|stringformat:'s' }}">
+<meta name="ICBM" content="{{ site.latitude|stringformat:'s' }}, {{ site.longitude|stringformat:'s' }}">{% endif %}
+{% if site.google_site_verification %}<meta name="google-site-verification" content="{{ site.google_site_verification }}">{% endif %}
 
 <!-- Open Graph -->
 <meta property="og:type" content="{{ og_type|default:'website' }}">
@@ -15,11 +38,13 @@
 <meta property="og:locale" content="tr_TR">
 <meta property="og:title" content="{{ title }}">
 <meta property="og:description" content="{{ description }}">
-<meta property="og:url" content="{{ request.build_absolute_uri }}">
-<meta property="og:image" content="{% if og_image %}{{ request.scheme }}://{{ request.get_host }}{{ og_image }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}">
+<meta property="og:url" content="{{ origin }}{{ request.path }}">
+<meta property="og:image" content="{% if og_image %}{{ origin }}{{ og_image }}{% else %}{{ origin }}{% static 'img/logo.png' %}{% endif %}">
+<meta property="og:image:alt" content="{{ title }}">
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ title }}">
 <meta name="twitter:description" content="{{ description }}">
-<meta name="twitter:image" content="{% if og_image %}{{ request.scheme }}://{{ request.get_host }}{{ og_image }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}">
+<meta name="twitter:image" content="{% if og_image %}{{ origin }}{{ og_image }}{% else %}{{ origin }}{% static 'img/logo.png' %}{% endif %}">
+{% endwith %}

@@ -1,7 +1,28 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block head_seo %}{% include "partials/seo.html" with title="Telefon Ürünleri | Eskişehir Bayço Teknoloji – Sıfır & İkinci El" description="Eskişehir Bayço Teknoloji ürünleri: sıfır ve garantili ikinci el iPhone, Samsung, Xiaomi telefonlar. Eskişehir'de uygun fiyat, taksit ve WhatsApp'tan hızlı teklif." %}{% endblock %}
+{% block head_seo %}{% include "partials/seo.html" with title=seo_title description=seo_description noindex=seo_noindex %}{% endblock %}
+
+{% block head_extra %}
+{% comment %} Listeleme sayfasındaki ürünlerin sırası — Google'a hangi ürünlerin
+   bu sayfada olduğunu ve hangi sırayla göründüğünü bildirir. {% endcomment %}
+{% if products %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "{{ seo_title|escapejs }}",
+  "numberOfItems": {{ products|length }},
+  "itemListElement": [{% for p in products %}{
+    "@type": "ListItem",
+    "position": {{ forloop.counter }},
+    "url": "{{ request.scheme }}://{{ request.get_host }}{{ p.get_absolute_url }}",
+    "name": "{{ p.name|escapejs }}"
+  }{% if not forloop.last %}, {% endif %}{% endfor %}]
+}
+</script>
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <section class="section" style="padding-top:calc(var(--header-h) + var(--campaign-h) + 32px)">

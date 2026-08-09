@@ -1,44 +1,48 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block head_seo %}
-<title>{{ product.name }} {{ product.storage }} {{ product.get_condition_display }} Fiyatı | Eskişehir Bayço Teknoloji</title>
-<meta name="description" content="{{ product.name }} {{ product.storage }} {{ product.get_condition_display }} – Eskişehir Bayço Teknoloji'de {{ product.price_display }}. {{ product.short_desc }} Garantili, faturalı; WhatsApp'tan hemen teklif alın.">
-<link rel="canonical" href="{{ request.build_absolute_uri }}">
-<meta name="robots" content="index, follow, max-image-preview:large">
-<meta name="geo.region" content="TR-26"><meta name="geo.placename" content="Eskişehir">
-<meta property="og:type" content="product">
-<meta property="og:site_name" content="Eskişehir {{ site.brand_name }}">
-<meta property="og:locale" content="tr_TR">
-<meta property="og:title" content="{{ product.name }} | Eskişehir Bayço Teknoloji">
-<meta property="og:description" content="{{ product.name }} {{ product.get_condition_display }} – {{ product.price_display }}. Eskişehir'de garantili telefon.">
-<meta property="og:url" content="{{ request.build_absolute_uri }}">
-<meta property="og:image" content="{% if product.cover %}{{ request.scheme }}://{{ request.get_host }}{{ product.cover.url }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{{ product.name }} | Eskişehir Bayço Teknoloji">
-<meta name="twitter:description" content="{{ product.name }} {{ product.get_condition_display }} – {{ product.price_display }}.">
-<meta name="twitter:image" content="{% if product.cover %}{{ request.scheme }}://{{ request.get_host }}{{ product.cover.url }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}">
-{% endblock %}
+{% block head_seo %}{% include "partials/seo.html" with title=seo_title description=seo_description keywords=seo_keywords og_type="product" og_image=og_image %}{% endblock %}
 
 {% block head_extra %}
+{% with origin=request.scheme|add:"://"|add:request.get_host %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "Product",
   "name": "{{ product.name|escapejs }}",
-  "image": "{% if product.cover %}{{ request.scheme }}://{{ request.get_host }}{{ product.cover.url }}{% else %}{{ request.scheme }}://{{ request.get_host }}{% static 'img/logo.png' %}{% endif %}",
-  "description": "{{ product.short_desc|default:product.name|escapejs }}",
+  "image": [{% if product.cover %}"{{ origin }}{{ product.cover.url }}"{% for im in product.images.all %}, "{{ origin }}{{ im.image.url }}"{% endfor %}{% else %}"{{ origin }}{% static 'img/logo.png' %}"{% endif %}],
+  "description": "{{ product.short_desc|default:product.description|default:product.name|escapejs|truncatechars:300 }}",
+  "sku": "BT-{{ product.pk }}",
+  "mpn": "BT-{{ product.pk }}",
   {% if product.brand %}"brand": { "@type": "Brand", "name": "{{ product.brand.name|escapejs }}" },{% endif %}
+  {% if product.color %}"color": "{{ product.color|escapejs }}",{% endif %}
+  {% if product.storage %}"additionalProperty": [{
+    "@type": "PropertyValue", "name": "Hafıza", "value": "{{ product.storage|escapejs }}"
+  }{% if product.condition_grade %}, {
+    "@type": "PropertyValue", "name": "Kozmetik Durum", "value": "{{ product.condition_grade|escapejs }}"
+  }{% endif %}],{% endif %}
   "itemCondition": "{% if product.condition == 'sifir' %}https://schema.org/NewCondition{% else %}https://schema.org/UsedCondition{% endif %}",
   "offers": {
     "@type": "Offer",
-    {% if product.price %}"price": "{{ product.price|stringformat:'d' }}", "priceCurrency": "TRY",{% endif %}
+    {% comment %} Fiyatı olmayan ürün "Fiyat sorunuz" ile gösteriliyor. Google'a
+       0 TL göndermek yerine price alanını hiç yazmıyoruz: uydurma fiyat, zengin
+       sonucun reddedilmesine ve Merchant uyarısına yol açar. {% endcomment %}
+    {% if product.price %}"price": "{{ product.price|stringformat:'d' }}",
+    "priceCurrency": "TRY",
+    "priceValidUntil": "{{ price_valid_until }}",{% endif %}
     "availability": "https://schema.org/InStock",
-    "url": "{{ request.build_absolute_uri }}",
-    "seller": { "@type": "Store", "name": "Eskişehir {{ site.brand_name }}", "areaServed": "Eskişehir" }
-  }
+    "itemCondition": "{% if product.condition == 'sifir' %}https://schema.org/NewCondition{% else %}https://schema.org/UsedCondition{% endif %}",
+    "url": "{{ origin }}{{ request.path }}",
+    "seller": { "@type": "Store", "name": "Eskişehir {{ site.brand_name|escapejs }}", "areaServed": "Eskişehir" }
+  }{% if product.warranty %},
+  "warranty": "{{ product.warranty|escapejs }}"{% endif %}
+  {% comment %} hasMerchantReturnPolicy / shippingDetails BİLEREK yok: Search
+     Console bunlar için uyarı gösterir ama zengin sonuç yine de çalışır.
+     Gerçek iade/kargo koşulları teyit edilmeden buraya yazılan değer Google'a
+     yanlış ticari taahhüt bildirmek olur. Koşullar netleşince eklenmeli. {% endcomment %}
 }
 </script>
+{% endwith %}
 {% endblock %}
 
 {% block content %}

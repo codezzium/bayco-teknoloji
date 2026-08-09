@@ -18,8 +18,8 @@
                hx-target="#accessory-results" hx-swap="outerHTML"
                hx-push-url="true" hx-indicator="#list-spin">
       </div>
-      <div class="flex items-center gap-2">
-        <select name="kategori" class="select" style="width:auto"
+      <div class="flex flex-wrap items-center gap-2">
+        <select name="kategori" class="select" style="width:auto;max-width:100%"
                 hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
                 hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true">
           <option value="">Tüm kategoriler</option>

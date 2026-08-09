@@ -19,6 +19,8 @@ class SiteSettings(models.Model):
     email = models.EmailField("E-posta", blank=True, default="info@baycoteknoloji.com")
     address = models.CharField("Adres", max_length=255, blank=True,
                                default="Hoşnudiye Mah. Kızılcıklı Mahmut Pehlivan Cad. No:12, Tepebaşı / Eskişehir")
+    postal_code = models.CharField("Posta Kodu", max_length=10, blank=True, default="26130",
+                                   help_text="Google işletme verisi için. Örn: 26130")
     maps_embed = models.TextField(
         "Google Harita Embed URL", blank=True,
         help_text="Google Maps > Paylaş > Harita yerleştir > src bağlantısı",
@@ -48,7 +50,12 @@ class SiteSettings(models.Model):
     # Sosyal kanıt
     google_rating = models.DecimalField("Google Puanı", max_digits=2, decimal_places=1, default=4.9)
     google_review_count = models.PositiveIntegerField("Yorum Sayısı", default=128)
-    google_review_url = models.URLField("Google Yorum Linki", blank=True)
+    google_review_url = models.URLField(
+        "Google Yorum Linki", blank=True,
+        help_text="Google işletme kaydınızın yorum bağlantısı. GİRİLMEZSE yukarıdaki puan "
+                  "Google'a yapısal veri olarak bildirilmez — doğrulanamayan puan bildirmek "
+                  "politika ihlalidir ve sitenin tüm zengin sonuçlarını kaybettirebilir.",
+    )
 
     # Footer
     footer_about = models.TextField(
@@ -62,6 +69,60 @@ class SiteSettings(models.Model):
     facebook = models.URLField("Facebook", blank=True)
     tiktok = models.URLField("TikTok", blank=True)
     youtube = models.URLField("YouTube", blank=True)
+
+    # ---------- SEO / Google ----------
+    seo_title = models.CharField(
+        "SEO Başlık (ana sayfa)", max_length=70, blank=True,
+        default="Eskişehir Sıfır & İkinci El Telefon, Takas | Bayço Teknoloji",
+        help_text="Google'da görünen başlık. 60 karakteri geçmeyin — fazlası kırpılır.",
+    )
+    seo_description = models.CharField(
+        "SEO Açıklama (ana sayfa)", max_length=180, blank=True,
+        default="Eskişehir Bayço Teknoloji: sıfır ve ikinci el telefon satışı, telefon takas, "
+                "aksesuar ve teknik servis. Eskişehir'de güvenilir, garantili telefon mağazası.",
+        help_text="Arama sonuçlarındaki açıklama. 150-160 karakter ideal.",
+    )
+    seo_keywords = models.CharField(
+        "Anahtar Kelimeler", max_length=300, blank=True,
+        default="Eskişehir telefon, Eskişehir ikinci el telefon, Eskişehir sıfır telefon, "
+                "telefon takas Eskişehir, telefon tamiri Eskişehir, teknik servis Eskişehir",
+        help_text="Virgülle ayırın. Google sıralamada kullanmaz; diğer motorlar için tutulur.",
+    )
+    google_site_verification = models.CharField(
+        "Google Search Console Doğrulama Kodu", max_length=120, blank=True,
+        help_text="Search Console > HTML etiketi yönteminde verilen content=\"...\" değeri. "
+                  "Sadece kodu yapıştırın, etiketin tamamını değil.",
+    )
+    google_analytics_id = models.CharField(
+        "Google Analytics 4 Ölçüm Kimliği", max_length=40, blank=True,
+        help_text="G- ile başlar. Örn: G-XXXXXXXXXX. Boş bırakılırsa izleme kodu eklenmez.",
+    )
+    latitude = models.DecimalField(
+        "Enlem (latitude)", max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Google Haritalar'da mağazaya sağ tıklayınca çıkan ilk sayı. Örn: 39.776667",
+    )
+    longitude = models.DecimalField(
+        "Boylam (longitude)", max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Google Haritalar'daki ikinci sayı. Örn: 30.520556",
+    )
+    price_range = models.CharField(
+        "Fiyat Aralığı", max_length=10, blank=True, default="₺₺",
+        help_text="Google işletme kartı için. ₺ ile ₺₺₺₺ arası.",
+    )
+    # Makine okunabilir çalışma saatleri. `working_hours` sitede gösterilen serbest
+    # metindir; Google'ın openingHoursSpecification'ı ise "HH:MM" biçimi ister.
+    hours_weekday = models.CharField(
+        "Hafta içi saatleri", max_length=20, blank=True, default="09:00-20:00",
+        help_text="AÇILIŞ-KAPANIŞ biçiminde. Kapalıysa boş bırakın. Örn: 09:00-20:00",
+    )
+    hours_saturday = models.CharField(
+        "Cumartesi saatleri", max_length=20, blank=True, default="10:00-18:00",
+        help_text="Kapalıysa boş bırakın.",
+    )
+    hours_sunday = models.CharField(
+        "Pazar saatleri", max_length=20, blank=True, default="",
+        help_text="Kapalıysa boş bırakın.",
+    )
 
     class Meta:
         verbose_name = "Site Ayarı"
@@ -82,6 +143,46 @@ class SiteSettings(models.Model):
     @property
     def whatsapp_link(self):
         return f"https://wa.me/{self.whatsapp_number}"
+
+    @property
+    def social_links(self):
+        """schema.org sameAs için dolu olan sosyal medya adresleri."""
+        return [u for u in (self.instagram, self.facebook, self.tiktok, self.youtube) if u]
+
+    @property
+    def opening_hours_spec(self):
+        """schema.org openingHoursSpecification listesi.
+
+        Şablonda `{"...": ...}` sözlükleri kurmak JSON-LD'yi okunamaz hale
+        getiriyor; gün/saat ayrıştırmasını burada yapıp hazır sözlük veriyoruz.
+        Hatalı girilen saat ("akşam 8" gibi) satırı sessizce atlanır — bozuk
+        yapısal veri, eksik yapısal veriden daha kötüdür.
+        """
+        days = [
+            (self.hours_weekday, ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]),
+            (self.hours_saturday, ["Saturday"]),
+            (self.hours_sunday, ["Sunday"]),
+        ]
+        spec = []
+        for raw, day_names in days:
+            value = (raw or "").strip()
+            if "-" not in value:
+                continue
+            opens, _, closes = value.partition("-")
+            opens, closes = opens.strip(), closes.strip()
+            if not (_looks_like_time(opens) and _looks_like_time(closes)):
+                continue
+            spec.append({"days": day_names, "opens": opens, "closes": closes})
+        return spec
+
+
+def _looks_like_time(value):
+    """"HH:MM" mi? Google başka biçimleri reddeder."""
+    parts = value.split(":")
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return False
+    hour, minute = int(parts[0]), int(parts[1])
+    return 0 <= hour <= 23 and 0 <= minute <= 59
 
 
 class Slider(models.Model):

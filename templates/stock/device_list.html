@@ -21,8 +21,11 @@
                hx-target="#device-results" hx-swap="outerHTML"
                hx-push-url="true" hx-indicator="#list-spin">
       </div>
-      <div class="flex items-center gap-2">
-        <select name="marka" class="select" style="width:auto"
+      {% comment %} flex-wrap ZORUNLU: iki select + "Yükleniyor…" 390px'e sığmaz,
+         sarmayan satır sayfayı yatay taşırır. Telefonda taşan sayfa uzaklaşarak
+         ölçeklenir ve alt menü ekranın dışına kayar. {% endcomment %}
+      <div class="flex flex-wrap items-center gap-2">
+        <select name="marka" class="select" style="width:auto;max-width:100%"
                 hx-get="{% url 'stock:device_list' %}" hx-include="#device-filters"
                 hx-target="#device-results" hx-swap="outerHTML" hx-push-url="true">
           <option value="">Tüm markalar</option>
@@ -30,7 +33,7 @@
           <option value="{{ b.slug }}" {% if marka == b.slug %}selected{% endif %}>{{ b.name }}</option>
           {% endfor %}
         </select>
-        <select name="sirala" class="select" style="width:auto"
+        <select name="sirala" class="select" style="width:auto;max-width:100%"
                 hx-get="{% url 'stock:device_list' %}" hx-include="#device-filters"
                 hx-target="#device-results" hx-swap="outerHTML" hx-push-url="true">
           {% for value, label in orderings.items %}

@@ -63,14 +63,6 @@
       </template>
     </select>
     <span id="scan-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Aranıyor…</span>
-    {% comment %} Tercih localStorage'da (bayco.autostart) tutulur ve tüm
-       tarama akışlarında geçerlidir. {% endcomment %}
-    <label class="text-sm flex items-center gap-2 cursor-pointer ml-auto"
-           style="color:var(--muted)">
-      <input type="checkbox" class="toggle-check" :checked="auto"
-             @change="setAuto($event.target.checked)">
-      Kamerayı otomatik aç
-    </label>
   </div>
 
   <p class="text-sm mt-3 rounded-xl px-3 py-2" x-show="err" x-cloak x-text="err"
