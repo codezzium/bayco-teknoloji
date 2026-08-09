@@ -15,7 +15,6 @@
   </script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   <style>[x-cloak]{display:none!important}</style>
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' x-data="{ sidebar:false }">
@@ -108,5 +107,14 @@
   </div>
 </div>
 {% block scripts %}{% endblock %}
+
+{% comment %} Alpine EN SONA yüklenir; head'de OLAMAZ.
+   cdn.min.js son satırında queueMicrotask(() => Alpine.start()) çağırır ve
+   start() "alpine:init" olayını ANINDA yayar. defer'li scriptler belge
+   sırasıyla çalıştığından, head'deki Alpine scan.js'ten önce başlar; scan.js'in
+   alpine:init dinleyicisi hiç tetiklenmez, Alpine.data("baycoScanner") kayıtlı
+   olmaz ve tarayıcı bileşeninin TAMAMI ölür (x-cloak kalkmaz → video hiç
+   görünmez, "Kamerayı Aç" hiçbir şey yapmaz). {% endcomment %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </body>
 </html>

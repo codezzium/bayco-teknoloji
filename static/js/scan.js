@@ -15,6 +15,20 @@
     maxNumberOfSymbols: 1, binarizer: "LocalAverage", textMode: "Plain"
   };
 
+  // Kamerayı otomatik açma tercihi TÜM akışlarda ortaktır: kasiyer ayarı
+  // satışta kapatıp sayımda kamerayla karşılaşırsa "kaydedilmemiş" sanır.
+  var AUTO_KEY = "bayco.autostart";
+
+  function autoPref(fallback) {
+    try {
+      var v = localStorage.getItem(AUTO_KEY);
+      return v === null ? !!fallback : v === "1";
+    } catch (e) { return !!fallback; }        // Safari gizli sekme
+  }
+  function saveAutoPref(on) {
+    try { localStorage.setItem(AUTO_KEY, on ? "1" : "0"); } catch (e) {}
+  }
+
   function emit(code, source) {
     document.dispatchEvent(new CustomEvent("bayco:scan", {
       detail: { code: String(code).trim(), source: source }
@@ -25,46 +39,77 @@
   /* ------------------------------------------------------------------ */
   /* Kamera                                                              */
   /* ------------------------------------------------------------------ */
-  document.addEventListener("alpine:init", function () {
+  function registerScanner() {
     Alpine.data("baycoScanner", function (cfg) {
       return {
         c: Object.assign({ fps: 8, sample: 720, dedupeMs: 2500, autostart: false },
                          cfg || {}),
-        on: false, err: "", ok: false, busyUi: false,
+        on: false, err: "", hint: "", ok: false, busyUi: false,
+        // auto = kullanıcı tercihi; cfg.autostart yalnızca ilk ziyaretteki
+        // varsayılandır (satış/sayım gibi sayfalarda 1).
+        auto: autoPref(cfg && cfg.autostart),
         torchable: false, torchOn: false,
         cams: [], camId: localStorage.getItem("bayco.camId") || "",
         _stream: null, _raf: 0, _busy: false, _last: "", _lastAt: 0,
-        _audio: null, _canvas: null, _ctx: null, _vis: null,
+        _audio: null, _canvas: null, _ctx: null, _vis: null, _hide: null,
+        _armed: false, _disarm: null, _autoPaused: false,
 
         init: function () {
           var self = this;
-          this._vis = function () { if (document.hidden && self.on) self.stop(); };
+          // Mobilde sekme değişimi sürekli olur. Kamerayı bırakmak ZORUNLU
+          // (iOS'ta turuncu gösterge yanık kalır), ama geri dönüldüğünde
+          // otomatik açma tercihi açıksa kendiliğinden geri gelmeli.
+          this._vis = function () {
+            if (document.hidden) {
+              if (self.on) { self._autoPaused = true; self.stop(); }
+            } else if (self._autoPaused) {
+              self._autoPaused = false;
+              if (self.auto) self.start();
+            }
+          };
+          // pagehide'da document.hidden false olabilir — ayrı tutulur, yoksa
+          // sayfadan çıkarken kamerayı yeniden açmaya çalışır.
+          this._hide = function () { self.stop(); };
           document.addEventListener("visibilitychange", this._vis);
-          window.addEventListener("pagehide", this._vis);
+          window.addEventListener("pagehide", this._hide);
           // Sunucu yanıtı geldiğinde sesli/görsel geri bildirim
           this._scanned = function (e) {
             var ok = e.detail && e.detail.ok !== false;
             self.beep(ok);
           };
           document.body.addEventListener("bayco:scanned", this._scanned);
-          if (this.c.autostart) this.start();
+          if (this.auto) this.start(true);
+        },
+
+        setAuto: function (on) {
+          this.auto = !!on;
+          saveAutoPref(this.auto);
+          // Açıldığında hemen başlat: tercih zaten kullanıcı dokunuşu içinde
+          // değiştiği için iOS izin/ses akışı sorunsuz çalışır.
+          if (this.auto && !this.on) this.start();
         },
 
         destroy: function () {
           document.removeEventListener("visibilitychange", this._vis);
-          window.removeEventListener("pagehide", this._vis);
+          window.removeEventListener("pagehide", this._hide);
           document.body.removeEventListener("bayco:scanned", this._scanned);
+          if (this._disarm) {
+            document.removeEventListener("pointerdown", this._disarm, true);
+            document.removeEventListener("touchstart", this._disarm, true);
+          }
           this.stop();
         },
 
-        start: async function () {
-          this.err = "";
+        start: async function (fromAuto) {
+          this.err = ""; this.hint = "";
           // http://192.168.x.x üzerinde mediaDevices TANIMSIZDIR — "hata verir"
           // değil, nesne hiç yoktur. Bu yüzden önce varlığı kontrol edilir.
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            this.err = "Kamera yalnızca güvenli bağlantıda çalışır " +
-                       "(https:// veya localhost). Barkod okuyucu ile veya " +
-                       "kodu elle yazarak devam edebilirsiniz.";
+            this.err = "Kamera yalnızca güvenli bağlantıda çalışır. Şu anki " +
+                       "adres: " + location.protocol + "//" + location.host +
+                       " — panele https:// ile (alan adı üzerinden) girin. " +
+                       "Bu sayfada barkod okuyucuyla okutabilir veya kodu elle " +
+                       "yazabilirsiniz.";
             return;
           }
           // iOS: AudioContext kullanıcı dokunuşu İÇİNDE yaratılmalı
@@ -73,7 +118,8 @@
             if (AC && !this._audio) this._audio = new AC();
           } catch (e) { /* sesi olmayan cihaz */ }
 
-          var video = { width: { ideal: 1280 }, height: { ideal: 720 } };
+          var base = { width: { ideal: 1280 }, height: { ideal: 720 } };
+          var video = Object.assign({}, base);
           if (this.camId) video.deviceId = { exact: this.camId };
           else video.facingMode = { ideal: "environment" };
 
@@ -82,17 +128,27 @@
               { video: video, audio: false });
           } catch (e) {
             var name = e && e.name;
-            if (name === "NotAllowedError") {
-              this.err = "Kamera izni reddedildi. Tarayıcı ayarlarından izin " +
-                         "verin. (Instagram/WhatsApp içi tarayıcı kamerayı " +
-                         "engeller — bağlantıyı Safari veya Chrome'da açın.)";
-            } else if (name === "NotFoundError") {
-              this.err = "Kamera bulunamadı.";
+            // iOS her oturumda deviceId'leri döndürür; kayıtlı kimlik bir
+            // sonraki gün geçersizdir ve exact kısıtı OverconstrainedError
+            // verir. Kaydı at, arka kamerayla yeniden dene.
+            if (this.camId &&
+                (name === "OverconstrainedError" || name === "NotFoundError")) {
+              this.forgetCam();
+              var retry = Object.assign({}, base);
+              retry.facingMode = { ideal: "environment" };
+              try {
+                this._stream = await navigator.mediaDevices.getUserMedia(
+                  { video: retry, audio: false });
+              } catch (e2) { this.fail(e2, fromAuto); return; }
             } else {
-              this.err = "Kamera açılamadı (" + name + ").";
+              this.fail(e, fromAuto); return;
             }
-            return;
           }
+
+          // on=true ÖNCE: kapsayıcı x-show ile gizliyken WebKit gizli <video>
+          // için kare üretmez, canvas siyah kalır ve hiçbir barkod okunmaz.
+          this.on = true;
+          await this.$nextTick();
 
           var v = this.$refs.video;
           // iOS: playsinline + muted olmazsa tam ekran oynatıcı açılır ve
@@ -102,7 +158,6 @@
           v.muted = true;
           v.srcObject = this._stream;
           try { await v.play(); } catch (e) { /* yoksay */ }
-          this.on = true;
 
           var track = this._stream.getVideoTracks()[0];
           var caps = track.getCapabilities ? track.getCapabilities() : {};
@@ -124,6 +179,53 @@
             catch (e) { /* zaten hazır */ }
           }
           this._loop();
+        },
+
+        fail: function (e, fromAuto) {
+          var name = (e && e.name) || "Error";
+          if (name === "NotAllowedError") {
+            // Sayfa açılışındaki otomatik denemede iOS Safari izni kullanıcı
+            // etkileşimi olmadan reddeder — istem bile çıkmaz. İlk dokunuşta
+            // sessizce yeniden dener; kullanıcı için "kendiliğinden açıldı"
+            // gibi görünür.
+            if (fromAuto) {
+              this.hint = "Kamerayı başlatmak için ekrana bir kez dokunun.";
+              this.armGesture();
+              return;
+            }
+            this.err = "Kamera izni reddedildi. Tarayıcı ayarlarından izin " +
+                       "verin. (Instagram/WhatsApp içi tarayıcı kamerayı " +
+                       "engeller — bağlantıyı Safari veya Chrome'da açın.)";
+          } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+            this.err = "Kamera bulunamadı.";
+          } else if (name === "NotReadableError") {
+            // Android'de tipik: kamerayı başka bir uygulama/sekme tutuyor.
+            this.err = "Kamera başka bir uygulama tarafından kullanılıyor. " +
+                       "Diğer sekmeleri ve kamera uygulamalarını kapatın.";
+          } else {
+            this.err = "Kamera açılamadı (" + name + ").";
+          }
+        },
+
+        armGesture: function () {
+          if (this._armed) return;
+          this._armed = true;
+          var self = this;
+          var once = function () {
+            document.removeEventListener("pointerdown", once, true);
+            document.removeEventListener("touchstart", once, true);
+            self._armed = false;
+            self.hint = "";
+            self.start();          // fromAuto YOK: bu artık gerçek bir dokunuş
+          };
+          document.addEventListener("pointerdown", once, true);
+          document.addEventListener("touchstart", once, true);
+          this._disarm = once;
+        },
+
+        forgetCam: function () {
+          this.camId = "";
+          try { localStorage.removeItem("bayco.camId"); } catch (e) {}
         },
 
         stop: function () {
@@ -221,7 +323,24 @@
         }
       };
     });
-  });
+  }
+
+  // Alpine bu dosyadan SONRA yüklenmelidir (bkz. dashboard/base.html). Yine de
+  // sıra bozulursa bileşen sessizce ölmesin: Alpine zaten oradaysa doğrudan
+  // kaydet, DOM'u yeniden başlat.
+  if (window.Alpine && window.Alpine.data) {
+    registerScanner();
+    if (window.Alpine.initTree) {
+      document.addEventListener("DOMContentLoaded", function () {
+        var els = document.querySelectorAll('[x-data^="baycoScanner"]');
+        for (var i = 0; i < els.length; i++) {
+          if (!els[i]._x_dataStack) Alpine.initTree(els[i]);
+        }
+      });
+    }
+  } else {
+    document.addEventListener("alpine:init", registerScanner);
+  }
 
   /* ------------------------------------------------------------------ */
   /* HID okuyucu (USB / Bluetooth, klavye emülasyonlu)                   */
