@@ -191,6 +191,15 @@
         <option value="{{ model.pk }}">{{ model }}</option>
         {% endfor %}
       </select>
+      {% comment %} Liste boşken takas hiç yapılamaz ve sebebi ekranda görünmez.
+         Sepet oturumda tutulduğu için tanım sayfasına gidip dönmek onu bozmaz. {% endcomment %}
+      {% if not device_models %}
+      <p class="text-xs" style="color:var(--muted)">
+        Tanımlı cihaz modeli yok —
+        <a href="{% url 'stock:simple_create' key='modeller' %}?next={% url 'stock:pos' %}"
+           class="underline" style="color:var(--ink)">önce model ekleyin</a>.
+      </p>
+      {% endif %}
       <input type="number" name="amount" step="0.01" min="0" class="input"
              placeholder="Takas bedeli (₺)" required>
       <input type="text" name="imei1" class="input" placeholder="IMEI (opsiyonel)"

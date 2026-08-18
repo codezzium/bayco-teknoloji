@@ -7,6 +7,12 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Panel Girişi — {{ site.brand_name }}</title>
   <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
+  {% comment %} Kurulu uygulama açıldığında oturum kapalıysa ilk görülen sayfa
+     burasıdır. Bildirim ve tema rengi olmadan pencere sistem beyazına düşer ve
+     uygulama "bozulmuş" görünür — kurulum düğmesi yok, yalnızca bu üç etiket. {% endcomment %}
+  <link rel="manifest" href="{% url 'dashboard:manifest' %}">
+  <meta name="theme-color" content="#150c22">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">

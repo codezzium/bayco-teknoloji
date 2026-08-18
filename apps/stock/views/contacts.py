@@ -10,7 +10,14 @@ from django.views.decorators.http import require_POST
 from ..forms import ContactForm
 from ..models import Contact
 from ..utils import trfold
-from .base import can_see_money, panel_required, paginate, pick_template, querystring
+from .base import (
+    can_see_money,
+    paginate,
+    panel_required,
+    pick_template,
+    querystring,
+    safe_next,
+)
 
 
 @panel_required
@@ -66,9 +73,7 @@ def contact_form(request, pk=None):
     instance = get_object_or_404(Contact, pk=pk) if pk else None
     duplicate = None
 
-    next_url = request.POST.get("next") or request.GET.get("next", "")
-    if next_url and not next_url.startswith("/panel/"):
-        next_url = ""
+    next_url = safe_next(request)
 
     if request.method == "POST":
         form = ContactForm(request.POST, instance=instance, user=request.user)

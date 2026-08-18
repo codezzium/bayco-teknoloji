@@ -1,0 +1,308 @@
+{% load static %}
+{% comment %} Ana sayfa Instagram pop-up'ı. Oturum başına bir kez, sayfa
+   açıldıktan 2 saniye sonra ekranın ortasında açılır. Panelden Instagram
+   adresi girilmemişse hiç basılmaz.
+
+   CSS neden app.css'te değil, burada gömülü?
+   nginx /static/ dosyalarını 30 gün önbelleğe veriyor (`expires 30d`) ve
+   dosya adlarında içerik hash'i yok. HTML her istekte taze geliyor, app.css
+   ise ziyaretçinin telefonunda aylarca eski kalabiliyor — bu ikisi ayrıştığı
+   anda pop-up stilsiz bir blok olarak sayfanın en altına düşüyor ve JS
+   sayfayı kilitliyor. Stil işaretlemeyle aynı yanıtta gittiği sürece böyle
+   bir uyumsuzluk mümkün değil. {% endcomment %}
+{% if site.instagram %}
+<style>
+  /* Varsayılan display:none — JS çalışmazsa ya da stil bir şekilde
+     uygulanmazsa bile sayfada hiçbir iz bırakmaz. */
+  #ig-modal { display: none; }
+  #ig-modal.is-open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+  }
+  #ig-modal .ig-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(6, 3, 12, .8);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    animation: ig-fade .35s ease both;
+  }
+  /* Kart her ekranda dikey/yatay ortada. Ekran çok kısaysa sayfa değil
+     bu alan kayar; overscroll-behavior hareketin arkaya sızmasını keser. */
+  #ig-modal .ig-wrap {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  #ig-modal .ig-card {
+    position: relative;
+    width: 100%; max-width: 380px;
+    margin: auto;
+    padding: 32px 26px 22px;
+    text-align: center;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    background:
+      radial-gradient(120% 72% at 50% -12%, rgba(238, 42, 123, .32), transparent 62%),
+      linear-gradient(180deg, #251636 0%, #150c22 62%);
+    box-shadow: 0 40px 90px -22px rgba(0, 0, 0, .85);
+    color: #f4eefb;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    animation: ig-pop .45s cubic-bezier(.2, .9, .3, 1.15) both;
+  }
+  #ig-modal .ig-card:focus { outline: none; }
+
+  #ig-modal .ig-close {
+    position: absolute; top: 13px; right: 13px;
+    width: 32px; height: 32px; padding: 0;
+    border-radius: 50%; border: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, .08);
+    color: #cbb8e4; cursor: pointer;
+    transition: background .2s, color .2s;
+  }
+  #ig-modal .ig-close:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+
+  /* Logonun çevresinde Instagram gradyanı — hikâye halkası gibi yavaşça döner.
+     Gradyan ::before'da olduğu için logo sabit kalır. */
+  #ig-modal .ig-avatar {
+    position: relative;
+    width: 92px; height: 92px;
+    margin: 2px auto 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #ig-modal .ig-avatar::before {
+    content: "";
+    position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 0deg, #f9ce34, #ee2a7b, #6228d7, #f9ce34);
+    box-shadow: 0 12px 38px -8px rgba(238, 42, 123, .65);
+    animation: ig-spin 9s linear infinite;
+  }
+  #ig-modal .ig-avatar-in {
+    position: relative;
+    width: calc(100% - 7px); height: calc(100% - 7px);
+    border-radius: 50%;
+    background: #170e26;
+    overflow: hidden;
+  }
+  /* Logo kare bir görsel ve kendi koyu zemini var; `cover` ile yuvarlak
+     amblem daireyi tam doldurur, kare köşeler kırpılır. */
+  #ig-modal .ig-avatar-in img {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+
+  #ig-modal .ig-handle {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 13px; margin-bottom: 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .1);
+    font-size: 12.5px; font-weight: 600; color: #e9d7f7;
+  }
+  #ig-modal .ig-handle::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: #25d366; box-shadow: 0 0 8px #25d366;
+  }
+
+  #ig-modal .ig-title {
+    font-family: "Sora", "Inter", sans-serif;
+    font-size: 24px; font-weight: 800; line-height: 1.24;
+    letter-spacing: -0.02em;
+    margin: 0 0 9px;
+    text-wrap: balance;   /* "et" tek başına alt satıra düşmesin */
+  }
+  #ig-modal .ig-grad {
+    background: linear-gradient(95deg, #f9ce34 0%, #ee2a7b 46%, #a03bd2 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  #ig-modal .ig-text {
+    font-size: 14px; line-height: 1.55; color: #b9a9cf;
+    max-width: 300px; margin: 0 auto 22px;
+  }
+
+  #ig-modal .ig-cta {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 15px 20px;
+    border-radius: 16px; border: 0;
+    font-family: inherit; font-size: 15.5px; font-weight: 700;
+    color: #fff; text-decoration: none; cursor: pointer;
+    background: linear-gradient(95deg, #f9ce34 0%, #ee2a7b 46%, #6228d7 100%);
+    box-shadow: 0 14px 34px -10px rgba(238, 42, 123, .75);
+    transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s, filter .22s;
+  }
+  #ig-modal .ig-cta:hover { transform: translateY(-2px); filter: brightness(1.07); }
+  #ig-modal .ig-cta:active { transform: scale(.98); }
+
+  #ig-modal .ig-skip {
+    display: block; width: 100%;
+    margin-top: 6px; padding: 12px;
+    background: none; border: 0;
+    font-family: inherit; font-size: 13.5px; font-weight: 500;
+    color: #9b89b4; cursor: pointer;
+    transition: color .2s;
+  }
+  #ig-modal .ig-skip:hover { color: #f4eefb; }
+
+  /* Odak halkası yalnızca klavyeyle gezene görünsün. */
+  #ig-modal .ig-cta:focus-visible,
+  #ig-modal .ig-skip:focus-visible,
+  #ig-modal .ig-close:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+  @keyframes ig-fade { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes ig-pop {
+    from { opacity: 0; transform: translateY(24px) scale(.94) }
+    to   { opacity: 1; transform: none }
+  }
+  @keyframes ig-spin { to { transform: rotate(360deg) } }
+
+  @media (max-width: 380px) {
+    #ig-modal .ig-card { padding: 28px 20px 18px; }
+    #ig-modal .ig-avatar { width: 82px; height: 82px; }
+    #ig-modal .ig-title { font-size: 22px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #ig-modal .ig-backdrop,
+    #ig-modal .ig-card,
+    #ig-modal .ig-avatar::before { animation: none; }
+  }
+</style>
+
+<div class="ig-modal" id="ig-modal" role="dialog" aria-modal="true" aria-labelledby="ig-modal-title" aria-hidden="true">
+  <div class="ig-backdrop"></div>
+
+  <div class="ig-wrap">
+    {# Kartın DIŞINA tıklamak kapatır; kapatma kontrolleri data-ig-close taşır. #}
+    <div class="ig-card" tabindex="-1">
+      <button type="button" class="ig-close" data-ig-close aria-label="Kapat">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      <div class="ig-avatar">
+        <div class="ig-avatar-in">
+          <img src="{% static 'img/logo.png' %}" alt="{{ site.brand_name }}" width="92" height="92">
+        </div>
+      </div>
+
+      {% if site.instagram_handle %}<span class="ig-handle">{{ site.instagram_handle }}</span>{% endif %}
+
+      <h3 class="ig-title" id="ig-modal-title">
+        Bizi <span class="ig-grad">Instagram'da</span> takip et
+      </h3>
+      <p class="ig-text">
+        Stoğa yeni giren telefonlar, güncel fiyatlar ve takipçiye özel
+        kampanyalar önce orada paylaşılıyor.
+      </p>
+
+      <a href="{{ site.instagram }}" target="_blank" rel="noopener" class="ig-cta" data-ig-close>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.8 3.8 0 0 1-1.38-.9c-.42-.42-.68-.82-.9-1.38-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07c-1.28.06-2.15.26-2.91.56-.79.3-1.46.72-2.13 1.38A5.9 5.9 0 0 0 .63 4.14c-.3.77-.5 1.64-.56 2.91C.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.28.26 2.15.56 2.91.3.79.72 1.46 1.38 2.13a5.9 5.9 0 0 0 2.13 1.38c.77.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.28-.06 2.15-.26 2.91-.56a5.9 5.9 0 0 0 2.13-1.38 5.9 5.9 0 0 0 1.38-2.13c.3-.77.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.28-.26-2.15-.56-2.91a5.9 5.9 0 0 0-1.38-2.13A5.9 5.9 0 0 0 19.86.63c-.77-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0z"/><path d="M12 5.84a6.16 6.16 0 1 0 0 12.32 6.16 6.16 0 0 0 0-12.32zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/><circle cx="18.41" cy="5.59" r="1.44"/></svg>
+        Instagram'da Takip Et
+      </a>
+      <button type="button" class="ig-skip" data-ig-close>Şimdi değil, teşekkürler</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById("ig-modal");
+  if (!modal) return;
+
+  var KEY = "bayco.igPopup";       // oturum bayrağı
+  var DELAY = 2000;                // açılıştan 2 sn sonra
+  var body = document.body;
+  var lastFocus = null;
+  var scrollY = 0;
+  var locked = false;
+
+  // sessionStorage gizli sekmede / kısıtlı tarayıcı ayarında hata fırlatabilir;
+  // pop-up bu yüzden çalışmaz olmasın diye erişim sarmalanıyor.
+  function seen() {
+    try { return sessionStorage.getItem(KEY) === "1"; } catch (e) { return false; }
+  }
+  function mark() {
+    try { sessionStorage.setItem(KEY, "1"); } catch (e) {}
+  }
+
+  if (seen()) return;
+
+  // Arka plan kilidi. Yalnızca `overflow:hidden` yetmiyor: body'de zaten
+  // `overflow-x:hidden` var ve mobil Safari sayfayı kaydırmaya devam ediyor.
+  // Bu yüzden body sabitleniyor, kaydırma konumu `top` ile korunuyor.
+  function lock() {
+    scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    body.style.position = "fixed";
+    body.style.top = -scrollY + "px";
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    locked = true;
+  }
+  function unlock() {
+    if (!locked) return;
+    locked = false;
+    body.style.position = "";
+    body.style.top = "";
+    body.style.left = "";
+    body.style.right = "";
+    body.style.width = "";
+    // html'de `scroll-behavior: smooth` var; kapatmadan geri dönüş animasyona
+    // giriyor ve sayfa gözle görülür biçimde süzülüyor. Konum anında alınıyor.
+    var root = document.documentElement;
+    var prev = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto";
+    window.scrollTo(0, scrollY);
+    root.style.scrollBehavior = prev;
+  }
+
+  function open() {
+    mark();
+    modal.classList.add("is-open");
+
+    // Güvenlik freni: stil bir sebeple uygulanmadıysa modal tam ekran bir
+    // katman değil, sayfanın sonunda sıradan bir blok olur. O hâlde sayfayı
+    // KİLİTLEME — kullanıcı kapatamadığı bir kilitte kalmasın; pop-up'tan
+    // vazgeç, sayfa normal çalışmaya devam etsin.
+    if (getComputedStyle(modal).position !== "fixed") {
+      modal.classList.remove("is-open");
+      return;
+    }
+
+    lastFocus = document.activeElement;
+    lock();
+    modal.setAttribute("aria-hidden", "false");
+    var card = modal.querySelector(".ig-card");
+    if (card) card.focus({ preventScroll: true });
+    document.addEventListener("keydown", onKey);
+  }
+
+  function close() {
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    unlock();
+    document.removeEventListener("keydown", onKey);
+    if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+  }
+
+  function onKey(e) {
+    if (e.key === "Escape" || e.key === "Esc") close();
+  }
+
+  modal.addEventListener("click", function (e) {
+    if (e.target.closest("[data-ig-close]")) { close(); return; }  // kapat / takip et / şimdi değil
+    if (!e.target.closest(".ig-card")) close();                    // kartın dışı
+  });
+
+  // Sayfadan ayrılırken kilit kalmasın: geri tuşuyla dönüldüğünde tarayıcı
+  // sayfayı önbellekten (bfcache) geri getirebiliyor.
+  window.addEventListener("pagehide", unlock);
+
+  setTimeout(open, DELAY);
+})();
+</script>
+{% endif %}

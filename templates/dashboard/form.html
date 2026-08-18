@@ -11,6 +11,8 @@
 
   <form method="post" enctype="multipart/form-data" class="card p-6">
     {% csrf_token %}
+    {# Stok formundan "yeni marka ekle" ile gelindiyse kaydedince oraya dönülür. #}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
     {% if form.non_field_errors %}<div class="mb-4 text-sm" style="color:#ff8b95">{{ form.non_field_errors }}</div>{% endif %}
 
     <div class="grid sm:grid-cols-2 gap-x-5">
@@ -33,7 +35,8 @@
 
     <div class="flex items-center gap-3 mt-4">
       <button class="btn btn-gradient">Kaydet</button>
-      <a href="{% url 'dashboard:crud_list' key=key %}" class="btn btn-ghost">Vazgeç</a>
+      <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'dashboard:crud_list' key=key %}{% endif %}"
+         class="btn btn-ghost">Vazgeç</a>
     </div>
   </form>
 </div>

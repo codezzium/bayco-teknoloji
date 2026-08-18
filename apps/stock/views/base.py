@@ -2,6 +2,11 @@
 
 from django.core.paginator import Paginator
 
+from apps.dashboard.utils import (  # noqa: F401  (view modülleri buradan alır)
+    preselected,
+    safe_next,
+    with_param,
+)
 from apps.stock.permissions import (  # noqa: F401  (view modülleri buradan alır)
     can_manage_stock,
     can_see_money,

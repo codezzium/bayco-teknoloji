@@ -10,6 +10,28 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}Panel — {{ site.brand_name }}{% endblock %}</title>
   <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
+
+  {% comment %} Cihaza kurulabilir uygulama (PWA). Kurulum düğmesi topbar'da.
+     apple-* etiketleri hâlâ gerekli: iOS bildirimin display/theme alanlarını
+     ancak yeni sürümlerde okur, apple-touch-icon'u ise her zaman arar ve
+     bulamazsa ana ekrana sayfanın ekran görüntüsünü koyar. {% endcomment %}
+  <link rel="manifest" href="{% url 'dashboard:manifest' %}">
+  <meta name="theme-color" content="#150c22">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="{{ site.brand_name }}">
+  {% comment %} beforeinstallprompt sayfanın en başında tetiklenebilir; Alpine
+     ise gövdenin sonunda yüklenir. Olay burada, satır içi ve ertelenmemiş
+     biçimde yakalanmazsa kaçırılır ve düğme kurulumu hiç başlatamaz. {% endcomment %}
+  <script>
+    window.BaycoPWA = { sw: "{% url 'service_worker' %}", scope: "/panel/", prompt: null };
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();          // tarayıcının kendi şeridi çıkmasın
+      window.BaycoPWA.prompt = e;  // düğmeye basılınca kullanılacak
+    });
+  </script>
   {% comment %} Yazı tipleri render'ı ENGELLEMEZ: fonts.googleapis.com'a
      ulaşılamayan bir bağlantıda normal <link rel=stylesheet> ilk boyamayı
      zaman aşımına kadar bekletir ve panel saniyelerce bomboş/bozuk görünür.
@@ -70,12 +92,21 @@
       {% include "dashboard/partials/nav_link.html" with url='stock:intake' key='giris' label='Stok Girişi' icon='download' %}
       {% include "dashboard/partials/nav_link.html" with url='stock:stocktake' key='sayim' label='Sayım' icon='clipboard' %}
 
+      {% comment %} Cihaz/aksesuar kartı açılmadan ÖNCE dolması gereken listeler.
+         Markalar buraya taşındı: yalnızca site içeriği değil, cihaz modelinin ve
+         aksesuarın da zorunlu üst kaydıdır. Sıra iş akışını izler:
+         marka -> cihaz modeli -> cihaz. {% endcomment %}
+      <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">TANIMLAR</div>
+      {% include "dashboard/partials/nav_link.html" with key='markalar' label='Markalar' icon='tag' crud=1 %}
+      {% include "dashboard/partials/nav_link.html" with key='modeller' label='Cihaz Modelleri' icon='cpu' simple=1 %}
+      {% include "dashboard/partials/nav_link.html" with key='kategoriler' label='Aksesuar Kategorileri' icon='folder' simple=1 %}
+
       <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">İÇERİK</div>
       {% include "dashboard/partials/nav_link.html" with key='duyurular' label='Duyurular / Slider' icon='image' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='urunler' label='Ürünler' icon='phone' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='yorumlar' label='Yorumlar' icon='star' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='sss' label='S.S.S.' icon='help' crud=1 %}
-      {% include "dashboard/partials/nav_link.html" with key='markalar' label='Markalar' icon='tag' crud=1 %}
+
       <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">SİSTEM</div>
       {% include "dashboard/partials/nav_link.html" with url='dashboard:settings' key='ayarlar' label='Site Ayarları' icon='settings' %}
     </nav>
@@ -89,8 +120,12 @@
   <!-- Overlay (mobil) -->
   <div x-show="sidebar" x-cloak @click="sidebar=false" class="fixed inset-0 z-40 lg:hidden" style="background:rgba(0,0,0,.5)"></div>
 
+  {% comment %} baycoInstall kapsamı BURADA açılır, topbar'da değil: topbar'ın
+     backdrop-filter'ı içindeki position:fixed öğeler için yeni bir kapsayıcı
+     blok yaratır ve yönerge kutusu ekranı kaplayamaz, başlığın içine hapsolur.
+     Düğme topbar'da, kutu </main>'den sonra — ikisi de aynı x-data'yı görür. {% endcomment %}
   <!-- İçerik -->
-  <div class="min-w-0">
+  <div class="min-w-0" x-data="baycoInstall">
     <!-- Topbar -->
     <header class="sticky top-0 z-30 flex items-center justify-between gap-4 px-5 py-4 border-b"
             style="background:rgba(21,12,34,.85);backdrop-filter:blur(12px);border-color:var(--line)">
@@ -101,6 +136,12 @@
         <h1 class="font-display font-bold text-lg">{% block page_title %}Panel{% endblock %}</h1>
       </div>
       <div class="flex items-center gap-3 text-sm">
+        <button type="button" class="btn btn-ghost btn-sm shrink-0" x-show="show" x-cloak
+                @click="start()" :disabled="busy"
+                title="Paneli telefona veya masaüstüne kısayol olarak kur">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="hidden sm:inline" x-text="busy ? 'Yükleniyor…' : 'Uygulama Olarak Yükle'">Uygulama Olarak Yükle</span>
+        </button>
         <span class="hidden sm:block" style="color:var(--muted)">👤 {{ request.user.username }}</span>
       </div>
     </header>
@@ -119,6 +160,26 @@
     <main class="p-5">
       {% block content %}{% endblock %}
     </main>
+
+    {% comment %} Safari programatik kuruluma izin vermez, Chrome da bazen
+       bildirimi hazır bulamaz. İki durumda da elle yapılacak adımlar burada. {% endcomment %}
+    <div x-show="help" x-cloak @keydown.escape.window="help=false"
+         class="fixed inset-0 z-[60] grid place-items-center p-5"
+         style="background:rgba(0,0,0,.6)">
+      <div @click.outside="help=false" class="card p-5 w-full" style="max-width:26rem">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <h2 class="font-display font-bold" x-text="title"></h2>
+          <button type="button" @click="help=false" class="shrink-0 text-xl leading-none"
+                  style="color:var(--muted)" aria-label="Kapat">&times;</button>
+        </div>
+        <ol class="text-sm space-y-2 list-decimal pl-5" style="color:var(--muted)">
+          <template x-for="(step, i) in steps" :key="i"><li x-text="step"></li></template>
+        </ol>
+        <button type="button" @click="help=false" class="btn btn-gradient btn-sm btn-block mt-4">
+          Anladım
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 {% block scripts %}{% endblock %}
@@ -130,6 +191,8 @@
    alpine:init dinleyicisi hiç tetiklenmez, Alpine.data("baycoScanner") kayıtlı
    olmaz ve tarayıcı bileşeninin TAMAMI ölür (x-cloak kalkmaz → video hiç
    görünmez, "Kamerayı Aç" hiçbir şey yapmaz). {% endcomment %}
+{# install.js her panel sayfasında gerekli (düğme topbar'da) ve aynı sebeple Alpine'dan önce. #}
+<script src="{% static 'js/install.js' %}" defer></script>
 <script src="{% static 'vendor/alpine/alpine.min.js' %}" defer></script>
 </body>
 </html>

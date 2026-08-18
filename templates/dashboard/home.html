@@ -3,8 +3,45 @@
 {% block page_title %}Genel Bakış{% endblock %}
 
 {% block content %}
+<div x-data="{ scanOpen: false }">
+  {% comment %} Mobilde en sık yapılan iki iş yan yana, parmağın altında. sm ve
+     üstünde tarayıcı zaten açık durduğu için bu satır gizlenir. {% endcomment %}
+  <div class="grid grid-cols-2 gap-4 mb-4 sm:hidden">
+    <a href="{% url 'stock:pos' %}" class="card card-hover p-4">
+      <div class="icon-box mb-2">🛒</div>
+      <div class="font-display font-extrabold gradient-text">Satış Yap</div>
+      <div class="text-xs mt-0.5" style="color:var(--muted)">Kasa</div>
+    </a>
+    <button type="button" class="card card-hover p-4 text-left w-full"
+            @click="scanOpen = !scanOpen;
+                    $dispatch(scanOpen ? 'bayco:scan-open' : 'bayco:scan-close')">
+      <div class="icon-box mb-2">📷</div>
+      <div class="font-display font-extrabold">Barkod Tara</div>
+      <div class="text-xs mt-0.5" style="color:var(--muted)"
+           x-text="scanOpen ? 'Kapat' : 'Kod okut'">Kod okut</div>
+    </button>
+  </div>
+
+  {% comment %} Sayfadaki TEK baycoScanner örneği: bileşen document seviyesinde
+     dinler, ikinci bir kopya her okutmada çift POST atardı.
+
+     #scan-result KARDEŞ olarak durur — tarayıcının içine konsaydı her swap
+     <video> elemanını yok ederdi (scanner.html'deki yerleşim kuralı).
+
+     autostart YOK: LOGIN_REDIRECT_URL burasıdır, her panel açılışında kamera
+     izni istemek doğru olmaz. USB/HID okuyucu autostart'tan bağımsız çalışır.
+
+     Statik "hidden sm:block" + Alpine'ın nesne sözdizimi: Alpine boot etmeden
+     mobilde tarayıcı bir an görünüp kaybolmaz. {% endcomment %}
+  <div class="mb-6 max-w-2xl hidden sm:block" :class="{ 'hidden sm:block': !scanOpen }">
+    {% include "stock/partials/scanner.html" with mode='lookup' target='#scan-result' placeholder='Stok kodu, IMEI veya barkod okutun…' %}
+    <div id="scan-result" class="mt-4"></div>
+  </div>
+</div>
+
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
-  <a href="{% url 'stock:pos' %}" class="card card-hover p-5">
+  {# Mobilde bu kart yukarıdaki kısayol satırında zaten var. #}
+  <a href="{% url 'stock:pos' %}" class="card card-hover p-5 hidden sm:block">
     <div class="flex items-center justify-between">
       <div>
         <div class="text-xs" style="color:var(--muted)">Kasa</div>
@@ -54,16 +91,32 @@
       <div class="icon-box">⚠️</div>
     </div>
   </a>
-  <a href="{% url 'stock:scan' %}" class="card card-hover p-5">
+  {# Barkod kartı yerine bu: tarayıcı artık sayfanın en üstünde gömülü. #}
+  <a href="{% url 'stock:sale_list' %}" class="card card-hover p-5">
     <div class="flex items-center justify-between">
       <div>
-        <div class="text-xs" style="color:var(--muted)">Barkod</div>
-        <div class="text-xl font-display font-extrabold mt-1">Tara</div>
+        <div class="text-xs" style="color:var(--muted)">Bugünkü Satış</div>
+        <div class="text-3xl font-display font-extrabold mt-1">{{ stock.sales_today }}</div>
       </div>
-      <div class="icon-box">📷</div>
+      <div class="icon-box">🧾</div>
     </div>
   </a>
   {% endif %}
+</div>
+
+{% comment %} Ölçüt updated_at — cihaz listesinde de "Son İşlem" diye geçen ve
+   varsayılan olan sıralama, o yüzden "Tümü →" tutarlı bir devam ekranı verir. {% endcomment %}
+<div class="card p-5 mb-8">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-display font-bold">Son İşlem Gören Ürünler</h2>
+    <a href="{% url 'stock:device_list' %}" class="text-sm hover:text-white"
+       style="color:var(--muted)">Tümü →</a>
+  </div>
+  <div class="space-y-1 text-sm" style="max-height:26rem;overflow-y:auto">
+    {% for row in recent_products %}
+    {% include "dashboard/partials/recent_product_row.html" %}
+    {% empty %}<p style="color:var(--muted)">Henüz kayıt yok.</p>{% endfor %}
+  </div>
 </div>
 
 <div class="text-xs font-semibold mb-3" style="color:var(--muted)">SİTE İÇERİĞİ</div>
@@ -153,4 +206,10 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% comment %} dashboard/base.html zxing ve scan.js'i yüklemez; tarayıcı widget'ı
+   için altyapı açıkça buradan gelmelidir. {% endcomment %}
+{% block scripts %}
+{% include "stock/partials/scanner_scripts.html" %}
 {% endblock %}

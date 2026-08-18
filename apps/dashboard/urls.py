@@ -10,6 +10,7 @@ urlpatterns = [
     path("", views.home, name="home"),
 
     # Ayarlar & talepler (generic <key>'den ÖNCE)
+    path("manifest.webmanifest", views.manifest, name="manifest"),
     path("ayarlar/", views.settings_view, name="settings"),
     path("talepler/", views.leads, name="leads"),
     path("talep/<str:tip>/<int:pk>/durum/", views.lead_toggle, name="lead_toggle"),

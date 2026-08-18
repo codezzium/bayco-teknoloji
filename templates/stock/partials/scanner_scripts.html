@@ -1,0 +1,30 @@
+{% load static %}
+{% comment %} Barkod tarayıcının JS altyapısı — TEK kaynak.
+
+   İki yerden dahil edilir: stock/base_stock.html (tüm stok sayfaları) ve
+   dashboard/home.html (Genel Bakış'taki tarayıcı widget'ı). Genel Bakış
+   base_stock.html'i extend ETMEZ; kopyalamak yerine buradan alınır.
+
+   Bu blok dashboard/base.html'in {% templatetag openblock %} block scripts {% templatetag closeblock %} bölümüne düşer, yani
+   Alpine'dan ÖNCE çalışır. Sıra bozulursa scan.js'in alpine:init dinleyicisi
+   hiç tetiklenmez ve tarayıcı bileşeni tamamen ölür (bkz. dashboard/base.html
+   sonundaki uzun yorum). {% endcomment %}
+<script defer src="{% static 'vendor/zxing/index.js' %}"></script>
+<script defer src="{% static 'js/scan.js' %}"></script>
+<script defer>
+  // WASM dosyasını kendi statiklerimizden yükle: dükkân wifi'si güvenilmez ve
+  // jsDelivr TR'de zaman zaman erişilemiyor. Sürüm git'te sabitlenmiş olur.
+  window.addEventListener("DOMContentLoaded", function () {
+    if (window.ZXingWASM) {
+      ZXingWASM.prepareZXingModule({
+        overrides: {
+          locateFile: function (path, prefix) {
+            return path.endsWith(".wasm")
+              ? "{% static 'vendor/zxing/zxing_reader.wasm' %}"
+              : prefix + path;
+          },
+        },
+      });
+    }
+  });
+</script>

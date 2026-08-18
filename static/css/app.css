@@ -150,6 +150,7 @@ img { max-width: 100%; display: block; }
   border: 1px solid transparent;
   transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s, background .25s, border-color .25s;
   white-space: nowrap;
+  font-family: inherit;   /* <button> UA yazı tipine düşmesin */
 }
 .btn:active { transform: scale(.97); }
 

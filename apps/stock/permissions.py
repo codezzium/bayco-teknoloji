@@ -61,9 +61,13 @@ class MoneyAwareModelForm(StyledModelForm):
 
     MONEY_FIELDS: list[str] = []
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, back_url="", **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        #: Formu gösteren view'ın tam adresi. Alt formlara ("yeni model ekle")
+        #: `?next=` olarak verilir; boşsa kısayol formun kendi ekleme adresine
+        #: döner. Bkz. apps.dashboard.utils.define_link.
+        self.back_url = back_url
         if not can_see_money(user):
             for name in self.MONEY_FIELDS:
                 self.fields.pop(name, None)

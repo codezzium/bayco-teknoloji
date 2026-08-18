@@ -124,10 +124,20 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
-        # Non-manifest: works in dev without collectstatic. For production
-        # cache-busting, switch to whitenoise.storage.CompressedManifestStaticFilesStorage
-        # and run `manage.py collectstatic`.
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        # Üretimde manifest (içerik hash'li dosya adları), geliştirmede düz kopya.
+        #
+        # nginx /static/ altını 30 gün önbelleğe veriyor (bayco.conf: `expires 30d`).
+        # Dosya adı sabit kaldığı sürece bu, yayına alınan her CSS/JS değişikliğinin
+        # geri gelen ziyaretçiye 30 gün boyunca ULAŞMAMASI demek — HTML taze gelir,
+        # stil eski kalır, sayfa bozuk görünür. Manifest ile ad app.<hash>.css olur:
+        # içerik değişince URL de değişir, önbellek kendiliğinden geçersizleşir.
+        #
+        # DEBUG'ta düz kopya kalıyor: manifest, collectstatic çalıştırılmadan
+        # `runserver` ile çalışmayı imkânsız kılardı.
+        "BACKEND": (
+            "whitenoise.storage.CompressedStaticFilesStorage" if DEBUG
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
     },
 }
 

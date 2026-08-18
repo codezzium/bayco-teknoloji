@@ -21,7 +21,16 @@ from ..forms import (
 from ..labels import LABEL_FORMATS
 from ..models import Accessory, AccessoryCategory, Device, DeviceModel
 from ..utils import trfold
-from .base import can_see_money, panel_required, paginate, pick_template, querystring
+from .base import (
+    can_see_money,
+    paginate,
+    panel_required,
+    pick_template,
+    preselected,
+    querystring,
+    safe_next,
+    with_param,
+)
 
 DEVICE_ORDERING = {
     "-updated_at": "Son İşlem",
@@ -111,8 +120,11 @@ def device_by_code(request, stock_code):
 @panel_required
 def device_form(request, pk=None):
     instance = get_object_or_404(Device, pk=pk) if pk else None
+    # Alan altındaki "yeni model ekle" kısayolu buraya geri döner.
+    back = request.get_full_path()
     if request.method == "POST":
-        form = DeviceForm(request.POST, instance=instance, user=request.user)
+        form = DeviceForm(request.POST, instance=instance, user=request.user,
+                          back_url=back)
         if form.is_valid():
             device = form.save(commit=False)
             if instance is None:
@@ -135,7 +147,11 @@ def device_form(request, pk=None):
         scanned = request.GET.get("imei", "").strip()
         if scanned and instance is None:
             initial["imei1"] = "".join(ch for ch in scanned if ch.isdigit())
-        form = DeviceForm(instance=instance, user=request.user, initial=initial)
+        if instance is None:
+            # "Yeni model ekle"den dönüş: az önce açılan model seçili gelir.
+            initial.update(preselected(request, "device_model"))
+        form = DeviceForm(instance=instance, user=request.user, initial=initial,
+                          back_url=back)
 
     return render(request, "stock/form.html", {
         "active": "cihazlar", "form": form, "title": "Cihazlar",
@@ -254,8 +270,10 @@ def accessory_detail(request, pk):
 @panel_required
 def accessory_form(request, pk=None):
     instance = get_object_or_404(Accessory, pk=pk) if pk else None
+    back = request.get_full_path()
     if request.method == "POST":
-        form = AccessoryForm(request.POST, instance=instance, user=request.user)
+        form = AccessoryForm(request.POST, instance=instance, user=request.user,
+                             back_url=back)
         if form.is_valid():
             accessory = form.save()
             opening = form.cleaned_data.get("opening_qty") or 0
@@ -272,7 +290,10 @@ def accessory_form(request, pk=None):
         scanned = request.GET.get("barkod", "").strip()
         if scanned and instance is None:
             initial["barcode"] = "".join(ch for ch in scanned if ch.isdigit())
-        form = AccessoryForm(instance=instance, user=request.user, initial=initial)
+        if instance is None:
+            initial.update(preselected(request, "category", "brand"))
+        form = AccessoryForm(instance=instance, user=request.user, initial=initial,
+                             back_url=back)
 
     return render(request, "stock/form.html", {
         "active": "aksesuarlar", "form": form, "title": "Aksesuarlar",
@@ -324,16 +345,18 @@ def accessory_adjust(request, pk):
 # Model kataloğu & kategoriler (küçük destek listeleri)
 # ===========================================================================
 
+#: `param`, `?next=` ile çağıran formun bu kaydı hangi query parametresiyle
+#: seçili göstereceğidir (cihaz formu ?device_model=, aksesuar formu ?category=).
 SIMPLE = {
     "modeller": {
         "model": DeviceModel, "form": DeviceModelForm, "title": "Cihaz Modelleri",
-        "singular": "Model", "active": "cihazlar",
+        "singular": "Model", "param": "device_model",
         "select": ("brand",), "order": ("brand__name", "name"),
     },
     "kategoriler": {
         "model": AccessoryCategory, "form": AccessoryCategoryForm,
         "title": "Aksesuar Kategorileri", "singular": "Kategori",
-        "active": "aksesuarlar", "select": (), "order": ("order", "name"),
+        "param": "category", "select": (), "order": ("order", "name"),
     },
 }
 
@@ -353,7 +376,9 @@ def simple_list(request, key):
         items = items.select_related(*cfg["select"])
     items = items.order_by(*cfg["order"])
     return render(request, "stock/simple_list.html", {
-        "active": cfg["active"], "items": items, "key": key,
+        # Yan menüde kendi maddesi vardır: "cihazlar"ı işaretlemek, tanım
+        # sayfasındayken cihaz listesindeymiş gibi görünmeye yol açardı.
+        "active": key, "items": items, "key": key,
         "title": cfg["title"], "singular": cfg["singular"],
         "total": items.count(),
         "create_url": reverse("stock:simple_create", kwargs={"key": key}),
@@ -364,18 +389,29 @@ def simple_list(request, key):
 def simple_form(request, key, pk=None):
     cfg = _simple_cfg(key)
     instance = get_object_or_404(cfg["model"], pk=pk) if pk else None
+    next_url = safe_next(request)
+    # Model formundaki "yeni marka ekle" kısayolu buraya döner; adres kendi
+    # `?next=`ini taşıdığı için cihaz -> model -> marka zinciri korunur.
+    back = request.get_full_path()
     if request.method == "POST":
-        form = cfg["form"](request.POST, instance=instance, user=request.user)
+        form = cfg["form"](request.POST, instance=instance, user=request.user,
+                           back_url=back)
         if form.is_valid():
-            form.save()
+            obj = form.save()
             messages.success(request, f"{cfg['singular']} kaydedildi.")
+            if next_url:
+                return redirect(with_param(next_url, cfg["param"], obj.pk))
             return redirect("stock:simple_list", key=key)
     else:
-        form = cfg["form"](instance=instance, user=request.user)
+        # "Yeni marka ekle"den dönüş (yalnızca cihaz modelinde üst kayıt var).
+        initial = preselected(request, "brand") if instance is None else {}
+        form = cfg["form"](instance=instance, user=request.user, back_url=back,
+                           initial=initial)
     return render(request, "stock/form.html", {
-        "active": cfg["active"], "form": form, "title": cfg["title"],
+        "active": key, "form": form, "title": cfg["title"],
         "singular": cfg["singular"], "is_edit": instance is not None,
-        "back_url": reverse("stock:simple_list", kwargs={"key": key}),
+        "next_url": next_url,
+        "back_url": next_url or reverse("stock:simple_list", kwargs={"key": key}),
     })
 
 

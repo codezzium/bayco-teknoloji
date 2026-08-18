@@ -1,0 +1,36 @@
+{% comment %} Genel Bakış'taki "Son İşlem Gören Ürünler" listesinin tek satırı.
+   Bekler: row = {kind, device|accessory, at} (stock.reports.recent_products).
+
+   stock/partials/device_row.html ve accessory_row.html KULLANILAMAZ: ikisi de
+   dışarıdaki etiket yazdırma formuna (form="lblform") bağlı bir checkbox
+   taşır, Genel Bakış'ta o form yoktur ve checkbox sahipsiz kalırdı. {% endcomment %}
+{% if row.kind == 'cihaz' %}
+<a href="{% url 'stock:device_detail' pk=row.device.pk %}"
+   class="flex items-center justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+  <div class="min-w-0">
+    <div class="truncate">📱 {{ row.device.label }}</div>
+    <div class="text-xs flex items-center gap-2 mt-0.5" style="color:var(--muted)">
+      <span class="font-mono">{{ row.device.stock_code }}</span>
+      {% include "stock/partials/status_badge.html" with device=row.device %}
+    </div>
+  </div>
+  <span class="shrink-0 text-xs" style="color:var(--muted)"
+        title="{{ row.at|date:'d.m.Y H:i' }}">{{ row.at|timesince }} önce</span>
+</a>
+{% else %}
+<a href="{% url 'stock:accessory_detail' pk=row.accessory.pk %}"
+   class="flex items-center justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+  <div class="min-w-0">
+    <div class="truncate">📦 {{ row.accessory }}</div>
+    <div class="text-xs flex flex-wrap items-center gap-x-2 mt-0.5" style="color:var(--muted)">
+      {% if row.accessory.brand %}<span>{{ row.accessory.brand.name }}</span>{% endif %}
+      <span {% if row.accessory.stock_qty < 0 %}style="color:#ff8b95"
+            {% elif row.accessory.is_low_stock %}style="color:#ffd48a"{% endif %}>
+        {{ row.accessory.stock_qty }} adet
+      </span>
+    </div>
+  </div>
+  <span class="shrink-0 text-xs" style="color:var(--muted)"
+        title="{{ row.at|date:'d.m.Y H:i' }}">{{ row.at|timesince }} önce</span>
+</a>
+{% endif %}

@@ -150,6 +150,21 @@ class SiteSettings(models.Model):
         return [u for u in (self.instagram, self.facebook, self.tiktok, self.youtube) if u]
 
     @property
+    def instagram_handle(self):
+        """Instagram adresinden "@kullaniciadi". Adres yoksa/parse edilemezse boş.
+
+        Panele tam URL giriliyor (model URLField); pop-up ve benzeri yerlerde
+        gösterilecek olan ise kullanıcı adı. Sondaki eğik çizgi ve `?igsh=...`
+        gibi paylaşım parametreleri temizlenir.
+        """
+        url = (self.instagram or "").strip()
+        if not url:
+            return ""
+        path = url.split("?")[0].split("#")[0].rstrip("/")
+        handle = path.rsplit("/", 1)[-1]
+        return f"@{handle}" if handle and "." not in handle else ""
+
+    @property
     def opening_hours_spec(self):
         """schema.org openingHoursSpecification listesi.
 

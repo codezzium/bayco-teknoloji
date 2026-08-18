@@ -6,8 +6,10 @@ alanlarını yetkisiz kullanıcıdan tamamen kaldıran katmanı ekler.
 """
 
 from django import forms
+from django.urls import reverse
 
 from apps.catalog.models import Brand
+from apps.dashboard.utils import define_link
 
 from .models import (
     Accessory,
@@ -22,6 +24,14 @@ from .permissions import MoneyAwareModelForm
 
 DATE = forms.DateInput(attrs={"type": "date"})       # mobilde yerel tarih seçici
 DATETIME = forms.DateTimeInput(attrs={"type": "datetime-local"})
+
+
+def _simple_create(key: str) -> str:
+    return reverse("stock:simple_create", kwargs={"key": key})
+
+
+def _brand_create() -> str:
+    return reverse("dashboard:crud_create", kwargs={"key": "markalar"})
 
 
 class DeviceForm(MoneyAwareModelForm):
@@ -52,6 +62,15 @@ class DeviceForm(MoneyAwareModelForm):
         super().__init__(*args, **kwargs)
         self.fields["device_model"].queryset = (
             DeviceModel.objects.filter(is_active=True).select_related("brand")
+        )
+        # Marka ayrı sorulmaz: DeviceModel zaten marka+model çiftidir ve
+        # listede "Apple iPhone 13 Pro" olarak görünür. Serbest metin marka/
+        # model alanları olsaydı "en çok satan model" raporu anlamsızlaşırdı.
+        self.fields["device_model"].empty_label = "— Marka ve model seçin —"
+        self.fields["device_model"].help_text = define_link(
+            _simple_create("modeller"),
+            self.back_url or reverse("stock:device_create"),
+            "model",
         )
         self.fields["supplier"].queryset = Contact.objects.filter(is_supplier=True)
         self.fields["supplier"].empty_label = "— Tedarikçi seçin —"
@@ -86,10 +105,14 @@ class AccessoryForm(MoneyAwareModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        back = self.back_url or reverse("stock:accessory_create")
         self.fields["brand"].queryset = Brand.objects.all()
         self.fields["brand"].empty_label = "— Marka seçin —"
+        self.fields["brand"].help_text = define_link(_brand_create(), back, "marka")
         self.fields["category"].queryset = AccessoryCategory.objects.all()
         self.fields["category"].empty_label = "— Kategori seçin —"
+        self.fields["category"].help_text = define_link(
+            _simple_create("kategoriler"), back, "kategori")
         if self.instance.pk:
             self.fields.pop("opening_qty", None)
 
@@ -101,9 +124,15 @@ class DeviceModelForm(MoneyAwareModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["brand"].empty_label = "— Marka seçin —"
+        self.fields["brand"].help_text = define_link(
+            _brand_create(),
+            self.back_url or _simple_create("modeller"),
+            "marka",
+        )
         self.fields["name"].help_text = (
-            "Tek biçim kullanın: 'iPhone 13 Pro'. Farklı yazımlar raporlarda "
-            "ayrı ürün gibi görünür."
+            "Yalnızca model adı — markayı tekrar yazmayın. Tek biçim kullanın: "
+            "'iPhone 13 Pro'. Farklı yazımlar raporlarda ayrı ürün gibi görünür."
         )
 
 

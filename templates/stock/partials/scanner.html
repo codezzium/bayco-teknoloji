@@ -9,10 +9,19 @@
    YERLEŞİM KURALI: bu bileşen htmx hedefinin ATASI OLAMAZ. #cart bu div'in
    içinde olursa her swap <video> elemanını yok eder, MediaStream ölür ve her
    üründen sonra "Kamerayı Aç"a basmak gerekir. Hedef KARDEŞ olarak render
-   edilmelidir. {% endcomment %}
+   edilmelidir.
+
+   bayco:scan-open / bayco:scan-close, bileşeni katlanır bir kutuya koyan
+   sayfalar içindir (Genel Bakış'ta mobil "Barkod Tara" kartı). Kapanışta
+   stop() ŞART: gizlenmiş bir <video> kamerayı serbest bırakmaz ve iOS'ta
+   turuncu gösterge yanık kalır. Olayı kimse yayınlamazsa iki satır da atıldır.
+   $dispatch @click içinden senkron çağrıldığı sürece iOS'un "kullanıcı
+   dokunuşu" şartı korunur. {% endcomment %}
 <div class="card p-4 transition"
      x-data="baycoScanner({ autostart: {{ autostart|default_if_none:0|yesno:'true,false' }} })"
      @bayco:scan.document="fire($event.detail.code)"
+     @bayco:scan-open.window="start()"
+     @bayco:scan-close.window="stop()"
      :style="ok ? 'box-shadow:0 0 0 3px rgba(37,211,102,.55)' : ''">
 
   <form x-ref="form"

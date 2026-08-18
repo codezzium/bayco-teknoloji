@@ -315,6 +315,38 @@ def expiring_warranty(days=30):
             .order_by("warranty_end"))
 
 
+def recent_products(limit=20) -> list[dict]:
+    """Son işlem gören ürünler — cihaz ve aksesuar tek listede.
+
+    Ölçüt `updated_at`: cihaz listesinde zaten "Son İşlem" diye adlandırılan ve
+    varsayılan olan sıralama (views/catalog.py DEVICE_ORDERING). Satış, durum
+    değişikliği, stok girişi, sayım, kart düzenlemesi — hepsi bu alanı günceller.
+    StockMovement + DeviceStatusLog birleşiminden farkı, henüz hiç hareket
+    görmemiş yeni kartların da listeye girmesidir; "az önce neye dokunduk"
+    sorusunun cevabı budur.
+
+    İki model UNION edilemez (sütunları farklı). Her birinden `limit` kadar
+    çekip Python'da birleştirmek DOĞRU sonucu verir: birleşik listenin ilk
+    `limit` kaydı, iki listenin kendi ilk `limit`inin dışında kalamaz.
+
+    Dönen satırlarda PARA YOKTUR (durum rozeti, adet ve "N önce" yeter). Bu
+    bilinçlidir: can_see_money + defer("purchase_price", "sold_price") kalıbına
+    hiç gerek kalmaz, Personel rolüne maliyet sızma yolu açılmaz.
+    """
+    devices = (Device.objects
+               .select_related("device_model__brand")
+               .order_by("-updated_at")[:limit])
+    accessories = (Accessory.objects
+                   .select_related("brand")
+                   .order_by("-updated_at")[:limit])
+
+    rows = [{"kind": "cihaz", "device": d, "at": d.updated_at} for d in devices]
+    rows += [{"kind": "aksesuar", "accessory": a, "at": a.updated_at}
+             for a in accessories]
+    rows.sort(key=lambda row: row["at"], reverse=True)
+    return rows[:limit]
+
+
 # ---------------------------------------------------------------------------
 # Panel özeti
 # ---------------------------------------------------------------------------
