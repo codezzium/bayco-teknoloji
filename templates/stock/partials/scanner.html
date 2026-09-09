@@ -33,16 +33,36 @@
     </div>
   </form>
 
-  <div class="mt-3 rounded-2xl overflow-hidden relative" style="background:#000;aspect-ratio:4/3"
-       x-show="on" x-cloak>
-    <video x-ref="video" class="w-full h-full object-cover" playsinline muted autoplay></video>
+  {% comment %} aspect-ratio 4/3 ile getUserMedia'dan istenen 4:3 kare BİREBİR
+     örtüşür — object-cover hiçbir şey kırpmaz. Oran değiştirilecekse
+     scan.js'teki c.capture oranı da birlikte değişmelidir. {% endcomment %}
+  {% comment %} :style DAİMA nesne biçiminde: string biçimi style attribute'unu
+     komple değiştirir; buradaki statik background/aspect-ratio'yu siler ve
+     x-show'un koyduğu display:none'ı ezip gizli elemanı görünür yapar. Nesne
+     biçimi tek tek setProperty çağırır, geri kalanına dokunmaz. {% endcomment %}
+  <div x-ref="box" class="mt-3 rounded-2xl overflow-hidden relative"
+       style="background:#000;aspect-ratio:4/3" x-show="on" x-cloak
+       @click="tapFocus($event)" :style="{ cursor: focusable ? 'crosshair' : '' }">
+    <video x-ref="video" class="w-full h-full object-cover" playsinline muted autoplay
+           :style="{ transform: !zoomHw && zoom > 1 ? 'scale(' + zoom + ')' : '',
+                     transformOrigin: 'center' }"></video>
     {% comment %} Nişangâh GENİŞ ve alçaktır: EAN-13 kısa ve geniştir, kare bir çerçeve
-       1D barkodda okuma oranını belirgin biçimde düşürür. {% endcomment %}
-    <div class="absolute inset-x-6 top-1/2 -translate-y-1/2 h-24 rounded-xl pointer-events-none"
+       1D barkodda okuma oranını belirgin biçimde düşürür.
+
+       x-ref="reticle": scan.js bu elemanın GERÇEK ölçüsünü okuyup video
+       pikseline çevirir ve YALNIZCA burayı, küçültmeden çözer. Sınıflar
+       değişirse okuma alanı da onunla birlikte kayar — sabit oran YOKTUR. {% endcomment %}
+    <div x-ref="reticle"
+         class="absolute inset-x-6 top-1/2 -translate-y-1/2 h-24 rounded-xl pointer-events-none"
          style="border:2px solid rgba(255,255,255,.85);box-shadow:0 0 0 9999px rgba(0,0,0,.35)"></div>
-    <div class="absolute inset-x-0 bottom-2 text-center text-xs" style="color:rgba(255,255,255,.8)">
-      Barkodu çerçeveye getirin
-    </div>
+    <div class="absolute rounded-full pointer-events-none" x-show="focusPt" x-cloak
+         :style="{ width: '56px', height: '56px',
+                   left: (focusPt ? focusPt.x - 28 : 0) + 'px',
+                   top: (focusPt ? focusPt.y - 28 : 0) + 'px',
+                   border: '2px solid rgba(255,214,0,.9)' }"></div>
+    <div class="absolute inset-x-0 bottom-2 text-center text-xs" style="color:rgba(255,255,255,.8)"
+         x-text="zoomable ? 'Barkodu çerçeveye getirin — yaklaşmayın, 🔍 ile büyütün'
+                          : 'Barkodu çerçeveye getirin'"></div>
   </div>
 
   <div class="flex flex-wrap items-center gap-2 mt-3">
@@ -51,15 +71,29 @@
       Kamerayı Aç
     </button>
     <button type="button" class="btn btn-ghost btn-sm" x-show="on" x-cloak @click="stop()">Kamerayı Kapat</button>
-    {% comment %} iOS Safari'de torch YOKTUR (getCapabilities().torch daima false) —
-       ölü kontrol göstermemek için tamamen gizlenir. {% endcomment %}
+    {% comment %} Torch iOS Safari'de uzun süre yoktu, 17.4+ ile geldi. Kontrol
+       capability sürücülüdür: desteklemeyen cihazda hiç görünmez, destekleyende
+       kendiliğinden çıkar. Karanlıkta çerçevesi vurgulanır ama OTOMATİK açılmaz —
+       parlak/laminasyonlu etiketlerde parlama yapıp okumayı kötüleştirebilir. {% endcomment %}
     <button type="button" class="btn btn-ghost btn-sm" x-show="on && torchable" x-cloak
-            @click="toggleTorch()" :class="torchOn ? 'badge-brand' : ''">🔦 Işık</button>
+            @click="toggleTorch()" :class="torchOn ? 'badge-brand' : ''"
+            :style="{ borderColor: dark && !torchOn ? 'rgba(255,209,102,.75)' : '',
+                      color: dark && !torchOn ? '#ffd166' : '' }">🔦 Işık</button>
+    {% comment %} Zoom, "kamera odaklanmıyor" şikâyetinin asıl çözümü: telefonu
+       yaklaştırmak yerine 15-25 cm'de tutup büyütmek. Donanım zoom'u yoksa ve
+       çözünürlük yetmiyorsa kontrol HİÇ gösterilmez (ölü buton olmasın). {% endcomment %}
+    <label class="flex items-center gap-2 text-xs" x-show="on && zoomable" x-cloak
+           style="color:var(--muted)">
+      <span x-text="'🔍 ' + zoom.toFixed(1) + '×'" style="min-width:44px"></span>
+      <input type="range" style="width:120px;accent-color:var(--magenta)"
+             :min="_zoomMin" :max="zoomMax" :step="_zoomStep"
+             :value="zoom" @input="setZoom($event.target.value)">
+    </label>
     <select class="select" style="width:auto;padding:6px 32px 6px 10px"
             x-show="on && cams.length > 1" x-cloak
             x-model="camId" @change="pickCam(camId)">
-      <template x-for="cam in cams" :key="cam.deviceId">
-        <option :value="cam.deviceId" x-text="cam.label || 'Kamera'"></option>
+      <template x-for="(cam, i) in cams" :key="cam.deviceId">
+        <option :value="cam.deviceId" x-text="camLabel(cam, i)"></option>
       </template>
     </select>
     <span id="scan-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Aranıyor…</span>
@@ -67,6 +101,22 @@
 
   <p class="text-sm mt-3 rounded-xl px-3 py-2" x-show="err" x-cloak x-text="err"
      style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)"></p>
+
+  {% comment %} Ultra-geniş kamera sabit odaklıdır ve küçük barkodu okuyamaz.
+     Hangi cihazın ultra-geniş olduğunu ÖNCEDEN bilemeyiz (Android etiketleri
+     "camera2 0, facing back" der, odak bilgisi yoktur); ama AÇILAN kamera odak
+     kipi bildirmiyorsa sabit odaklı olduğunu söyleyebiliriz. {% endcomment %}
+  <p class="text-xs mt-2" x-show="on && fixedFocus" x-cloak style="color:#ffd166">
+    Bu kamera sabit odaklı — küçük barkodları okumakta zorlanır.
+    Listeden başka bir kamera deneyin.
+  </p>
+
+  {% comment %} Çözünürlük düşük geldiyse küçük barkod hiçbir ayarla okunmaz;
+     sessizce başarısız olmak yerine sebebini söyle. {% endcomment %}
+  <p class="text-xs mt-2" x-show="on && lowRes" x-cloak style="color:#ffd166">
+    Bu kamera düşük çözünürlük veriyor (<span x-text="res"></span>) — küçük
+    barkodlar için barkod okuyucu kullanın veya kodu elle yazın.
+  </p>
 
   {% comment %} iOS otomatik açmayı dokunuş olmadan reddeder; ilk dokunuşta
      kendiliğinden yeniden denenir (scan.js armGesture). {% endcomment %}
