@@ -17,7 +17,7 @@ class QuoteRequest(models.Model):
     model = models.CharField("Model", max_length=120, blank=True)
     year = models.CharField("Yıl", max_length=10, blank=True)
     storage = models.CharField("Hafıza", max_length=40, blank=True)
-    condition = models.CharField("Durum", max_length=80, blank=True)
+    condition = models.CharField("Durum", max_length=255, blank=True)
     note = models.TextField("Not / Ek Bilgi", blank=True)
 
     product = models.ForeignKey(
