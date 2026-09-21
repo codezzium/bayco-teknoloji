@@ -51,7 +51,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "config.middleware.MediaWhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -100,6 +100,31 @@ DATABASES = {
     }
 }
 
+# Ortak Postgres (shared-pgbouncer). DB_HOST tanımlıysa yukarıdaki SQLite dalı
+# yerine bu kullanılır; SQLite geliştirmede ve tek başına çalıştırmada kalır.
+#
+# CONN_MAX_AGE=0 ve DISABLE_SERVER_SIDE_CURSORS=True ZORUNLU: bağlantı
+# PgBouncer'ın transaction pooling moduna gidiyor. O modda bir bağlantı her
+# transaction bitiminde başka bir istemciye devredilebilir; kalıcı bağlantı
+# (CONN_MAX_AGE) yanlış oturuma yapışır, sunucu taraflı imleç (DECLARE CURSOR)
+# ise kendini açan transaction'dan sonra kaybolur.
+#
+# Yukarıdaki SQLite OPTIONS'ı (WAL / IMMEDIATE / timeout) bilerek taşınmadı:
+# hepsi SQLite'a özgü, Postgres'te karşılığı yok.
+if os.environ.get("DB_HOST"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("DB_NAME"),
+            "USER": os.environ.get("DB_USER"),
+            "PASSWORD": os.environ.get("DB_PASSWORD"),
+            "HOST": os.environ.get("DB_HOST"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+            "CONN_MAX_AGE": 0,
+            "DISABLE_SERVER_SIDE_CURSORS": True,
+        }
+    }
+
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -144,6 +169,12 @@ STORAGES = {
 # Media files (uploads)
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# WhiteNoise dosya listesini normalde açılışta bir kez tarar. Medya artık ondan
+# geçtiği için, panelden yüklenen bir görsel konteyner yeniden başlatılana kadar
+# 404 dönerdi. Autorefresh her istekte dosya sistemine bakar; bu sitenin
+# trafiğinde maliyeti önemsiz.
+WHITENOISE_AUTOREFRESH = True
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

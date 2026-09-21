@@ -1,0 +1,13 @@
+# Ortak Postgres (shared-pgbouncer) erişimi.
+# Kullanım: docker compose -f docker-compose.yml -f docker-compose.shared.yml up -d
+#
+# Ana docker-compose.yml bilerek ağ tanımı içermiyor; tek başına
+# `docker compose up -d` ile SQLite üzerinden ayağa kalkabiliyor.
+services:
+  web:
+    networks:
+      - shared-db-net
+
+networks:
+  shared-db-net:
+    external: true
