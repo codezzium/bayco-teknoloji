@@ -8,8 +8,7 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8090
-             --workers 1 --timeout 60 --access-logfile - --error-logfile -"
+             gunicorn config.wsgi:application --bind 0.0.0.0:8090 --workers 1 --timeout 60 --access-logfile - --error-logfile -"
     volumes:
       # db.sqlite3, media/ ve staticfiles/ host'ta kalsın (rebuild'de kaybolmasın,
       # nginx alias ile diskten okuyabilsin).
