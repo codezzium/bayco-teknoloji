@@ -15,7 +15,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Case, F, Q, Sum, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -292,6 +292,7 @@ class Device(models.Model):
     # ------------------------------------------------------------------
     # Türetilmiş alanlar
     # ------------------------------------------------------------------
+    @transaction.atomic
     def save(self, *args, **kwargs):
         self.imei1 = digits_only(self.imei1)
         self.imei2 = digits_only(self.imei2)
@@ -474,6 +475,7 @@ class Accessory(models.Model):
     def __str__(self):
         return f"{self.name} {self.variant}".strip()
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
         if not self.sku:
             self.sku = next_code("accessory", "BYC-A")
