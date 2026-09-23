@@ -419,6 +419,32 @@ def _sell_device(device: Device, *, sale: Sale, item: SaleItem, user) -> None:
     unpublish_device(device)
 
 
+IDENTIFIERS = ["imei1", "imei2", "serial_no"]
+
+
+def _sold_device_with_imei(imei: str) -> Device | None:
+    if not imei:
+        return None
+    return (Device.objects.select_for_update()
+            .filter(Q(imei1=imei) | Q(imei2=imei), status=Device.Status.SATILDI)
+            .first())
+
+
+def _previous_record(device: Device, sale: Sale) -> Device | None:
+    if not device.imei1:
+        return None
+    return (Device.objects
+            .filter(status=Device.Status.SATILDI, imei1="", status_logs__sale=sale,
+                    sale_items__item_imei=device.imei1)
+            .order_by("-pk").first())
+
+
+def _move_identifiers(source: Device, target: Device) -> None:
+    for name in IDENTIFIERS:
+        setattr(target, name, getattr(source, name))
+        setattr(source, name, "")
+
+
 def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
     """Takasla gelen cihazı stoğa alır ve fişe bağlar.
 
@@ -429,11 +455,13 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
     from .models import DeviceModel
 
     amount = _q(entry["amount"])
+    imei = digits_only(entry.get("imei1", ""))
+    previous = _sold_device_with_imei(imei)
     device = Device(
         device_model=DeviceModel.objects.get(pk=entry["device_model_id"]),
         condition=entry.get("condition", Device.Condition.IKINCI_EL),
         status=Device.Status.STOKTA,
-        imei1=digits_only(entry.get("imei1", "")),
+        imei1=imei,
         color=entry.get("color", ""),
         storage=entry.get("storage", ""),
         defect_note=entry.get("note", ""),
@@ -443,6 +471,13 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
         acquisition=Device.Acquisition.TAKAS,
         created_by=user,
     )
+    note = f"Takas girişi — fiş {sale.receipt_no}"
+    if previous:
+        _move_identifiers(previous, device)
+        previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_at"])
+        device.color = device.color or previous.color
+        device.storage = device.storage or previous.storage
+        note = f"{note} · önceki kayıt {previous.stock_code}"
     try:
         device.full_clean(exclude=["stock_code", "warranty_end", "search_blob"])
     except ValidationError as exc:
@@ -450,8 +485,13 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
     device.save()
     DeviceStatusLog.objects.create(
         device=device, from_status="", to_status=Device.Status.STOKTA,
-        sale=sale, note=f"Takas girişi — fiş {sale.receipt_no}", created_by=user,
+        sale=sale, note=note, created_by=user,
     )
+    if previous:
+        DeviceStatusLog.objects.create(
+            device=previous, from_status=previous.status, to_status=previous.status,
+            sale=sale, note=f"Takasla geri alındı: {device.stock_code}", created_by=user,
+        )
     return TradeIn.objects.create(sale=sale, device=device, amount=amount,
                                   note=entry.get("note", "")[:200])
 
@@ -581,9 +621,18 @@ def void_sale(sale: Sale, *, user=None, reason: str = "") -> Sale:
 
     for trade_in in sale.trade_ins.select_related("device"):
         device = trade_in.device
+        previous = _previous_record(device, sale)
         trade_in.delete()
         device.status_logs.all().delete()
         device.delete()
+        if previous:
+            _move_identifiers(device, previous)
+            previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_at"])
+            DeviceStatusLog.objects.create(
+                device=previous, from_status=previous.status, to_status=previous.status,
+                sale=sale, note="Takas fişi iptal edildi, IMEI geri alındı",
+                created_by=user,
+            )
 
     sale.status = Sale.Status.IPTAL
     sale.voided_at = timezone.now()

@@ -14,6 +14,7 @@ from .base import (
     can_see_money,
     paginate,
     panel_required,
+    patron_required,
     pick_template,
     querystring,
     safe_next,
@@ -110,7 +111,7 @@ def contact_form(request, pk=None):
     })
 
 
-@panel_required
+@patron_required
 @require_POST
 def contact_delete(request, pk):
     contact = get_object_or_404(Contact, pk=pk)

@@ -262,7 +262,8 @@ class StockMovementFlowTests(PanelFlowTestCase):
 class SaleFlowTests(PanelFlowTestCase):
     def setUp(self):
         super().setUp()
-        self.device = self.make_device(imei1="351234567890123")
+        self.device = self.make_device(imei1="351234567890123", storage="128GB",
+                                       color="Mavi")
         self.accessory = self.make_accessory(barcode="8690000000017")
 
     def fill_cart(self):
@@ -339,6 +340,71 @@ class SaleFlowTests(PanelFlowTestCase):
         self.assertEqual(sale.status, Sale.Status.IPTAL)
         self.assertEqual(sale.paid_total, TL("0.00"))
         self.assertEqual(self.device.status, Device.Status.STOKTA)
+
+    def sell_first(self):
+        self.fill_cart()
+        self.client.post(reverse("stock:checkout"),
+                         {"paid_amount": "", "payment_method": "nakit"})
+        return Sale.objects.get()
+
+    def trade_back(self, imei, amount="9000"):
+        self.client.post(reverse("stock:scan_resolve"),
+                         {"mode": "sale", "code": self.accessory.barcode})
+        self.client.post(reverse("stock:cart_customer"), {"customer": self.customer.pk})
+        self.client.post(reverse("stock:cart_trade_in"), {
+            "device_model": self.model.pk, "amount": amount, "imei1": imei,
+            "color": "", "storage": "", "note": "",
+        })
+        return self.client.post(reverse("stock:checkout"),
+                                {"paid_amount": "", "payment_method": "nakit"})
+
+    def test_sold_device_can_come_back_as_a_trade_in(self):
+        first_sale = self.sell_first()
+        response = self.trade_back(self.device.imei1)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Sale.objects.count(), 2)
+
+        returned = Device.objects.get(imei1="351234567890123")
+        self.assertNotEqual(returned.pk, self.device.pk)
+        self.assertEqual(returned.status, Device.Status.STOKTA)
+        self.assertEqual(returned.acquisition, Device.Acquisition.TAKAS)
+        self.assertEqual(returned.purchase_price, TL("9000.00"))
+        self.assertEqual((returned.storage, returned.color), ("128GB", "Mavi"))
+        self.assertIn(self.device.stock_code, returned.status_logs.get().note)
+
+        self.device.refresh_from_db()
+        self.assertEqual((self.device.status, self.device.imei1),
+                         (Device.Status.SATILDI, ""))
+        self.assertEqual(self.device.sold_to, self.customer)
+        self.assertTrue(self.device.status_logs.filter(
+            note__contains=returned.stock_code).exists())
+        self.assertEqual(first_sale.items.get(kind=SaleItem.Kind.CIHAZ).item_imei,
+                         "351234567890123")
+
+        self.client.post(reverse("stock:scan_resolve"),
+                         {"mode": "sale", "code": returned.stock_code})
+        self.client.post(reverse("stock:cart_customer"), {"customer": self.customer.pk})
+        self.client.post(reverse("stock:checkout"),
+                         {"paid_amount": "0", "payment_method": "nakit"})
+        returned.refresh_from_db()
+        self.assertEqual(returned.status, Device.Status.SATILDI)
+        self.assertEqual(Sale.objects.count(), 3)
+
+    def test_voiding_the_trade_in_sale_gives_the_imei_back(self):
+        self.sell_first()
+        self.trade_back(self.device.imei1)
+        self.assertEqual(Sale.objects.count(), 2)
+        self.assertTrue(Device.objects.filter(acquisition=Device.Acquisition.TAKAS).exists())
+        second = Sale.objects.latest("id")
+        response = self.client.post(reverse("stock:sale_void", kwargs={"pk": second.pk}),
+                                    {"reason": "Yanlış işlem"})
+        self.assertEqual(response.status_code, 302)
+        second.refresh_from_db()
+        self.assertEqual(second.status, Sale.Status.IPTAL)
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.imei1, "351234567890123")
+        self.assertFalse(Device.objects.filter(acquisition=Device.Acquisition.TAKAS).exists())
+        self.assertEqual(Device.objects.get(imei1="351234567890123"), self.device)
 
     def test_sold_device_keeps_history(self):
         self.fill_cart()

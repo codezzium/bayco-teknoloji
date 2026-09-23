@@ -1,7 +1,9 @@
 <div class="flex items-center gap-2 shrink-0">
   <a href="{% url 'dashboard:crud_edit' key=key pk=obj.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
+  {% if perms.stock.view_money %}
   <button hx-post="{% url 'dashboard:crud_delete' key=key pk=obj.pk %}"
           hx-target="#item-{{ obj.pk }}" hx-swap="outerHTML"
           hx-confirm="Silmek istediğinize emin misiniz?"
           class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+  {% endif %}
 </div>

@@ -13,7 +13,14 @@ from .. import services
 from ..forms import PaymentForm
 from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem
 from ..utils import parse_money, trfold
-from .base import can_see_money, panel_required, paginate, pick_template, querystring
+from .base import (
+    can_see_money,
+    paginate,
+    panel_required,
+    patron_required,
+    pick_template,
+    querystring,
+)
 
 
 def cart_context(request, cart=None) -> dict:
@@ -331,7 +338,7 @@ def sale_item_return(request, pk, item_id):
     return redirect("stock:sale_detail", pk=pk)
 
 
-@panel_required
+@patron_required
 @require_POST
 def sale_void(request, pk):
     sale = get_object_or_404(Sale, pk=pk)

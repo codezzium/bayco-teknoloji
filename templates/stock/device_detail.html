@@ -270,6 +270,7 @@
       </form>
     </div>
 
+    {% if perms.stock.view_money %}
     <form method="post" action="{% url 'stock:device_delete' pk=device.pk %}"
           onsubmit="return confirm('{{ device.stock_code }} silinsin mi? Bu işlem geri alınamaz.')">
       {% csrf_token %}
@@ -278,6 +279,7 @@
         Cihazı Sil
       </button>
     </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -11,7 +11,7 @@ from apps.catalog.models import Brand, Product
 from apps.leads.models import ContactMessage, QuoteRequest, ServiceRequest
 from apps.sitecore.models import FAQ, SiteSettings, Slider, Testimonial
 from apps.stock.models import Accessory, DeviceModel
-from apps.stock.permissions import GROUP_PERSONEL
+from apps.stock.permissions import GROUP_PATRON, GROUP_PERSONEL
 
 from .views import CRUD
 
@@ -289,3 +289,67 @@ class SettingsAndLeadTests(PanelTestCase):
         self.assertEqual(manifest.json()["start_url"], reverse("dashboard:home"))
         worker = self.client.get(reverse("service_worker"))
         self.assertEqual(worker["Cache-Control"], "no-cache")
+
+
+class PersonelLimitTests(PanelTestCase):
+    def setUp(self):
+        self.client.force_login(self.personel)
+
+    def test_personel_cannot_delete_site_records(self):
+        for key, record in self.records().items():
+            with self.subTest(key=key):
+                response = self.client.post(
+                    reverse("dashboard:crud_delete", kwargs={"key": key, "pk": record.pk}),
+                    HTTP_HX_REQUEST="true")
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(type(record).objects.filter(pk=record.pk).exists())
+
+    def test_personel_cannot_delete_leads(self):
+        for tip, record in (("quote", self.quote), ("service", self.service),
+                            ("contact", self.message)):
+            with self.subTest(tip=tip):
+                response = self.client.post(
+                    reverse("dashboard:lead_delete", kwargs={"tip": tip, "pk": record.pk}))
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(type(record).objects.filter(pk=record.pk).exists())
+
+    def test_personel_cannot_open_or_change_site_settings(self):
+        url = reverse("dashboard:settings")
+        self.assertEqual(self.client.get(url).status_code, 302)
+        self.client.post(url, {"brand_name": "Başka", "whatsapp_number": "900000000000"})
+        self.assertNotEqual(SiteSettings.load().whatsapp_number, "900000000000")
+
+    def test_personel_does_not_see_delete_buttons_or_settings(self):
+        body = self.client.get(reverse("dashboard:crud_list",
+                                       kwargs={"key": "urunler"})).content.decode()
+        self.assertNotIn(reverse("dashboard:crud_delete",
+                                 kwargs={"key": "urunler", "pk": self.product.pk}), body)
+        self.assertNotIn(reverse("dashboard:settings"), body)
+        body = self.client.get(reverse("dashboard:leads")).content.decode()
+        self.assertNotIn(reverse("dashboard:lead_delete",
+                                 kwargs={"tip": "quote", "pk": self.quote.pk}), body)
+
+    def test_personel_can_still_add_edit_and_handle_leads(self):
+        response = self.client.post(reverse("dashboard:crud_create", kwargs={"key": "markalar"}),
+                                    {"name": "Anker", "order": "0"})
+        self.assertEqual(response.status_code, 302)
+        toggle = reverse("dashboard:crud_toggle", kwargs={"key": "urunler",
+                                                          "pk": self.product.pk,
+                                                          "field": "is_active"})
+        self.assertEqual(self.client.post(toggle).status_code, 200)
+        lead = reverse("dashboard:lead_toggle", kwargs={"tip": "quote", "pk": self.quote.pk})
+        self.assertEqual(self.client.post(lead).status_code, 200)
+
+
+class PatronGroupTests(PanelTestCase):
+    def test_patron_group_member_has_full_access(self):
+        owner = User.objects.create_user("sahip", password=PASSWORD)
+        owner.groups.add(Group.objects.get(name=GROUP_PATRON))
+        self.client.force_login(owner)
+        self.assertEqual(self.client.get(reverse("dashboard:settings")).status_code, 200)
+        body = self.client.get(reverse("dashboard:crud_list",
+                                       kwargs={"key": "urunler"})).content.decode()
+        delete = reverse("dashboard:crud_delete", kwargs={"key": "urunler", "pk": self.product.pk})
+        self.assertIn(delete, body)
+        self.assertEqual(self.client.post(delete, HTTP_HX_REQUEST="true").status_code, 200)
+        self.assertFalse(Product.objects.filter(pk=self.product.pk).exists())

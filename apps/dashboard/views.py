@@ -12,7 +12,7 @@ from apps.catalog.models import Brand, Product
 from apps.leads.models import ContactMessage, QuoteRequest, ServiceRequest
 from apps.leads.utils import customer_wa
 from apps.sitecore.models import FAQ, SiteSettings, Slider, Testimonial
-from apps.stock.permissions import can_see_money, in_panel, panel_required
+from apps.stock.permissions import can_see_money, in_panel, panel_required, patron_required
 
 from .forms import (
     BrandForm,
@@ -164,7 +164,7 @@ def crud_form(request, key, pk=None):
     })
 
 
-@staff_required
+@patron_required
 @require_POST
 def crud_delete(request, key, pk):
     cfg = _cfg(key)
@@ -233,7 +233,7 @@ def lead_toggle(request, tip, pk):
     })
 
 
-@staff_required
+@patron_required
 @require_POST
 def lead_delete(request, tip, pk):
     model = LEAD_MODELS.get(tip)
@@ -245,7 +245,7 @@ def lead_delete(request, tip, pk):
 
 # ---------- Site Ayarları ----------
 
-@staff_required
+@patron_required
 def settings_view(request):
     obj = SiteSettings.load()
     if request.method == "POST":

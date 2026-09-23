@@ -46,8 +46,13 @@ def can_manage_stock(user) -> bool:
                 and (user.has_perm(MANAGE_PERM) or user.is_superuser))
 
 
+def is_patron(user) -> bool:
+    return can_see_money(user)
+
+
 panel_required = user_passes_test(in_panel, login_url="dashboard:login")
 money_required = user_passes_test(can_see_money, login_url="dashboard:login")
+patron_required = user_passes_test(is_patron, login_url="dashboard:login")
 
 
 class MoneyAwareModelForm(StyledModelForm):

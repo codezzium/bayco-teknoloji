@@ -12,6 +12,7 @@ from apps.stock.permissions import (  # noqa: F401  (view modÃ¼lleri buradan alÄ
     can_see_money,
     money_required,
     panel_required,
+    patron_required,
 )
 
 PAGE_SIZE = 25

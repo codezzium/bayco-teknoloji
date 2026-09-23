@@ -107,8 +107,10 @@
       {% include "dashboard/partials/nav_link.html" with key='yorumlar' label='Yorumlar' icon='star' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='sss' label='S.S.S.' icon='help' crud=1 %}
 
+      {% if perms.stock.view_money %}
       <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">SİSTEM</div>
       {% include "dashboard/partials/nav_link.html" with url='dashboard:settings' key='ayarlar' label='Site Ayarları' icon='settings' %}
+      {% endif %}
     </nav>
 
     <div class="p-3 shrink-0 border-t" style="border-color:var(--line)">

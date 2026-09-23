@@ -110,6 +110,7 @@
     </div>
     {% endif %}
 
+    {% if perms.stock.view_money %}
     <form method="post" action="{% url 'stock:contact_delete' pk=contact.pk %}"
           onsubmit="return confirm('{{ contact.full_name|escapejs }} silinsin mi?')">
       {% csrf_token %}
@@ -118,6 +119,7 @@
         Cariyi Sil
       </button>
     </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

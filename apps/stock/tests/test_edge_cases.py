@@ -1,8 +1,10 @@
 import html
 import re
 from decimal import Decimal
+from io import StringIO
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
@@ -11,6 +13,7 @@ from apps.stock import cart as cart_utils
 from apps.stock import services
 from apps.stock.models import (
     Accessory,
+    AccessoryCategory,
     Contact,
     Device,
     DeviceModel,
@@ -21,6 +24,7 @@ from apps.stock.models import (
     SaleItem,
     TradeIn,
 )
+from apps.stock.permissions import GROUP_PERSONEL
 
 TL = Decimal
 SCANNED = "8816581028935"
@@ -240,6 +244,26 @@ class PosInputTests(EdgeCaseTestCase):
         self.assertFalse(Sale.objects.exists())
         self.assertEqual(Device.objects.count(), 1)
 
+    def test_trade_in_matching_the_second_imei_moves_both(self):
+        device = services.create_device(
+            user=self.patron, device_model=self.model, imei1="351111111111111",
+            imei2="352222222222222", purchase_price=TL("1000"), list_price=TL("1500"))
+        services.create_sale_from_cart(
+            {"customer_id": self.customer.pk,
+             "lines": [{"lid": "d", "kind": "cihaz", "id": device.pk, "name": "x",
+                        "qty": 1, "unit": "1500"}]},
+            user=self.patron)
+        services.create_sale_from_cart(
+            {"customer_id": self.customer.pk, "lines": [],
+             "trade_ins": [{"device_model_id": self.model.pk, "amount": "800",
+                            "imei1": "352222222222222"}]},
+            user=self.patron)
+        returned = Device.objects.get(acquisition=Device.Acquisition.TAKAS)
+        self.assertEqual((returned.imei1, returned.imei2),
+                         ("351111111111111", "352222222222222"))
+        device.refresh_from_db()
+        self.assertEqual((device.imei1, device.imei2), ("", ""))
+
     def test_trade_in_long_note_is_trimmed(self):
         self.client.post(reverse("stock:cart_customer"), {"customer": self.customer.pk})
         self.add_trade_in(color="Mavi", storage="128GB", note=LONG)
@@ -332,3 +356,60 @@ class ScriptInjectionTests(EdgeCaseTestCase):
         sale = self.sell_accessory()
         self.assert_not_injected(self.client.get(
             reverse("stock:sale_detail", kwargs={"pk": sale.pk})))
+
+
+class PersonelLimitTests(EdgeCaseTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        call_command("seed_roles", stdout=StringIO(), stderr=StringIO())
+        cls.personel = User.objects.create_user("personel", password="pw")
+        cls.personel.groups.add(Group.objects.get(name=GROUP_PERSONEL))
+        cls.category = AccessoryCategory.objects.create(name="Kılıf")
+
+    def setUp(self):
+        self.client.force_login(self.personel)
+
+    def test_personel_cannot_delete_or_void(self):
+        sale = self.sell_accessory()
+        for url in (reverse("stock:device_delete", kwargs={"pk": self.device.pk}),
+                    reverse("stock:contact_delete", kwargs={"pk": self.customer.pk}),
+                    reverse("stock:simple_delete",
+                            kwargs={"key": "kategoriler", "pk": self.category.pk}),
+                    reverse("stock:sale_void", kwargs={"pk": sale.pk})):
+            with self.subTest(url=url):
+                response = self.client.post(url, {"reason": "deneme"})
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response["Location"].startswith(reverse("dashboard:login")))
+        self.assertTrue(Device.objects.filter(pk=self.device.pk).exists())
+        self.assertTrue(Contact.objects.filter(pk=self.customer.pk).exists())
+        self.assertTrue(AccessoryCategory.objects.filter(pk=self.category.pk).exists())
+        sale.refresh_from_db()
+        self.assertEqual(sale.status, Sale.Status.TAMAMLANDI)
+
+    def test_personel_does_not_see_delete_or_void_buttons(self):
+        sale = self.sell_accessory()
+        for page, hidden in (
+            (reverse("stock:device_detail", kwargs={"pk": self.device.pk}),
+             reverse("stock:device_delete", kwargs={"pk": self.device.pk})),
+            (reverse("stock:contact_detail", kwargs={"pk": self.customer.pk}),
+             reverse("stock:contact_delete", kwargs={"pk": self.customer.pk})),
+            (reverse("stock:simple_list", kwargs={"key": "kategoriler"}),
+             reverse("stock:simple_delete",
+                     kwargs={"key": "kategoriler", "pk": self.category.pk})),
+            (reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
+             reverse("stock:sale_void", kwargs={"pk": sale.pk})),
+        ):
+            with self.subTest(page=page):
+                response = self.client.get(page)
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(response, hidden)
+
+    def test_personel_can_still_sell_and_return(self):
+        sale = self.sell_accessory()
+        item = sale.items.get()
+        self.client.post(reverse("stock:sale_item_return",
+                                 kwargs={"pk": sale.pk, "item_id": item.pk}),
+                         {"reason": "", "refund": "1"})
+        item.refresh_from_db()
+        self.assertIsNotNone(item.returned_at)

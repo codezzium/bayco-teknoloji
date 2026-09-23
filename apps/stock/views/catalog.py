@@ -26,6 +26,7 @@ from .base import (
     can_see_money,
     paginate,
     panel_required,
+    patron_required,
     pick_template,
     preselected,
     querystring,
@@ -196,7 +197,7 @@ def device_publish(request, pk):
     return redirect("stock:device_detail", pk=device.pk)
 
 
-@panel_required
+@patron_required
 @require_POST
 def device_delete(request, pk):
     device = get_object_or_404(Device, pk=pk)
@@ -422,7 +423,7 @@ def simple_form(request, key, pk=None):
     })
 
 
-@panel_required
+@patron_required
 @require_POST
 def simple_delete(request, key, pk):
     cfg = _simple_cfg(key)
