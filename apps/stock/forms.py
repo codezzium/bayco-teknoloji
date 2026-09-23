@@ -21,6 +21,7 @@ from .models import (
     Payment,
 )
 from .permissions import MoneyAwareModelForm
+from .utils import MAX_QTY
 
 DATE = forms.DateInput(attrs={"type": "date"})       # mobilde yerel tarih seçici
 DATETIME = forms.DateTimeInput(attrs={"type": "datetime-local"})
@@ -86,7 +87,8 @@ class AccessoryForm(MoneyAwareModelForm):
     #: Yalnızca yeni kayıtta gösterilir; kaydedildikten sonra stok değişimi
     #: hareket defteri üzerinden yapılır (doğrudan adet düzenlenemez).
     opening_qty = forms.IntegerField(
-        label="Açılış Stoğu (adet)", min_value=0, required=False, initial=0,
+        label="Açılış Stoğu (adet)", min_value=0, max_value=MAX_QTY, required=False,
+        initial=0,
         help_text="Elinizdeki mevcut adet. Sonradan 'Stok Girişi' ekranından eklenir.",
     )
 
@@ -208,9 +210,10 @@ class PaymentForm(MoneyAwareModelForm):
 class StockIntakeForm(forms.Form):
     """Aksesuar mal girişi — doğrudan adet düzenlemek yerine hareket yazar."""
 
-    quantity = forms.IntegerField(label="Giren Adet", min_value=1, initial=1)
+    quantity = forms.IntegerField(label="Giren Adet", min_value=1, max_value=MAX_QTY,
+                                  initial=1)
     unit_cost = forms.DecimalField(label="Birim Alış (₺)", max_digits=12,
-                                   decimal_places=2, required=False)
+                                   decimal_places=2, min_value=0, required=False)
     note = forms.CharField(label="Not", max_length=200, required=False)
 
     def __init__(self, *args, user=None, **kwargs):
@@ -226,7 +229,8 @@ class StockIntakeForm(forms.Form):
 class StocktakeForm(forms.Form):
     """Sayım — girilen değer hedef adettir, fark kadar hareket yazılır."""
 
-    counted_qty = forms.IntegerField(label="Sayılan Adet", min_value=0)
+    counted_qty = forms.IntegerField(label="Sayılan Adet", min_value=0,
+                                     max_value=MAX_QTY)
     note = forms.CharField(label="Not", max_length=200, required=False)
 
     def __init__(self, *args, **kwargs):

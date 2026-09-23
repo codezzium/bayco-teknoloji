@@ -4,7 +4,7 @@
 {% block content %}
 {% include "stock/partials/list_header.html" %}
 
-<div id="contact-filters" class="glass rounded-2xl p-4 mb-5" x-data="{ rol: '{{ rol }}' }">
+<div id="contact-filters" class="glass rounded-2xl p-4 mb-5" x-data="{ rol: '{{ rol|escapejs }}' }">
   <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
     <div class="lg:w-96">
       <input type="search" name="q" value="{{ q }}" class="input"

@@ -3,7 +3,7 @@
 import calendar
 import re
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 # ---------------------------------------------------------------------------
 # Para yuvarlama
@@ -18,6 +18,8 @@ from decimal import ROUND_HALF_UP, Decimal
 # MUTLAKA money() içinden geçirilir.
 CENT = Decimal("0.01")
 ZERO_TL = Decimal("0.00")
+MONEY_MAX = Decimal("9999999999.99")
+MAX_QTY = 99_999
 
 
 def money(value) -> Decimal:
@@ -27,6 +29,16 @@ def money(value) -> Decimal:
     if not isinstance(value, Decimal):
         value = Decimal(str(value))
     return value.quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def parse_money(raw) -> Decimal | None:
+    try:
+        value = Decimal(str(raw or "0").strip().replace(",", "."))
+    except InvalidOperation:
+        return None
+    if not value.is_finite() or abs(value) > MONEY_MAX:
+        return None
+    return value
 
 # ---------------------------------------------------------------------------
 # Türkçe arama katlaması

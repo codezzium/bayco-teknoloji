@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+from django.db.models import ProtectedError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
@@ -76,11 +77,11 @@ def login_view(request):
         return redirect("dashboard:home")
     error = None
     if request.method == "POST":
-        user = authenticate(
-            request,
-            username=request.POST.get("username", "").strip(),
-            password=request.POST.get("password", ""),
-        )
+        username = request.POST.get("username", "").strip()
+        password = request.POST.get("password", "")
+        user = None
+        if "\x00" not in username + password:
+            user = authenticate(request, username=username, password=password)
         if user and in_panel(user):
             login(request, user)
             nxt = request.GET.get("next", "")
@@ -168,7 +169,13 @@ def crud_form(request, key, pk=None):
 def crud_delete(request, key, pk):
     cfg = _cfg(key)
     obj = get_object_or_404(cfg["model"], pk=pk)
-    obj.delete()
+    try:
+        obj.delete()
+    except ProtectedError:
+        messages.error(request, f"{cfg['singular']} stokta kullanıldığı için silinemez.")
+        if request.headers.get("HX-Request"):
+            return HttpResponse(status=204, headers={"HX-Refresh": "true"})
+        return redirect("dashboard:crud_list", key=key)
     if request.headers.get("HX-Request"):
         return HttpResponse("")  # satırı DOM'dan kaldır
     messages.success(request, f"{cfg['singular']} silindi.")

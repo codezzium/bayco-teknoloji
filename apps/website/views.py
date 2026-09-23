@@ -42,6 +42,12 @@ def robots_txt(request):
     return HttpResponse("\n".join(lines), content_type="text/plain")
 
 
+def _posted(request, model, name):
+    value = request.POST.get(name, "").replace("\x00", "").strip()
+    limit = model._meta.get_field(name).max_length
+    return value[:limit] if limit else value
+
+
 def _crumbs(request, *pairs):
     """BreadcrumbList JSON-LD için (ad, yol) çiftlerini mutlak URL'ye çevirir.
 
@@ -71,8 +77,8 @@ def home(request):
 def _filtered_products(request):
     qs = Product.objects.filter(is_active=True).select_related("brand")
     durum = request.GET.get("durum", "")
-    marka = request.GET.get("marka", "")
-    q = request.GET.get("q", "").strip()
+    marka = request.GET.get("marka", "").replace("\x00", "")
+    q = request.GET.get("q", "").replace("\x00", "").strip()
     if durum in (Product.Condition.SIFIR, Product.Condition.IKINCI_EL):
         qs = qs.filter(condition=durum)
     if marka:
@@ -176,13 +182,13 @@ def product_detail(request, slug):
 
 def quote(request):
     prefill_product = None
-    urun_id = request.GET.get("urun")
-    if urun_id:
+    urun_id = request.GET.get("urun", "")
+    if urun_id.isdecimal():
         prefill_product = Product.objects.filter(pk=urun_id, is_active=True).first()
     ctx = {
         "brands": Brand.objects.filter(is_public=True),
         "prefill_product": prefill_product,
-        "default_kind": request.GET.get("mod", "sat"),
+        "default_kind": "al" if request.GET.get("mod") == "al" else "sat",
         "breadcrumbs": _crumbs(
             request,
             ("Ana Sayfa", reverse("website:home")),
@@ -199,19 +205,19 @@ def quote_submit(request):
     if kind not in ("sat", "al"):
         kind = "sat"
     product = None
-    pid = request.POST.get("product_id")
-    if pid:
+    pid = request.POST.get("product_id", "")
+    if pid.isdecimal():
         product = Product.objects.filter(pk=pid).first()
     qr = QuoteRequest.objects.create(
         kind=kind,
-        name=request.POST.get("name", "").strip(),
-        phone=request.POST.get("phone", "").strip(),
-        brand=request.POST.get("brand", "").strip(),
-        model=request.POST.get("model", "").strip(),
-        year=request.POST.get("year", "").strip(),
-        storage=request.POST.get("storage", "").strip(),
-        condition=request.POST.get("condition", "").strip(),
-        note=request.POST.get("note", "").strip(),
+        name=_posted(request, QuoteRequest, "name"),
+        phone=_posted(request, QuoteRequest, "phone"),
+        brand=_posted(request, QuoteRequest, "brand"),
+        model=_posted(request, QuoteRequest, "model"),
+        year=_posted(request, QuoteRequest, "year"),
+        storage=_posted(request, QuoteRequest, "storage"),
+        condition=_posted(request, QuoteRequest, "condition"),
+        note=_posted(request, QuoteRequest, "note"),
         product=product,
     )
     site = SiteSettings.load()
@@ -239,11 +245,11 @@ def service_submit(request):
     if request.method != "POST":
         return redirect("website:service")
     sr = ServiceRequest.objects.create(
-        name=request.POST.get("name", "").strip(),
-        phone=request.POST.get("phone", "").strip(),
-        device=request.POST.get("device", "").strip(),
-        issue=request.POST.get("issue", "").strip(),
-        note=request.POST.get("note", "").strip(),
+        name=_posted(request, ServiceRequest, "name"),
+        phone=_posted(request, ServiceRequest, "phone"),
+        device=_posted(request, ServiceRequest, "device"),
+        issue=_posted(request, ServiceRequest, "issue"),
+        note=_posted(request, ServiceRequest, "note"),
     )
     site = SiteSettings.load()
     link = wa_link(site.whatsapp_number, service_message(sr))
@@ -270,10 +276,10 @@ def contact_submit(request):
     if request.method != "POST":
         return redirect("website:contact")
     cm = ContactMessage.objects.create(
-        name=request.POST.get("name", "").strip(),
-        phone=request.POST.get("phone", "").strip(),
-        email=request.POST.get("email", "").strip(),
-        message=request.POST.get("message", "").strip(),
+        name=_posted(request, ContactMessage, "name"),
+        phone=_posted(request, ContactMessage, "phone"),
+        email=_posted(request, ContactMessage, "email"),
+        message=_posted(request, ContactMessage, "message"),
     )
     site = SiteSettings.load()
     link = wa_link(site.whatsapp_number, contact_message(cm))

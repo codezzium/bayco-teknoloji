@@ -111,7 +111,7 @@
     {% endif %}
 
     <form method="post" action="{% url 'stock:contact_delete' pk=contact.pk %}"
-          onsubmit="return confirm('{{ contact.full_name }} silinsin mi?')">
+          onsubmit="return confirm('{{ contact.full_name|escapejs }} silinsin mi?')">
       {% csrf_token %}
       <button class="btn btn-sm btn-block"
               style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">

@@ -2,7 +2,7 @@
 {% block page_title %}Talepler{% endblock %}
 
 {% block content %}
-<div x-data="{ tab: '{{ tab }}' }">
+<div x-data="{ tab: '{{ tab|escapejs }}' }">
   <!-- Sekmeler -->
   <div class="flex flex-wrap gap-2 mb-6">
     <button class="tab-btn" style="flex:none;min-width:150px" :class="{active: tab==='quote'}" @click="tab='quote'">📱 Teklif ({{ quotes|length }})</button>

@@ -1,7 +1,8 @@
 """Cihaz ve aksesuar listeleri, detayları ve formları."""
 
 from django.contrib import messages
-from django.db.models import F, Q
+from django.db import transaction
+from django.db.models import F, ProtectedError, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -203,8 +204,14 @@ def device_delete(request, pk):
         messages.error(request, "Satışı olan cihaz silinemez. Durumunu değiştirin.")
         return redirect("stock:device_detail", pk=pk)
     code = device.stock_code
-    device.status_logs.all().delete()
-    device.delete()
+    try:
+        with transaction.atomic():
+            device.status_logs.all().delete()
+            device.delete()
+    except ProtectedError:
+        messages.error(request, "Bu cihaza bağlı gider veya takas kaydı var; silinemez. "
+                                "Durumunu değiştirin.")
+        return redirect("stock:device_detail", pk=pk)
     messages.success(request, f"{code} silindi.")
     if request.headers.get("HX-Request"):
         return HttpResponse("")

@@ -63,7 +63,7 @@
             {% endif %}
             {% if not item.returned_at and sale.status != 'iptal' %}
             <form method="post" action="{% url 'stock:sale_item_return' pk=sale.pk item_id=item.pk %}"
-                  class="mt-1" onsubmit="return confirm('{{ item.item_name }} iade edilsin mi?')">
+                  class="mt-1" onsubmit="return confirm('{{ item.item_name|escapejs }} iade edilsin mi?')">
               {% csrf_token %}
               <input type="hidden" name="refund" value="1">
               <button class="text-xs hover:underline" style="color:#ff8b95">İade et</button>

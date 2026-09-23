@@ -9,7 +9,7 @@
   {% comment %} Filtre çubuğu SWAP HEDEFİNİN DIŞINDA: içinde olsaydı her tuş vuruşunda
      <input> yeniden oluşur, imleç konumu ve IME durumu kaybolurdu. {% endcomment %}
   <div id="device-filters" class="glass rounded-2xl p-4 mb-5"
-       x-data="{ durum: '{{ durum }}' }">
+       x-data="{ durum: '{{ durum|escapejs }}' }">
     <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
       <div class="lg:w-96">
         <input type="search" name="q" value="{{ q }}" class="input"

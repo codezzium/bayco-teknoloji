@@ -7,7 +7,7 @@
   {% include "stock/partials/list_header.html" %}
 
   <div id="accessory-filters" class="glass rounded-2xl p-4 mb-5"
-       x-data="{ filtre: '{{ filtre }}' }">
+       x-data="{ filtre: '{{ filtre|escapejs }}' }">
     <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
       <div class="lg:w-96">
         <input type="search" name="q" value="{{ q }}" class="input"

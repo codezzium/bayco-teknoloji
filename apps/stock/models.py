@@ -146,7 +146,7 @@ class Contact(models.Model):
         # — ikinci bir normalizer yazılmaz.
         from apps.leads.utils import normalize_tr
 
-        self.phone_norm = normalize_tr(self.phone)
+        self.phone_norm = normalize_tr(self.phone)[:20]
         self.search_blob = trfold(
             " ".join(filter(None, [self.full_name, self.company, self.phone,
                                    self.phone_norm, self.tax_no]))

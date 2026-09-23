@@ -13,6 +13,7 @@ olmalıdır.
 from datetime import datetime, time
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, Sum, Value
 from django.db.models.functions import Coalesce
@@ -32,7 +33,7 @@ from .models import (
     StockMovement,
     TradeIn,
 )
-from .utils import digits_only, money, next_code, normalize_scan
+from .utils import MAX_QTY, digits_only, money, next_code, normalize_scan
 
 
 # ===========================================================================
@@ -132,6 +133,8 @@ def create_device(*, user=None, **fields) -> Device:
 def set_device_status(device: Device, new_status: str, *, user=None, note="",
                       sale=None, _from_sale=False) -> Device:
     """Cihaz durumunu geçiş grafiğine uyarak değiştirir ve loglar."""
+    if new_status not in Device.Status.values:
+        raise InvalidStatusTransition("Geçersiz durum.")
     if device.status == new_status:
         return device
 
@@ -153,7 +156,7 @@ def set_device_status(device: Device, new_status: str, *, user=None, note="",
     device.save(update_fields=["status", "updated_at"])
     DeviceStatusLog.objects.create(
         device=device, from_status=old, to_status=new_status,
-        sale=sale, note=note, created_by=user,
+        sale=sale, note=note[:200], created_by=user,
     )
     return device
 
@@ -161,6 +164,11 @@ def set_device_status(device: Device, new_status: str, *, user=None, note="",
 # ===========================================================================
 # Aksesuar stoğu
 # ===========================================================================
+
+def _lock_accessory(accessory: Accessory) -> None:
+    accessory.stock_qty = (Accessory.objects.select_for_update()
+                           .values_list("stock_qty", flat=True).get(pk=accessory.pk))
+
 
 def _current_balance(accessory: Accessory) -> int:
     return accessory.movements.aggregate(
@@ -186,11 +194,14 @@ def _record_movement(accessory: Accessory, quantity: int, reason: str, *,
                      note="") -> StockMovement:
     if quantity == 0:
         raise StockError("Miktar sıfır olamaz.")
+    if abs(quantity) > MAX_QTY:
+        raise StockError(f"Tek harekette en fazla {MAX_QTY} adet işlenebilir.")
+    _lock_accessory(accessory)
     balance = _current_balance(accessory) + quantity
     movement = StockMovement.objects.create(
         accessory=accessory, quantity=quantity, reason=reason,
         unit_cost=unit_cost, sale_item=sale_item, balance_after=balance,
-        note=note, created_by=user,
+        note=note[:200], created_by=user,
     )
     _resync_accessory_qty(accessory)
     return movement
@@ -218,6 +229,7 @@ def receive_accessory_stock(accessory: Accessory, quantity: int, *, user=None,
 def adjust_accessory_stock(accessory: Accessory, counted_qty: int, *, user=None,
                            note="") -> StockMovement | None:
     """Sayım sonucu. Doğrudan set etmez, FARK kadar hareket yazar."""
+    _lock_accessory(accessory)
     diff = counted_qty - _current_balance(accessory)
     if diff == 0:
         return None
@@ -344,7 +356,7 @@ def create_sale_from_cart(cart: dict, *, user, payments=None, due_date=None,
             device = devices[line["id"]]
             item = SaleItem.objects.create(
                 sale=sale, kind=SaleItem.Kind.CIHAZ, device=device,
-                item_name=device.label, item_code=device.stock_code,
+                item_name=device.label[:200], item_code=device.stock_code,
                 item_imei=device.imei1, quantity=1,
                 unit_price=_q(line["unit"]),
                 # Maliyet kasada güncel değerden okunur; sepet snapshot'ı
@@ -359,7 +371,8 @@ def create_sale_from_cart(cart: dict, *, user, payments=None, due_date=None,
             accessory = accessories[line["id"]]
             item = SaleItem.objects.create(
                 sale=sale, kind=SaleItem.Kind.AKSESUAR, accessory=accessory,
-                item_name=str(accessory), item_code=accessory.barcode or accessory.sku,
+                item_name=str(accessory)[:200],
+                item_code=accessory.barcode or accessory.sku,
                 quantity=line["qty"], unit_price=_q(line["unit"]),
                 unit_cost=_q(accessory.cost),
                 line_discount=_q(line.get("discount", 0)),
@@ -416,7 +429,7 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
     from .models import DeviceModel
 
     amount = _q(entry["amount"])
-    device = Device.objects.create(
+    device = Device(
         device_model=DeviceModel.objects.get(pk=entry["device_model_id"]),
         condition=entry.get("condition", Device.Condition.IKINCI_EL),
         status=Device.Status.STOKTA,
@@ -430,12 +443,17 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
         acquisition=Device.Acquisition.TAKAS,
         created_by=user,
     )
+    try:
+        device.full_clean(exclude=["stock_code", "warranty_end", "search_blob"])
+    except ValidationError as exc:
+        raise StockError(f"Takas cihazı kaydedilemedi: {' '.join(exc.messages)}")
+    device.save()
     DeviceStatusLog.objects.create(
         device=device, from_status="", to_status=Device.Status.STOKTA,
         sale=sale, note=f"Takas girişi — fiş {sale.receipt_no}", created_by=user,
     )
     return TradeIn.objects.create(sale=sale, device=device, amount=amount,
-                                  note=entry.get("note", ""))
+                                  note=entry.get("note", "")[:200])
 
 
 @transaction.atomic
@@ -453,7 +471,7 @@ def record_historical_sale(device: Device, *, customer, sold_on, price, user=Non
     )
     item = SaleItem.objects.create(
         sale=sale, kind=SaleItem.Kind.CIHAZ, device=device,
-        item_name=device.label, item_code=device.stock_code,
+        item_name=device.label[:200], item_code=device.stock_code,
         item_imei=device.imei1, quantity=1,
         unit_price=price, unit_cost=_q(device.purchase_price),
     )
@@ -493,12 +511,13 @@ def return_sale_item(item: SaleItem, *, user=None, reason="", refund=True) -> Sa
     kısmi tekil indeks bunu okuduğu için cihaz otomatik olarak yeniden
     satılabilir hale gelir.
     """
-    if item.returned_at:
+    locked = SaleItem.objects.select_for_update().get(pk=item.pk)
+    if locked.returned_at:
         raise StockError("Bu kalem zaten iade edilmiş.")
 
     refund_amount = item.line_total
     item.returned_at = timezone.now()
-    item.return_reason = reason
+    item.return_reason = reason[:200]
     item.save(update_fields=["returned_at", "return_reason"])
 
     if item.kind == SaleItem.Kind.CIHAZ and item.device_id:
@@ -612,7 +631,7 @@ def publish_device_to_site(device: Device, *, user=None) -> Product:
         raise StockError("Yalnızca stoktaki cihazlar siteye çıkarılabilir.")
 
     product = device.published_product or Product()
-    product.name = device.label
+    product.name = device.label[:160]
     product.brand = device.device_model.brand
     product.condition = (Product.Condition.SIFIR
                          if device.condition == Device.Condition.SIFIR

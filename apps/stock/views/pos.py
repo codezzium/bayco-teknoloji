@@ -1,19 +1,18 @@
 """Kasa (POS), satış listesi, fiş ve tahsilat ekranları."""
 
-from decimal import Decimal, InvalidOperation
-
 from django.contrib import messages
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from .. import cart as cart_utils
 from .. import services
 from ..forms import PaymentForm
 from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem
-from ..utils import trfold
+from ..utils import parse_money, trfold
 from .base import can_see_money, panel_required, paginate, pick_template, querystring
 
 
@@ -120,18 +119,14 @@ def cart_qty(request, lid):
 @require_POST
 def cart_price(request, lid):
     cart = cart_utils.get_cart(request)
-    try:
-        price = Decimal(str(request.POST.get("price") or "0").replace(",", "."))
-    except InvalidOperation:
+    price = parse_money(request.POST.get("price"))
+    if price is None:
         return _render_cart(request, cart, "Geçersiz fiyat.")
     cart = cart_utils.set_price(cart, lid, price)
     if request.POST.get("discount") is not None:
-        try:
-            cart = cart_utils.set_discount(
-                cart, lid,
-                Decimal(str(request.POST.get("discount") or "0").replace(",", ".")))
-        except InvalidOperation:
-            pass
+        discount = parse_money(request.POST.get("discount"))
+        if discount is not None:
+            cart = cart_utils.set_discount(cart, lid, discount)
     return _render_cart(request, cart)
 
 
@@ -163,9 +158,8 @@ def cart_trade_in(request):
     model = DeviceModel.objects.filter(pk=request.POST.get("device_model")).first()
     if model is None:
         return _render_cart(request, cart, "Takas için model seçilmelidir.")
-    try:
-        amount = Decimal(str(request.POST.get("amount") or "0").replace(",", "."))
-    except InvalidOperation:
+    amount = parse_money(request.POST.get("amount"))
+    if amount is None:
         return _render_cart(request, cart, "Geçersiz takas bedeli.")
     if amount <= 0:
         return _render_cart(request, cart, "Takas bedeli pozitif olmalıdır.")
@@ -190,21 +184,26 @@ def checkout(request):
 
     amount_raw = (request.POST.get("paid_amount") or "").strip()
     if amount_raw:
-        try:
-            paid = Decimal(amount_raw.replace(",", "."))
-        except InvalidOperation:
+        paid = parse_money(amount_raw)
+        if paid is None:
             return _render_cart(request, cart, "Geçersiz tahsilat tutarı.")
     else:
         paid = payable
 
+    method = request.POST.get("payment_method", "nakit")
+    if method not in Payment.Method.values:
+        method = Payment.Method.NAKIT
     payments = []
     if paid > 0:
-        payments.append({
-            "amount": paid,
-            "method": request.POST.get("payment_method", "nakit"),
-        })
+        payments.append({"amount": paid, "method": method})
 
-    due_date = request.POST.get("due_date") or None
+    due_raw = (request.POST.get("due_date") or "").strip()
+    try:
+        due_date = parse_date(due_raw) if due_raw else None
+    except ValueError:
+        due_date = None
+    if due_raw and due_date is None:
+        return _render_cart(request, cart, "Geçersiz vade tarihi.")
     try:
         sale = services.create_sale_from_cart(
             cart, user=request.user, payments=payments, due_date=due_date,

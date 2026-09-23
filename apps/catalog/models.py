@@ -23,7 +23,13 @@ class Brand(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name)
+            base = slugify(self.name) or "marka"
+            slug = base
+            i = 2
+            while Brand.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{i}"
+                i += 1
+            self.slug = slug
         super().save(*args, **kwargs)
 
 

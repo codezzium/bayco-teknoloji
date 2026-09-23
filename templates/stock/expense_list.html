@@ -10,7 +10,7 @@
   <div class="text-3xl font-display font-extrabold gradient-text mt-1">{{ amount_total|tl }}</div>
 </div>
 
-<div id="expense-filters" class="glass rounded-2xl p-4 mb-5" x-data="{ kapsam: '{{ kapsam }}' }">
+<div id="expense-filters" class="glass rounded-2xl p-4 mb-5" x-data="{ kapsam: '{{ kapsam|escapejs }}' }">
   <div class="flex flex-wrap items-center gap-3 justify-between">
     <select name="tur" class="select" style="width:auto"
             hx-get="{% url 'stock:expense_list' %}" hx-include="#expense-filters"

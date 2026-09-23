@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from .. import cart as cart_utils
 from .. import services
 from ..models import Accessory, Device
+from ..utils import MAX_QTY
 from .base import can_see_money, panel_required
 from .pos import cart_context
 
@@ -201,11 +202,15 @@ def _scan_into_count(request, obj):
 def stocktake_mark(request):
     """Bir satırın sayılan adedini elle düzeltir."""
     counted = request.session.get(COUNT_KEY, {})
-    key = str(request.POST.get("accessory"))
+    key = request.POST.get("accessory") or ""
     try:
         quantity = int(request.POST.get("counted") or 0)
     except ValueError:
         quantity = 0
+    if not key.isdecimal() or quantity > MAX_QTY:
+        return render(request, "stock/partials/count_result.html", {
+            **_count_context(request), "flash": "Geçersiz adet.",
+        })
     if request.POST.get("remove"):
         counted.pop(key, None)
     else:
