@@ -195,6 +195,8 @@
    görünmez, "Kamerayı Aç" hiçbir şey yapmaz). {% endcomment %}
 {# install.js her panel sayfasında gerekli (düğme topbar'da) ve aynı sebeple Alpine'dan önce. #}
 <script src="{% static 'js/install.js' %}" defer></script>
+{# fields.js: tutarda binlik noktası, adette −/+ sayacı; BaycoNum Alpine'dan önce tanımlı olmalı. #}
+<script src="{% static 'js/fields.js' %}" defer></script>
 <script src="{% static 'vendor/alpine/alpine.min.js' %}" defer></script>
 </body>
 </html>

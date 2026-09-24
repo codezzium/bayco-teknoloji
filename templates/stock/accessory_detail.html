@@ -180,7 +180,8 @@
       <form method="post" action="{% url 'stock:accessory_adjust' pk=accessory.pk %}" class="space-y-3">
         {% csrf_token %}
         <input type="hidden" name="mode" value="fire">
-        <input type="number" name="quantity" min="1" value="1" class="input" placeholder="Adet">
+        <input type="text" name="quantity" value="1" data-qty data-min="1" data-max="99999"
+               inputmode="numeric" autocomplete="off" class="input" aria-label="Adet">
         <input type="text" name="note" class="input" placeholder="Sebep (kırıldı, kayboldu…)">
         <button class="btn btn-sm btn-block"
                 style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">

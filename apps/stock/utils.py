@@ -5,6 +5,8 @@ import re
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from apps.dashboard.numbers import normalize_decimal_input
+
 # ---------------------------------------------------------------------------
 # Para yuvarlama
 # ---------------------------------------------------------------------------
@@ -32,8 +34,13 @@ def money(value) -> Decimal:
 
 
 def parse_money(raw) -> Decimal | None:
+    """Türkçe yazılmış tutar: "18.500" → 18500, "18.500,90" → 18500.90, "150,90" → 150.90.
+
+    Eskiden virgül noktaya çevriliyordu; "18.500" 18,5 okunurdu. Biçim kuralları
+    apps.dashboard.numbers'ta, panel formlarıyla ortak.
+    """
     try:
-        value = Decimal(str(raw or "0").strip().replace(",", "."))
+        value = Decimal(normalize_decimal_input(raw or "0"))
     except InvalidOperation:
         return None
     if not value.is_finite() or abs(value) > MONEY_MAX:

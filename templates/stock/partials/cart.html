@@ -67,11 +67,13 @@
           <form class="flex items-center gap-2 mt-2"
                 hx-post="{% url 'stock:cart_price' lid=line.lid %}"
                 hx-target="#cart" hx-swap="outerHTML" hx-trigger="change">
-            <input type="number" name="price" step="0.01" min="0" value="{{ line.unit|unlocalize }}"
+            <input type="text" name="price" data-money="2" inputmode="decimal" autocomplete="off"
+                   value="{{ line.unit|money_input }}"
                    class="input" style="width:110px;padding:5px 8px;font-size:13px">
             <span class="text-xs" style="color:var(--muted)">₺ birim</span>
             {% if line.discount != "0.00" %}
-            <input type="number" name="discount" step="0.01" min="0" value="{{ line.discount|unlocalize }}"
+            <input type="text" name="discount" data-money="2" inputmode="decimal" autocomplete="off"
+                   value="{{ line.discount|money_input }}"
                    class="input" style="width:90px;padding:5px 8px;font-size:13px">
             <span class="text-xs" style="color:var(--muted)">₺ ind.</span>
             {% endif %}
@@ -81,9 +83,11 @@
         <div class="flex items-center gap-2 shrink-0">
           {% if line.kind == 'aksesuar' %}
           <form hx-post="{% url 'stock:cart_qty' lid=line.lid %}" hx-target="#cart"
-                hx-swap="outerHTML" hx-trigger="change" class="flex items-center">
-            <input type="number" name="qty" min="1" value="{{ line.qty|unlocalize }}"
-                   class="input text-center" style="width:64px;padding:5px 4px">
+                hx-swap="outerHTML" hx-trigger="change delay:400ms" class="flex items-center">
+            {# −/+ sayacı fields.js'ten; delay: art arda tıklamalar tek isteğe iner. #}
+            <input type="text" name="qty" data-qty data-min="1" data-max="99999" inputmode="numeric"
+                   autocomplete="off" value="{{ line.qty|unlocalize }}"
+                   class="input text-center" style="width:48px;padding:5px 4px">
           </form>
           {% else %}
           <span class="chip" style="font-size:11px">1 adet</span>
@@ -200,8 +204,8 @@
            class="underline" style="color:var(--ink)">önce model ekleyin</a>.
       </p>
       {% endif %}
-      <input type="number" name="amount" step="0.01" min="0" class="input"
-             placeholder="Takas bedeli (₺)" required>
+      <input type="text" name="amount" data-money="2" inputmode="decimal" autocomplete="off"
+             class="input" placeholder="Takas bedeli (₺)" required>
       <input type="text" name="imei1" class="input" placeholder="IMEI (opsiyonel)"
              inputmode="numeric">
       <div class="grid grid-cols-2 gap-2">
@@ -222,17 +226,18 @@
   {% if cart.lines or cart.trade_ins %}
   <form class="card p-4 space-y-3"
         hx-post="{% url 'stock:checkout' %}" hx-target="#cart" hx-swap="outerHTML"
-        x-data="{ payable: {{ cart.payable|unlocalize }}, paid: {{ cart.payable|unlocalize }} }">
+        x-data="{ payable: {{ cart.payable|unlocalize }}, paidText: '{{ cart.payable|money_input }}',
+                  get paid() { return BaycoNum.parse(this.paidText); } }">
     {% csrf_token %}
     <h3 class="font-display font-bold text-sm">Ödeme</h3>
     <div class="grid grid-cols-2 gap-2">
       <div class="field" style="margin:0">
         <label class="label">Tahsil Edilen (₺)</label>
-        <input type="number" name="paid_amount" step="0.01" min="0" class="input"
-               required x-model.number="paid"
-               value="{{ cart.payable|unlocalize }}">
+        {# Metin: "18.500,90" biçimi. x-model.number parseFloat'la 18,5 okurdu. #}
+        <input type="text" name="paid_amount" data-money="2" inputmode="decimal" autocomplete="off"
+               class="input" required x-model="paidText">
         <button type="button" class="text-xs mt-1 hover:underline" style="color:var(--muted)"
-                @click="paid = payable">Tamamını yaz</button>
+                @click="paidText = BaycoNum.format(payable)">Tamamını yaz</button>
       </div>
       <div class="field" style="margin:0">
         <label class="label">Ödeme Şekli</label>

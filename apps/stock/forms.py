@@ -9,6 +9,7 @@ from django import forms
 from django.urls import reverse
 
 from apps.catalog.models import Brand
+from apps.dashboard.forms import MoneyField, QtyInput
 from apps.dashboard.utils import define_link
 
 from .models import (
@@ -47,6 +48,7 @@ class DeviceForm(MoneyAwareModelForm):
             "supplier", "purchase_date", "purchase_price",
             "list_price", "warranty_months", "warranty_start",
         ]
+        field_classes = {"purchase_price": MoneyField, "list_price": MoneyField}
         widgets = {
             "purchase_date": DATE,
             "warranty_start": DATE,
@@ -88,7 +90,7 @@ class AccessoryForm(MoneyAwareModelForm):
     #: hareket defteri üzerinden yapılır (doğrudan adet düzenlenemez).
     opening_qty = forms.IntegerField(
         label="Açılış Stoğu (adet)", min_value=0, max_value=MAX_QTY, required=False,
-        initial=0,
+        initial=0, widget=QtyInput,
         help_text="Elinizdeki mevcut adet. Sonradan 'Stok Girişi' ekranından eklenir.",
     )
 
@@ -98,7 +100,9 @@ class AccessoryForm(MoneyAwareModelForm):
             "name", "variant", "brand", "category", "barcode",
             "cost", "price", "min_stock_level", "note", "is_active",
         ]
+        field_classes = {"cost": MoneyField, "price": MoneyField}
         widgets = {
+            "min_stock_level": QtyInput,
             "note": forms.Textarea(attrs={"rows": 2}),
             "barcode": forms.TextInput(attrs={"inputmode": "numeric",
                                               "autocomplete": "off",
@@ -168,6 +172,7 @@ class ExpenseForm(MoneyAwareModelForm):
     class Meta:
         model = Expense
         fields = ["kind", "title", "amount", "spent_on", "device", "supplier", "note"]
+        field_classes = {"amount": MoneyField}
         widgets = {"spent_on": DATE, "note": forms.Textarea(attrs={"rows": 2})}
 
     def __init__(self, *args, device=None, **kwargs):
@@ -204,6 +209,7 @@ class PaymentForm(MoneyAwareModelForm):
     class Meta:
         model = Payment
         fields = ["amount", "method", "kind", "paid_at", "note"]
+        field_classes = {"amount": MoneyField}
         widgets = {"paid_at": DATETIME}
 
 
@@ -211,9 +217,9 @@ class StockIntakeForm(forms.Form):
     """Aksesuar mal girişi — doğrudan adet düzenlemek yerine hareket yazar."""
 
     quantity = forms.IntegerField(label="Giren Adet", min_value=1, max_value=MAX_QTY,
-                                  initial=1)
-    unit_cost = forms.DecimalField(label="Birim Alış (₺)", max_digits=12,
-                                   decimal_places=2, min_value=0, required=False)
+                                  initial=1, widget=QtyInput)
+    unit_cost = MoneyField(label="Birim Alış (₺)", max_digits=12,
+                           decimal_places=2, min_value=0, required=False)
     note = forms.CharField(label="Not", max_length=200, required=False)
 
     def __init__(self, *args, user=None, **kwargs):
@@ -230,7 +236,7 @@ class StocktakeForm(forms.Form):
     """Sayım — girilen değer hedef adettir, fark kadar hareket yazılır."""
 
     counted_qty = forms.IntegerField(label="Sayılan Adet", min_value=0,
-                                     max_value=MAX_QTY)
+                                     max_value=MAX_QTY, widget=QtyInput)
     note = forms.CharField(label="Not", max_length=200, required=False)
 
     def __init__(self, *args, **kwargs):

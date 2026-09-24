@@ -5,6 +5,8 @@ from decimal import Decimal, InvalidOperation
 from django import forms
 from django import template
 
+from apps.dashboard.numbers import format_decimal_input
+
 register = template.Library()
 
 
@@ -27,6 +29,21 @@ def tl(value, decimals=2):
 def tl0(value):
     """Ondalıksız TL: 18500 -> '18.500 ₺'. Liste ekranlarında daha okunur."""
     return tl(value, 0)
+
+
+@register.filter
+def money_input(value, decimals=2):
+    """Tutar input'unun value'su: 18500 -> '18.500', 150.9 -> '150,90' (₺ işareti yok).
+
+    Elle yazılmış data-money input'ları için; formlar bunu MoneyInput ile yapar.
+    Sepet tutarları oturumda metin ("120.00") olarak durur, önce sayıya çevrilir.
+    """
+    if isinstance(value, str):
+        try:
+            value = Decimal(value)
+        except InvalidOperation:
+            return value
+    return format_decimal_input(value, int(decimals))
 
 
 @register.filter

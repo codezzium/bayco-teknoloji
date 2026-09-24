@@ -286,8 +286,10 @@ class CheckoutPaymentDefaultTests(ScreenTestCase):
                          {"mode": "sale", "code": self.accessory.barcode})
         body = self.client.get(reverse("stock:pos")).content.decode()
         self.assertIn('name="paid_amount"', body)
-        self.assertIn('value="150.90"', body)
-        self.assertNotIn('value="150,90"', body)
+        # Tutar alanı artık type="text" ve Türkçe biçimli ("150,90"); değeri Alpine
+        # x-model="paidText" ile doldurur (static/js/fields.js). Sunucu bu biçimi okur.
+        self.assertIn("paidText: '150,90'", body)
+        self.assertIn('x-model="paidText"', body)
 
     def test_decimal_values_are_never_localized_in_number_inputs(self):
         import re

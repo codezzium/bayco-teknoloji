@@ -36,10 +36,11 @@
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <form hx-post="{% url 'stock:stocktake_mark' %}" hx-target="#count-result"
-              hx-swap="outerHTML" hx-trigger="change">
+              hx-swap="outerHTML" hx-trigger="change delay:400ms">
           <input type="hidden" name="accessory" value="{{ row.accessory.pk }}">
-          <input type="number" name="counted" min="0" value="{{ row.counted|unlocalize }}"
-                 class="input text-center" style="width:72px;padding:5px 4px">
+          <input type="text" name="counted" data-qty data-min="0" data-max="99999" inputmode="numeric"
+                 autocomplete="off" value="{{ row.counted|unlocalize }}"
+                 class="input text-center" style="width:56px;padding:5px 4px">
         </form>
         <form hx-post="{% url 'stock:stocktake_mark' %}" hx-target="#count-result" hx-swap="outerHTML">
           <input type="hidden" name="accessory" value="{{ row.accessory.pk }}">
