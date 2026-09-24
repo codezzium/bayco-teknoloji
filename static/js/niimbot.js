@@ -37,6 +37,12 @@
     printWait: 60000, idleDisconnect: 90000,
   };
   var DEFAULT_DENSITY = 3;
+  var MAX_COPIES = 10;  // apps/stock/labels.py MAX_COPIES ile aynı
+
+  function clampCopies(value) {
+    var n = parseInt(value, 10);
+    return Math.max(1, Math.min(MAX_COPIES, isNaN(n) ? 1 : n));
+  }
 
   function printerError(code, message) {
     var e = new Error(message);
@@ -415,7 +421,7 @@
   async function printLabel(url, opts) {
     opts = opts || {};
     var say = opts.onStatus || function () {};
-    var copies = Math.max(1, Math.min(10, parseInt(opts.copies, 10) || 1));
+    var copies = clampCopies(opts.copies);
     if (state.busy) throw printerError("busy", "Önceki baskı sürüyor.");
     state.busy = true;
     clearTimeout(state.idleTimer);
@@ -477,18 +483,35 @@
 
   root.addEventListener("pagehide", disconnect);
 
+  var PRICE_KEY = "bayco.niimbot.fiyat";
+
   function registerComponent() {
     Alpine.data("niimbotPrint", function (cfg) {
       return {
-        url: cfg.url, copies: 1, busy: false, msg: "", err: false,
+        url: cfg.url, copies: 1, showPrice: true, busy: false, msg: "", err: false,
         supported: isSupported(),
+        init: function () {
+          // Fiyat tercihi bu tarayıcıda hatırlanır; depolama kapalıysa fiyat basılır.
+          try { this.showPrice = localStorage.getItem(PRICE_KEY) !== "0"; } catch (e) { /* yoksay */ }
+          this.$watch("showPrice", function (value) {
+            try { localStorage.setItem(PRICE_KEY, value ? "1" : "0"); } catch (e) { /* yoksay */ }
+          });
+        },
+        inc: function () { this.copies = clampCopies((parseInt(this.copies, 10) || 1) + 1); },
+        dec: function () { this.copies = clampCopies((parseInt(this.copies, 10) || 1) - 1); },
+        clampCopies: function () { this.copies = clampCopies(this.copies); },
+        labelUrl: function () {
+          return this.url + (this.url.indexOf("?") < 0 ? "?" : "&") +
+                 "fiyat=" + (this.showPrice ? "1" : "0");
+        },
         print: async function () {
           if (this.busy) return;
           var self = this;
+          this.clampCopies();
           this.busy = true;
           this.err = false;
           try {
-            var r = await printLabel(this.url, {
+            var r = await printLabel(this.labelUrl(), {
               copies: this.copies,
               onStatus: function (m) { self.msg = m; },
             });

@@ -105,6 +105,18 @@ class NiimbotViewTests(TestCase):
         image = Image.open(io.BytesIO(response.content))
         self.assertEqual(image.size, (320, 96))
 
+    def test_price_can_be_hidden(self):
+        self.client.force_login(self.patron)
+
+        def price_area(query):
+            content = self.client.get(self.url() + query).content
+            # Fiyat üst satırın sağ ucunda; ad ("Baseus Araç Şarjı 45W") oraya uzanmaz.
+            return Image.open(io.BytesIO(content)).convert("L").crop((250, 10, 310, 26))
+
+        self.assertEqual(price_area("?fiyat=1").getextrema()[0], 0)
+        self.assertEqual(price_area("").getextrema()[0], 0)  # varsayılan: göster
+        self.assertEqual(price_area("?fiyat=0").getextrema(), (255, 255))
+
     def test_unknown_kind_and_missing_object(self):
         self.client.force_login(self.patron)
         self.assertEqual(self.client.get(self.url(kind="x")).status_code, 404)
