@@ -7,13 +7,20 @@ telefon iş akışı taramadır. Ayrıca Safari @page{size} kuralını yok sayar
 Chrome/Edge uyar.
 """
 
-from django.shortcuts import render
+from django.http import Http404, HttpResponse
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
 from ..labels import DEFAULT_FORMAT, LABEL_FORMATS, MAX_COPIES, MAX_LABELS, build_label
 from ..labels import paginate_labels
 from ..models import Accessory, Device
+from ..niimbot import label_image, to_png
 from .base import panel_required
+
+NIIMBOT_KINDS = {
+    "aksesuar": Accessory.objects.select_related("brand"),
+    "cihaz": Device.objects.select_related("device_model__brand"),
+}
 
 
 @panel_required
@@ -56,3 +63,14 @@ def label_print(request):
         "auto": request.GET.get("auto") == "1",
         "back_url": request.META.get("HTTP_REFERER") or reverse("stock:device_list"),
     })
+
+
+@panel_required
+def niimbot_png(request, kind, pk):
+    """Niimbot termal etiketi (40×12 mm PNG); niim-agent bunu olduğu gibi basar."""
+    queryset = NIIMBOT_KINDS.get(kind)
+    if queryset is None:
+        raise Http404
+    obj = get_object_or_404(queryset, pk=pk)
+    image = label_image(obj, show_price=request.GET.get("fiyat", "1") == "1")
+    return HttpResponse(to_png(image), content_type="image/png")

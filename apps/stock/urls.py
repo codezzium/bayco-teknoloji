@@ -84,6 +84,7 @@ urlpatterns = [
 
     # --- Etiket ---
     path("etiket/", labels.label_print, name="label_print"),
+    path("etiket/niimbot/<str:kind>/<int:pk>.png", labels.niimbot_png, name="niimbot_png"),
 
     # --- Rapor ---
     path("rapor/", reports.reports, name="reports"),

@@ -90,40 +90,55 @@ def barcode_svg(value: str, *, symbology="code128", module_width=0.25,
     return svg[match.start():] if match else ""
 
 
-def build_label(obj, fmt: dict, *, show_price=True) -> dict:
-    """Device veya Accessory için etiket verisini hazırlar."""
+def ean13_is_valid(code: str) -> bool:
+    """13 hane ve kontrol hanesi tutuyor mu.
+
+    python-barcode tutmayan kontrol hanesini SESSİZCE düzeltir: kayıtta
+    8690000010154 varken etikete 8690000010158 basılır ve tarama ürünü bulamaz
+    (services.resolve_code barkodu birebir arar). Böyle değerler Code128 ile,
+    oldukları gibi basılmalı.
+    """
+    if len(code) != 13 or not code.isdigit():
+        return False
+    total = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(code[:12]))
+    return (10 - total % 10) % 10 == int(code[12])
+
+
+def symbology_for(code: str) -> str:
+    # Gerçek EAN-13 varsa onu bas: başka mağazanın kasasında da okunur.
+    # Cihaz kodu alfanümeriktir (BYC-000123) -> her zaman Code128.
+    return "ean13" if ean13_is_valid(code) else "code128"
+
+
+def label_fields(obj) -> dict:
+    """Device veya Accessory için etikete basılan kod, marka, ad ve fiyat."""
     from .models import Accessory, Device
-    from .templatetags.stock_extras import tl0
 
     if isinstance(obj, Device):
-        code = obj.stock_code
-        brand = obj.device_model.brand.name
-        name = obj.label
-        price = obj.list_price
-        # Cihaz kodu alfanümeriktir (BYC-000123) -> EAN-13 kullanılamaz
-        symbology, bar_value = "code128", code
-    elif isinstance(obj, Accessory):
-        code = obj.barcode or obj.sku
-        brand = obj.brand.name if obj.brand_id else ""
-        name = str(obj)
-        price = obj.price
-        # Gerçek EAN-13 varsa onu bas: başka mağazanın kasasında da okunur
-        if obj.barcode and obj.barcode.isdigit() and len(obj.barcode) == 13:
-            symbology, bar_value = "ean13", obj.barcode
-        else:
-            symbology, bar_value = "code128", code
-    else:
-        raise TypeError("Etiket yalnızca Device veya Accessory için üretilir.")
+        return {"code": obj.stock_code, "brand": obj.device_model.brand.name,
+                "name": obj.label, "price": obj.list_price}
+    if isinstance(obj, Accessory):
+        return {"code": obj.barcode or obj.sku,
+                "brand": obj.brand.name if obj.brand_id else "",
+                "name": str(obj), "price": obj.price}
+    raise TypeError("Etiket yalnızca Device veya Accessory için üretilir.")
 
+
+def build_label(obj, fmt: dict, *, show_price=True) -> dict:
+    """Device veya Accessory için etiket verisini hazırlar."""
+    from .templatetags.stock_extras import tl0
+
+    fields = label_fields(obj)
+    code, price = fields["code"], fields["price"]
     return {
         "code": code,
-        "brand": brand,
-        "name": name,
+        "brand": fields["brand"],
+        "name": fields["name"],
         "price": tl0(price) if (show_price and price) else "",
         # QR içeriği çıplak koddur, URL değil: kısa payload -> az modül ->
         # büyük modül -> telefon kamerasıyla belirgin biçimde daha iyi okuma.
         "qr": qr_svg(code),
-        "bar": barcode_svg(bar_value, symbology=symbology,
+        "bar": barcode_svg(code, symbology=symbology_for(code),
                            module_width=fmt["mod"], module_height=fmt["bh"]),
     }
 

@@ -1,5 +1,5 @@
 {% extends "stock/base_stock.html" %}
-{% load stock_extras %}
+{% load static stock_extras %}
 {% block page_title %}{{ accessory }}{% endblock %}
 
 {% block content %}
@@ -24,10 +24,24 @@
             {% if accessory.category %} · {{ accessory.category.name }}{% endif %}
           </p>
         </div>
-        <div class="flex gap-2">
-          <a href="{% url 'stock:accessory_edit' pk=accessory.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
-          <a href="{% url 'stock:label_print' %}?acc={{ accessory.pk }}&format=a4-52x30&auto=1"
-             target="_blank" class="btn btn-gradient btn-sm">🖨️ Etiket</a>
+        <div class="flex flex-col items-end gap-1"
+             x-data="niimbotPrint({url: '{% url 'stock:niimbot_png' kind='aksesuar' pk=accessory.pk %}'})">
+          <div class="flex gap-2 items-center">
+            <a href="{% url 'stock:accessory_edit' pk=accessory.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
+            <a href="{% url 'stock:label_print' %}?acc={{ accessory.pk }}&format=a4-52x30&auto=1"
+               target="_blank" class="btn btn-ghost btn-sm">🖨️ Etiket</a>
+            {# Niimbot'a Bluetooth ile doğrudan baskı (static/js/niimbot.js); yalnızca Chrome / Edge. #}
+            <input type="number" min="1" max="10" x-model.number="copies" class="input"
+                   style="width:3.5rem;padding:.35rem .5rem" title="Kopya" aria-label="Kopya">
+            <button type="button" class="btn btn-gradient btn-sm" data-niimbot
+                    @click="print()" :disabled="busy || !supported"
+                    :title="supported ? 'Niimbot yazıcıya Bluetooth ile bas (40×12 mm)' : 'Chrome veya Edge gerekli'">
+              <span x-text="busy ? 'Basılıyor…' : '🏷️ Niimbot'">🏷️ Niimbot</span>
+            </button>
+          </div>
+          <p x-show="msg || !supported" x-cloak class="text-xs text-right" data-niimbot-status
+             :style="err || !supported ? 'color:#ff8b95' : 'color:var(--muted)'"
+             x-text="supported ? msg : 'Niimbot baskısı için Chrome veya Edge kullanın.'"></p>
         </div>
       </div>
 
@@ -148,4 +162,8 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block stock_scripts %}
+<script defer src="{% static 'js/niimbot.js' %}"></script>
 {% endblock %}
