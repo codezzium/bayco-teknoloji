@@ -84,7 +84,7 @@
           <div class="text-3xl font-display font-extrabold gradient-text">{{ accessory.price|tl0 }}</div>
           <div class="text-xs" style="color:var(--muted)">Satış fiyatı</div>
         </div>
-        {% if perms.stock.view_money %}
+        {% if access.money %}
         <div class="text-center">
           <div class="text-3xl font-display font-extrabold">{{ accessory.unit_profit|tl0 }}</div>
           <div class="text-xs" style="color:var(--muted)">Birim kâr (alış {{ accessory.cost|tl0 }})</div>
@@ -175,6 +175,7 @@
       </form>
     </div>
 
+    {% if access.delete %}
     <div class="card p-5">
       <h3 class="font-display font-bold mb-3">Fire / Kayıp</h3>
       <form method="post" action="{% url 'stock:accessory_adjust' pk=accessory.pk %}" class="space-y-3">
@@ -189,6 +190,7 @@
         </button>
       </form>
     </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

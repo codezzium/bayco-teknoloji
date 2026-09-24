@@ -8,8 +8,11 @@ from apps.dashboard.utils import (  # noqa: F401  (view modülleri buradan alır
     with_param,
 )
 from apps.stock.permissions import (  # noqa: F401  (view modülleri buradan alır)
+    access_required,
     can_manage_stock,
     can_see_money,
+    deny,
+    has_access,
     money_required,
     panel_required,
     patron_required,

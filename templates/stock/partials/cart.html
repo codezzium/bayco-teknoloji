@@ -64,6 +64,9 @@
           <div class="text-xs font-mono" style="color:var(--muted)">
             {{ line.code }}{% if line.imei %} · IMEI {{ line.imei }}{% endif %}
           </div>
+          {% comment %} "Kasada fiyat" tiki yoksa alan salt-okunur metindir; sunucu
+             tarafında cart_price da aynı tike bağlıdır. {% endcomment %}
+          {% if can_price %}
           <form class="flex items-center gap-2 mt-2"
                 hx-post="{% url 'stock:cart_price' lid=line.lid %}"
                 hx-target="#cart" hx-swap="outerHTML" hx-trigger="change">
@@ -78,6 +81,11 @@
             <span class="text-xs" style="color:var(--muted)">₺ ind.</span>
             {% endif %}
           </form>
+          {% else %}
+          <div class="text-xs mt-2" style="color:var(--muted)">
+            {{ line.unit|tl }} birim{% if line.discount != "0.00" %} · {{ line.discount|tl }} ind.{% endif %}
+          </div>
+          {% endif %}
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
@@ -114,10 +122,12 @@
           </div>
         </div>
         <span class="font-semibold text-sm" style="color:#ffd48a">− {{ trade.amount|tl }}</span>
+        {% if can_price %}
         <form hx-post="{% url 'stock:cart_trade_in' %}" hx-target="#cart" hx-swap="outerHTML">
           <input type="hidden" name="remove" value="{{ trade.tid }}">
           <button class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3);padding:4px 10px">✕</button>
         </form>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -181,7 +191,8 @@
     {% endif %}
   </div>
 
-  <!-- Takas -->
+  <!-- Takas: bedeli ödenecek tutarı düşürdüğü için fiyat tikine bağlı. -->
+  {% if can_price %}
   <div class="card p-4" x-data="{ open: false }">
     <button class="flex items-center justify-between w-full" @click="open = !open" type="button">
       <h3 class="font-display font-bold text-sm">↩️ Takas Ekle</h3>
@@ -220,6 +231,7 @@
       </p>
     </form>
   </div>
+  {% endif %}
   {% endif %}
 
   <!-- Ödeme ve tamamla -->

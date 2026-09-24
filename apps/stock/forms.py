@@ -38,6 +38,7 @@ def _brand_create() -> str:
 
 class DeviceForm(MoneyAwareModelForm):
     MONEY_FIELDS = ["purchase_price"]
+    PRICE_FIELDS = ["list_price"]
 
     class Meta:
         model = Device
@@ -85,6 +86,7 @@ class DeviceForm(MoneyAwareModelForm):
 
 class AccessoryForm(MoneyAwareModelForm):
     MONEY_FIELDS = ["cost"]
+    PRICE_FIELDS = ["price"]
 
     #: Yalnızca yeni kayıtta gösterilir; kaydedildikten sonra stok değişimi
     #: hareket defteri üzerinden yapılır (doğrudan adet düzenlenemez).
@@ -211,6 +213,18 @@ class PaymentForm(MoneyAwareModelForm):
         fields = ["amount", "method", "kind", "paid_at", "note"]
         field_classes = {"amount": MoneyField}
         widgets = {"paid_at": DATETIME}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .permissions import has_access
+
+        # Para iadesi "Silme, iptal, iade" tikine bağlı. Seçenekten çıkarmak
+        # elle POST edilen "iade"yi de geçersiz seçim yapar.
+        if not has_access(self.user, "delete"):
+            self.fields["kind"].choices = [
+                choice for choice in self.fields["kind"].choices
+                if choice[0] != Payment.Kind.IADE
+            ]
 
 
 class StockIntakeForm(forms.Form):

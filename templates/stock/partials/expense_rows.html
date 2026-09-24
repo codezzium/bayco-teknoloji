@@ -18,10 +18,12 @@
     <div class="flex items-center gap-3 shrink-0">
       <span class="font-display font-extrabold">{{ expense.amount|tl }}</span>
       <a href="{% url 'stock:expense_edit' pk=expense.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
+      {% if access.delete %}
       <button hx-post="{% url 'stock:expense_delete' pk=expense.pk %}"
               hx-target="#expense-{{ expense.pk }}" hx-swap="outerHTML"
               hx-confirm="Gider silinsin mi?" class="btn btn-sm"
               style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+      {% endif %}
     </div>
   </div>
   {% empty %}

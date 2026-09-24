@@ -1,0 +1,59 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}Personel{% endblock %}
+
+{% block content %}
+{% include "stock/partials/list_header.html" %}
+
+<p class="text-sm mb-5 max-w-3xl" style="color:var(--muted)">
+  Personel stoğu görür ve satış yapar; bunun dışındaki sayfa ve işlemler her kişi için
+  ayrı ayrı tiklenir. Patron her şeyi görür. Hesaplar silinmez, pasif yapılır: satış
+  geçmişi ve hareket kayıtları korunur.
+</p>
+
+<div class="space-y-3">
+  {% for row in rows %}
+  {% with user=row.user %}
+  <div class="card p-4 flex flex-wrap items-center justify-between gap-3 {% if not user.is_active %}opacity-60{% endif %}">
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-semibold">{{ user.get_full_name|default:user.username }}</span>
+        {% if user.get_full_name %}<span class="text-xs" style="color:var(--muted)">@{{ user.username }}</span>{% endif %}
+        {% if row.patron %}
+        <span class="chip badge-brand" style="font-size:11px">Patron</span>
+        {% else %}
+        <span class="chip" style="font-size:11px">Personel</span>
+        {% endif %}
+        {% if not user.is_active %}
+        <span class="chip" style="font-size:11px;color:#ff8b95;border-color:rgba(226,58,72,.3)">Pasif</span>
+        {% endif %}
+        {% if user.pk == request.user.pk %}<span class="text-xs" style="color:var(--muted)">(siz)</span>{% endif %}
+      </div>
+      <div class="text-xs mt-1" style="color:var(--muted)">
+        Son giriş: {{ user.last_login|date:"d.m.Y H:i"|default:"hiç giriş yapmadı" }}
+      </div>
+      <div class="flex flex-wrap gap-1.5 mt-2">
+        {% if row.patron %}
+        <span class="text-xs" style="color:var(--muted)">Tüm sayfalar ve işlemler</span>
+        {% else %}
+        {% for label in row.labels %}
+        <span class="chip" style="font-size:11px">{{ label }}</span>
+        {% empty %}
+        <span class="text-xs" style="color:var(--muted)">Yalnızca stok ve kasa</span>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <a href="{% url 'staff:logs' %}?kullanici={{ user.pk }}" class="btn btn-ghost btn-sm">Hareketler</a>
+      <a href="{% url 'staff:edit' pk=user.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
+    </div>
+  </div>
+  {% endwith %}
+  {% empty %}
+  <div class="card p-12 text-center">
+    <div class="text-4xl mb-3">👥</div>
+    <p class="font-semibold">Henüz personel yok</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

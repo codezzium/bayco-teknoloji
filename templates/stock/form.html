@@ -18,7 +18,7 @@
   <div class="card p-4 mb-4" style="border-color:rgba(245,180,60,.4)">
     <p class="text-sm" style="color:#ffd48a">
       Bu telefon numarası zaten kayıtlı:
-      <a href="{% url 'stock:contact_detail' pk=duplicate.pk %}" class="underline">{{ duplicate.full_name }}</a>.
+      {% if access.contacts %}<a href="{% url 'stock:contact_detail' pk=duplicate.pk %}" class="underline">{{ duplicate.full_name }}</a>{% else %}<strong>{{ duplicate.full_name }}</strong>{% endif %}.
       Aynı kişiyse yeni kayıt açmak yerine mevcut kaydı kullanın.
     </p>
   </div>

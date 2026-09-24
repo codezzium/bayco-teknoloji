@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "apps.website",
     "apps.dashboard",
     "apps.stock",
+    "apps.staff",
 ]
 
 MIDDLEWARE = [
@@ -57,6 +58,8 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # Paneldeki her POST'u hareket kaydına yazar (auth + messages'tan sonra).
+    "apps.staff.middleware.ActivityLogMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -74,6 +77,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.sitecore.context_processors.site_globals",
+                "apps.staff.context_processors.access",
             ],
         },
     },

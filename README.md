@@ -44,6 +44,32 @@ Genel Bakış · Talepler (Teklif/Servis/İletişim gelen kutusu) · Duyurular/S
 Ürünler · Yorumlar · S.S.S. · Markalar · **Site Ayarları** (telefon, WhatsApp no,
 hero görseli, kampanya şeridi, sosyal medya…). Değişiklikler siteye anında yansır.
 
+### Personel ve yetkiler (`/panel/personel/`)
+Yalnızca **Patron** (superuser ya da Patron grubu) görür. Patron buradan personel
+hesabı açar (kullanıcı adı, şifre), rol seçer ve her kişi için ayrı ayrı tikler:
+
+| Bölüm | Tikler |
+|---|---|
+| Sayfalar | Giderler · Raporlar (ciro/kâr/sermaye dahil) · İçerik ve Site Ayarları · Talepler · Cariler |
+| Genel Bakış | Bugünkü Ciro · Tahsil Edilmemiş |
+| İşlemler | Maliyet ve kâr · Kasada fiyat/indirim/takas · Silme, iptal, iade ve fire |
+
+Tiksiz personel stoğu görür, barkod okutur, satış yapar, tahsilat girer, stok girişi ve
+sayım yapar; kasadan yeni müşteri ekleyebilir. Yetkisiz bir sayfaya giren personel
+"Bu işlem için yetkiniz yok." mesajıyla ana sayfaya döner. Hesaplar silinmez, **pasif**
+yapılır (oturum hemen düşer, satış geçmişi korunur). Her kullanıcı sağ üstteki adına
+tıklayıp kendi şifresini değiştirebilir.
+
+Tik listesi tek yerde durur: `apps/staff/access.py`. Yeni tik = oraya bir satır +
+`makemigrations staff`.
+
+### Hareket kayıtları (`/panel/personel/loglar/`)
+Paneldeki her işlem (POST), giriş, çıkış, hatalı giriş ve yetkisiz deneme — Patron'un
+kendi hareketleri dahil — kim/ne zaman/hangi kayıt/girilen değerler/IP/cihaz bilgisiyle
+tutulur. Şifreler hiçbir zaman yazılmaz. Sayfa görüntülemeleri loglanmaz. Kullanıcı,
+tür, tarih ve metinle filtrelenir; **Excel (CSV) indir** aynı filtreyle dışa aktarır.
+365 günden eski kayıtlar her girişte otomatik silinir (elle: `manage.py prune_activity_log --days N`).
+
 ### Hero arka planı & görseller
 - **Hero mağaza fotoğrafı:** Panel → Site Ayarları → *Hero Arka Plan*'dan yükleyin.
 - **Ürün / slider görselleri:** İlgili panelden yüklenir. Görsel yoksa markalı gradient
@@ -59,6 +85,8 @@ apps/
   leads/           # QuoteRequest, ServiceRequest, ContactMessage + wa.me yardımcıları
   website/         # public görünümler
   dashboard/       # firma paneli (auth + generic htmx CRUD)
+  stock/           # stok, kasa, satış, cari, gider, rapor; permissions.py = erişim kuralları
+  staff/           # personel yönetimi, yetki tikleri (access.py), hareket kayıtları
 templates/  static/  media/
 ```
 

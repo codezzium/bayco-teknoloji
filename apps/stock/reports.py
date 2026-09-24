@@ -352,8 +352,10 @@ def recent_products(limit=20) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def dashboard_kpis(user=None) -> dict:
-    """Genel bakış kartları. Para gerektiren alanlar can_see_money'e bağlıdır."""
-    from .permissions import can_see_money
+    """Genel bakış kartları. Her para kartı kendi Personel tikine bağlıdır:
+    bugünkü ciro, tahsil edilmemiş ve maliyet/kâr ayrı ayrı verilebilir.
+    Yetkisi olmayanın sayısı hiç hesaplanmaz (şablona sızacak değer yok)."""
+    from .permissions import has_access
 
     today = timezone.localdate()
     month_start = today.replace(day=1)
@@ -368,21 +370,16 @@ def dashboard_kpis(user=None) -> dict:
                                            sold_at__date=today).count(),
         "expiring_warranty_count": expiring_warranty().count(),
     }
-    if not can_see_money(user):
-        return data
-
-    today_totals = revenue_and_profit(today, today)
-    month_totals = net_profit(month_start, today)
-    capital = stock_capital()
-    data.update({
-        "revenue_today": today_totals["revenue"],
-        "profit_today": today_totals["gross"],
-        "revenue_month": month_totals["revenue"],
-        "gross_month": month_totals["gross"],
-        "net_month": month_totals["net"],
-        "margin_month": month_totals["net_margin"],
-        "capital": capital["total"],
-        "receivables": receivables_total(),
-        "overdue_count": overdue_receivables().count(),
-    })
+    if has_access(user, "revenue_today"):
+        data["revenue_today"] = revenue_and_profit(today, today)["revenue"]
+    if has_access(user, "receivables"):
+        data["receivables"] = receivables_total()
+        data["overdue_count"] = overdue_receivables().count()
+    if has_access(user, "money"):
+        month_totals = net_profit(month_start, today)
+        data.update({
+            "net_month": month_totals["net"],
+            "margin_month": month_totals["net_margin"],
+            "capital": stock_capital()["total"],
+        })
     return data

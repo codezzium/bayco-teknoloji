@@ -20,7 +20,7 @@
     </div>
     <div class="flex items-center gap-2 shrink-0">
       <a href="{% url 'stock:simple_edit' key=key pk=item.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
-      {% if perms.stock.view_money %}
+      {% if access.delete %}
       <button hx-post="{% url 'stock:simple_delete' key=key pk=item.pk %}"
               hx-target="#simple-{{ item.pk }}" hx-swap="outerHTML"
               hx-confirm="Silmek istediğinize emin misiniz?"

@@ -1,4 +1,10 @@
-"""Cari (müşteri/tedarikçi) ekranları."""
+"""Cari (müşteri/tedarikçi) ekranları.
+
+"Cariler" tiki listeyi, detayı (bakiyeler) ve düzenlemeyi açar. YENİ cari
+eklemek herkese açıktır: kasadaki "+ Yeni Müşteri" veresiye satış için
+gereklidir. Tiki olmayan kullanıcı kayıttan sonra kasaya döner, cari
+detayına değil.
+"""
 
 from django.contrib import messages
 from django.db.models import Q
@@ -11,17 +17,18 @@ from ..forms import ContactForm
 from ..models import Contact
 from ..utils import trfold
 from .base import (
-    can_see_money,
+    access_required,
+    deny,
+    has_access,
     paginate,
     panel_required,
-    patron_required,
     pick_template,
     querystring,
     safe_next,
 )
 
 
-@panel_required
+@access_required("contacts")
 def contact_list(request):
     query = request.GET.get("q", "").strip()
     role = request.GET.get("rol", "")
@@ -44,7 +51,7 @@ def contact_list(request):
     })
 
 
-@panel_required
+@access_required("contacts")
 def contact_detail(request, pk):
     from django.db.models import F, Sum
 
@@ -65,12 +72,14 @@ def contact_detail(request, pk):
         "bought": contact.bought_devices.select_related("device_model__brand")[:30],
         "open_sales": open_sales,
         "balance": balance,
-        "show_money": can_see_money(request.user),
     })
 
 
 @panel_required
 def contact_form(request, pk=None):
+    can_browse = has_access(request.user, "contacts")
+    if pk and not can_browse:
+        return deny(request)
     instance = get_object_or_404(Contact, pk=pk) if pk else None
     duplicate = None
 
@@ -87,6 +96,8 @@ def contact_form(request, pk=None):
                 cart["customer_id"] = contact.pk
                 cart_utils.save_cart(request, cart)
                 return redirect(next_url)
+            if not can_browse:
+                return redirect("stock:pos")
             return redirect("stock:contact_detail", pk=contact.pk)
     else:
         form = ContactForm(instance=instance, user=request.user)
@@ -107,11 +118,12 @@ def contact_form(request, pk=None):
         "next_url": next_url,
         "back_url": (next_url or
                      (reverse("stock:contact_detail", kwargs={"pk": instance.pk})
-                      if instance else reverse("stock:contact_list"))),
+                      if instance else reverse("stock:contact_list" if can_browse
+                                               else "stock:pos"))),
     })
 
 
-@patron_required
+@access_required("delete")
 @require_POST
 def contact_delete(request, pk):
     contact = get_object_or_404(Contact, pk=pk)

@@ -54,7 +54,7 @@
         <div><span style="color:var(--muted)">Alış Tarihi</span><div>{{ device.purchase_date|date:"d.m.Y" }}</div></div>
         {% if device.supplier %}
         <div><span style="color:var(--muted)">Alındığı Kişi</span>
-          <div><a href="{% url 'stock:contact_detail' pk=device.supplier.pk %}" class="hover:underline">{{ device.supplier.full_name }}</a></div></div>
+          <div>{% if access.contacts %}<a href="{% url 'stock:contact_detail' pk=device.supplier.pk %}" class="hover:underline">{{ device.supplier.full_name }}</a>{% else %}{{ device.supplier.full_name }}{% endif %}</div></div>
         {% endif %}
         <div><span style="color:var(--muted)">Stokta Bekleme</span><div>{{ device.age_in_days }} gün</div></div>
       </div>
@@ -178,7 +178,7 @@
     </div>
     {% endif %}
 
-    {% if perms.stock.view_money %}
+    {% if access.money %}
     <div class="card p-5">
       <h3 class="font-display font-bold mb-3">Finans</h3>
       <div class="space-y-2 text-sm">
@@ -203,8 +203,10 @@
         </div>
         {% endif %}
       </div>
+      {% if access.expenses %}
       <a href="{% url 'stock:expense_create' %}?cihaz={{ device.pk }}"
          class="btn btn-ghost btn-sm btn-block mt-4">+ Gider / Tamir Ekle</a>
+      {% endif %}
     </div>
 
     {% if expenses %}
@@ -223,6 +225,10 @@
       </div>
     </div>
     {% endif %}
+    {% elif access.expenses %}
+    {# Gider yazabilen ama maliyeti göremeyen: yalnızca ekleme düğmesi. #}
+    <a href="{% url 'stock:expense_create' %}?cihaz={{ device.pk }}"
+       class="btn btn-ghost btn-sm btn-block">+ Gider / Tamir Ekle</a>
     {% endif %}
 
     <!-- Durum değiştir -->
@@ -246,6 +252,7 @@
     {% endif %}
 
     <!-- Site vitrini -->
+    {% if access.content %}
     <div class="card p-5">
       <h3 class="font-display font-bold mb-2">Site Vitrini</h3>
       <p class="text-xs mb-3" style="color:var(--muted)">
@@ -269,8 +276,9 @@
         {% endif %}
       </form>
     </div>
+    {% endif %}
 
-    {% if perms.stock.view_money %}
+    {% if access.delete %}
     <form method="post" action="{% url 'stock:device_delete' pk=device.pk %}"
           onsubmit="return confirm('{{ device.stock_code }} silinsin mi? Bu işlem geri alınamaz.')">
       {% csrf_token %}

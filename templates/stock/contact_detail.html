@@ -89,7 +89,7 @@
   </div>
 
   <div class="space-y-5">
-    {% if show_money %}
+    {# Bakiye "Cariler" tikiyle gelir: sayfa zaten o tike bağlı. #}
     <div class="card p-5">
       <h3 class="font-display font-bold mb-3">Bakiye</h3>
       <div class="text-3xl font-display font-extrabold"
@@ -108,9 +108,8 @@
       </a>
       {% endfor %}
     </div>
-    {% endif %}
 
-    {% if perms.stock.view_money %}
+    {% if access.delete %}
     <form method="post" action="{% url 'stock:contact_delete' pk=contact.pk %}"
           onsubmit="return confirm('{{ contact.full_name|escapejs }} silinsin mi?')">
       {% csrf_token %}

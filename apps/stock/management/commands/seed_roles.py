@@ -5,6 +5,11 @@ stock.manage_stock) django.contrib.auth'un post_migrate handler'ı yaratır ve o
 handler aynı `migrate` koşusundaki TÜM migration'lardan sonra çalışır. Bir
 RunPython içinde bu izinler henüz mevcut olmadığı için sessizce atlanırdı.
 
+Patron'un erişimi bu gruplara BAĞLI DEĞİLDİR (has_access Patron grubu
+üyeliğine bakar); Personel'in sayfa/işlem tikleri de kişi başınadır ve
+Personel sayfasından verilir. Bu komut grupların var olmasını ve admin'de
+tutarlı görünmesini sağlar.
+
 Idempotent — her deploy sonrası çalıştırılabilir:
     python manage.py migrate && python manage.py seed_roles
 """
@@ -16,7 +21,7 @@ from django.db import transaction
 from apps.stock.permissions import GROUP_PATRON, GROUP_PERSONEL
 
 # Personel: stoğu görür, satış yapar, tahsilat girer, cari ekler.
-# GÖREMEZ: maliyet, kâr, ciro (view_money yok), giderler, silme yetkisi.
+# Geri kalan her şey kişi başı tiklerdir (apps/staff/access.py).
 PERSONEL_PERMS = [
     "stock.view_device",
     "stock.change_device",
@@ -55,6 +60,7 @@ class Command(BaseCommand):
             content_type__app_label="stock"
         ).select_related("content_type")
         catalog_perms = Permission.objects.filter(content_type__app_label="catalog")
+        staff_perms = Permission.objects.filter(content_type__app_label="staff")
 
         if not stock_perms.exists():
             self.stderr.write(self.style.ERROR(
@@ -64,7 +70,8 @@ class Command(BaseCommand):
 
         # --- Patron: her şey ---
         patron, _ = Group.objects.get_or_create(name=GROUP_PATRON)
-        patron.permissions.set(list(stock_perms) + list(catalog_perms))
+        patron.permissions.set(list(stock_perms) + list(catalog_perms)
+                               + list(staff_perms))
 
         # --- Personel: sınırlı liste ---
         wanted = set(PERSONEL_PERMS)

@@ -34,8 +34,12 @@
       {% if sale.customer %}
       <div class="glass rounded-xl px-4 py-3 mb-4">
         <div class="text-xs" style="color:var(--muted)">Müşteri</div>
+        {% if access.contacts %}
         <a href="{% url 'stock:contact_detail' pk=sale.customer.pk %}"
            class="font-semibold hover:underline">{{ sale.customer.full_name }}</a>
+        {% else %}
+        <span class="font-semibold">{{ sale.customer.full_name }}</span>
+        {% endif %}
         <span class="text-sm" style="color:var(--muted)"> · {{ sale.customer.phone }}</span>
       </div>
       {% endif %}
@@ -61,7 +65,7 @@
             {% if show_money %}
             <div class="text-xs" style="color:var(--muted)">kâr {{ item.line_profit|tl0 }}</div>
             {% endif %}
-            {% if not item.returned_at and sale.status != 'iptal' %}
+            {% if not item.returned_at and sale.status != 'iptal' and access.delete %}
             <form method="post" action="{% url 'stock:sale_item_return' pk=sale.pk item_id=item.pk %}"
                   class="mt-1" onsubmit="return confirm('{{ item.item_name|escapejs }} iade edilsin mi?')">
               {% csrf_token %}
@@ -122,7 +126,7 @@
   <div class="space-y-5">
     <!-- Tahsilat -->
     <div class="card p-5">
-      <h3 class="font-display font-bold mb-3">Tahsilat / İade</h3>
+      <h3 class="font-display font-bold mb-3">Tahsilat{% if access.delete %} / İade{% endif %}</h3>
       <div class="space-y-2 text-sm mb-4">
         {% for payment in payments %}
         <div class="flex items-center justify-between gap-2 py-1.5" style="border-bottom:1px solid var(--line)">
@@ -161,7 +165,7 @@
     </div>
     {% endif %}
 
-    {% if sale.status != 'iptal' and perms.stock.view_money %}
+    {% if sale.status != 'iptal' and access.delete %}
     <form method="post" action="{% url 'stock:sale_void' pk=sale.pk %}" class="card p-5"
           onsubmit="return confirm('Fiş iptal edilecek: tüm kalemler iade olacak, cihazlar stoğa dönecek, tahsilat geri ödenecek. Emin misiniz?')">
       {% csrf_token %}

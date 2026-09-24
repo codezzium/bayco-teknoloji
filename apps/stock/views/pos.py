@@ -14,10 +14,11 @@ from ..forms import PaymentForm
 from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem
 from ..utils import parse_money, trfold
 from .base import (
+    access_required,
     can_see_money,
+    has_access,
     paginate,
     panel_required,
-    patron_required,
     pick_template,
     querystring,
 )
@@ -35,6 +36,7 @@ def cart_context(request, cart=None) -> dict:
         "customer": customer,
         "note": cart.get("note", ""),
         "show_money": show_money,
+        "can_price": has_access(request.user, "price"),
         "payment_methods": Payment.Method.choices,
         # Takas formu sepetin içinde render edilir; sepet her mutasyonda
         # yeniden çizildiği için model listesi de bu bağlamda olmalıdır.
@@ -122,7 +124,7 @@ def cart_qty(request, lid):
     return _render_cart(request, cart)
 
 
-@panel_required
+@access_required("price")
 @require_POST
 def cart_price(request, lid):
     cart = cart_utils.get_cart(request)
@@ -153,7 +155,7 @@ def cart_clear(request):
     return _render_cart(request, cart_utils.clear_cart(request), "Sepet temizlendi.")
 
 
-@panel_required
+@access_required("price")
 @require_POST
 def cart_trade_in(request):
     """Takas cihazını sepete ekler; asıl Device kaydı satış anında yaratılır."""
@@ -217,6 +219,9 @@ def checkout(request):
             note=cart.get("note", ""),
             confirm_prices=bool(request.POST.get("confirm_prices")),
         )
+        request.audit = {"target": sale.receipt_no,
+                         "target_url": reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
+                         "detail": {"Ödenecek": str(sale.payable_total)}}
     except services.PriceChanged as exc:
         context = cart_context(request, cart)
         context["price_changes"] = exc.changes
@@ -306,6 +311,8 @@ def receipt(request, pk):
 @require_POST
 def sale_payment(request, pk):
     sale = get_object_or_404(Sale, pk=pk)
+    # İade türü PaymentForm'da yetkisiz kullanıcıya hiç sunulmaz; elle POST
+    # edilirse geçersiz seçim olarak reddedilir.
     form = PaymentForm(request.POST, user=request.user)
     if form.is_valid():
         try:
@@ -323,7 +330,7 @@ def sale_payment(request, pk):
     return redirect("stock:sale_detail", pk=pk)
 
 
-@panel_required
+@access_required("delete")
 @require_POST
 def sale_item_return(request, pk, item_id):
     sale = get_object_or_404(Sale, pk=pk)
@@ -338,7 +345,7 @@ def sale_item_return(request, pk, item_id):
     return redirect("stock:sale_detail", pk=pk)
 
 
-@patron_required
+@access_required("delete")
 @require_POST
 def sale_void(request, pk):
     sale = get_object_or_404(Sale, pk=pk)

@@ -19,7 +19,9 @@ urlpatterns = [
     # SIRA KRİTİK: apps/dashboard/urls.py bir `<str:key>/` yakalayıcısıyla biter.
     # `panel/stok/` bu satırdan sonra gelirse tek segmentli /panel/stok/ isteği
     # crud_list(key="stok") ile eşleşip "Bölüm bulunamadı" 404'ü döner.
+    # `panel/personel/` için de aynısı geçerli.
     path("panel/stok/", include("apps.stock.urls")),
+    path("panel/personel/", include("apps.staff.urls")),
     path("panel/", include("apps.dashboard.urls")),
     # KÖKTE olmak ZORUNDA: service worker yalnızca kendi yolunun altını
     # denetleyebilir; /panel/sw.js olsaydı kapsam /panel/ ile sınırlı kalırdı —

@@ -23,10 +23,12 @@ from ..labels import LABEL_FORMATS
 from ..models import Accessory, AccessoryCategory, Device, DeviceModel
 from ..utils import trfold
 from .base import (
+    access_required,
     can_see_money,
+    deny,
+    has_access,
     paginate,
     panel_required,
-    patron_required,
     pick_template,
     preselected,
     querystring,
@@ -42,6 +44,9 @@ DEVICE_ORDERING = {
     "device_model__name": "Model",
 }
 DEFAULT_ORDERING = "-updated_at"
+
+#: Stoğu ya da parayı eksilten durum geçişleri: "Silme, iptal, iade" tikine bağlı.
+WRITE_OFF_STATUSES = {Device.Status.KAYIP, Device.Status.IADE}
 
 
 # ===========================================================================
@@ -109,6 +114,7 @@ def device_detail(request, pk):
             (value, Device.Status(value).label)
             for value in services.ALLOWED_TRANSITIONS.get(device.status, set())
             if value not in (Device.Status.SATILDI, Device.Status.IADE)
+            and (value not in WRITE_OFF_STATUSES or has_access(request.user, "delete"))
         ],
     })
 
@@ -167,6 +173,9 @@ def device_form(request, pk=None):
 @require_POST
 def device_status(request, pk):
     device = get_object_or_404(Device, pk=pk)
+    if (request.POST.get("status") in WRITE_OFF_STATUSES
+            and not has_access(request.user, "delete")):
+        return deny(request)
     try:
         services.set_device_status(device, request.POST.get("status", ""),
                                    user=request.user,
@@ -177,7 +186,7 @@ def device_status(request, pk):
     return redirect("stock:device_detail", pk=device.pk)
 
 
-@panel_required
+@access_required("content")
 @require_POST
 def device_publish(request, pk):
     device = get_object_or_404(Device, pk=pk)
@@ -197,7 +206,7 @@ def device_publish(request, pk):
     return redirect("stock:device_detail", pk=device.pk)
 
 
-@patron_required
+@access_required("delete")
 @require_POST
 def device_delete(request, pk):
     device = get_object_or_404(Device, pk=pk)
@@ -317,6 +326,8 @@ def accessory_adjust(request, pk):
     """Tek aksesuar için mal girişi veya sayım düzeltmesi."""
     accessory = get_object_or_404(Accessory, pk=pk)
     mode = request.POST.get("mode", "giris")
+    if mode == "fire" and not has_access(request.user, "delete"):
+        return deny(request)
     try:
         if mode == "sayim":
             form = StocktakeForm(request.POST)
@@ -423,7 +434,7 @@ def simple_form(request, key, pk=None):
     })
 
 
-@patron_required
+@access_required("delete")
 @require_POST
 def simple_delete(request, key, pk):
     cfg = _simple_cfg(key)

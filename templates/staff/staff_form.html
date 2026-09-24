@@ -1,0 +1,99 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}Personel{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl" x-data="{ role: '{{ form.role.value|default:'personel'|escapejs }}' }">
+  <div class="flex items-center gap-2 text-sm mb-5" style="color:var(--muted)">
+    <a href="{{ back_url }}" class="hover:text-white">Personel</a>
+    <span>/</span>
+    <span style="color:var(--ink)">{% if is_edit %}{{ form.instance.username }}{% else %}Yeni Personel{% endif %}</span>
+  </div>
+
+  <form method="post" class="space-y-5" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="rounded-xl px-4 py-3 text-sm"
+         style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+      {{ form.non_field_errors|striptags }}
+    </div>
+    {% endif %}
+
+    <div class="card p-6">
+      <h2 class="font-display font-bold mb-4">Hesap</h2>
+      <div class="grid sm:grid-cols-2 gap-x-5">
+        {% for field in form %}
+        {% if field.name in "username,first_name,last_name,password1,password2" %}
+        <div class="field">
+          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text|safe }}</div>{% endif %}
+          {% if field.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ field.errors|striptags }}</p>{% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      <div class="field">
+        <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+          {{ form.is_active }}
+          <span class="label" style="margin:0">{{ form.is_active.label }}</span>
+        </label>
+        <p class="text-xs mt-1" style="color:var(--muted)">{{ form.is_active.help_text }}</p>
+        {% if form.is_active.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ form.is_active.errors|striptags }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="card p-6">
+      <h2 class="font-display font-bold mb-3">Rol</h2>
+      <div class="flex flex-wrap gap-3">
+        {% for choice in form.role %}
+        <label class="filter-chip cursor-pointer" :class="role === '{{ choice.data.value }}' ? 'active' : ''">
+          <input type="radio" name="{{ form.role.html_name }}" value="{{ choice.data.value }}" class="sr-only"
+                 x-model="role" {% if choice.data.selected %}checked{% endif %}
+                 {% if form.role.field.disabled %}disabled{% endif %}>
+          {{ choice.choice_label }}
+        </label>
+        {% endfor %}
+      </div>
+      {% if form.role.field.disabled %}
+      <p class="text-xs mt-2" style="color:var(--muted)">
+        {% if form.instance.is_superuser %}Bu hesap sistem yöneticisidir, her zaman Patron'dur.{% else %}Kendi rolünüzü değiştiremezsiniz.{% endif %}
+      </p>
+      {% endif %}
+      {% if form.role.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ form.role.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div class="card p-6" x-show="role === 'patron'" x-cloak>
+      <p class="text-sm" style="color:var(--muted)">
+        Patron her sayfayı ve işlemi görür, personeli ve hareket kayıtlarını yönetir.
+        Aşağıdaki tikler saklanır ama Patron iken etkisizdir.
+      </p>
+    </div>
+
+    <div class="card p-6" :class="role === 'patron' ? 'opacity-50' : ''">
+      <h2 class="font-display font-bold mb-1">Yetkiler</h2>
+      <p class="text-xs mb-4" style="color:var(--muted)">
+        Tiksiz personel stoğu görür, barkod okutur, satış yapar, tahsilat girer ve stok girişi/sayım yapar.
+      </p>
+      {% for section, fields in form.sections %}
+      <div class="text-xs font-semibold mt-4 mb-2" style="color:var(--muted)">{{ section|upper }}</div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        {% for field in fields %}
+        <label class="glass rounded-xl p-3 flex items-start gap-3 cursor-pointer select-none">
+          {{ field }}
+          <span class="min-w-0">
+            <span class="block font-semibold text-sm">{{ field.label }}</span>
+            {% if field.help_text %}<span class="block text-xs mt-0.5" style="color:var(--muted)">{{ field.help_text }}</span>{% endif %}
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button class="btn btn-gradient">Kaydet</button>
+      <a href="{{ back_url }}" class="btn btn-ghost">Vazgeç</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 <div class="flex items-center gap-2 shrink-0">
   <a href="{% url 'dashboard:crud_edit' key=key pk=obj.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
-  {% if perms.stock.view_money %}
+  {% if access.delete %}
   <button hx-post="{% url 'dashboard:crud_delete' key=key pk=obj.pk %}"
           hx-target="#item-{{ obj.pk }}" hx-swap="outerHTML"
           hx-confirm="Silmek istediğinize emin misiniz?"

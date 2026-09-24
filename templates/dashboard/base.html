@@ -74,7 +74,9 @@
 
     <nav class="p-3 flex-1 min-h-0 overflow-y-auto flex flex-col gap-1 text-sm">
       {% include "dashboard/partials/nav_link.html" with url='dashboard:home' key='home' label='Genel Bakış' icon='grid' %}
+      {% if access.leads %}
       {% include "dashboard/partials/nav_link.html" with url='dashboard:leads' key='talepler' label='Talepler' icon='inbox' %}
+      {% endif %}
 
       {% comment %} Stok modülü: nav_link'in url= biçimi kullanılır. crud=1 dashboard'un
          CRUD kayıt defterine bakar ve stok rotaları orada değildir. {% endcomment %}
@@ -84,9 +86,13 @@
       {% include "dashboard/partials/nav_link.html" with url='stock:device_list' key='cihazlar' label='Cihazlar' icon='box' %}
       {% include "dashboard/partials/nav_link.html" with url='stock:accessory_list' key='aksesuarlar' label='Aksesuarlar' icon='layers' %}
       {% include "dashboard/partials/nav_link.html" with url='stock:sale_list' key='satislar' label='Satışlar' icon='receipt' %}
+      {% if access.contacts %}
       {% include "dashboard/partials/nav_link.html" with url='stock:contact_list' key='cariler' label='Cariler' icon='users' %}
-      {% if perms.stock.view_money %}
+      {% endif %}
+      {% if access.expenses %}
       {% include "dashboard/partials/nav_link.html" with url='stock:expense_list' key='giderler' label='Giderler' icon='wallet' %}
+      {% endif %}
+      {% if access.reports %}
       {% include "dashboard/partials/nav_link.html" with url='stock:reports' key='rapor' label='Raporlar' icon='chart' %}
       {% endif %}
       {% include "dashboard/partials/nav_link.html" with url='stock:intake' key='giris' label='Stok Girişi' icon='download' %}
@@ -101,15 +107,25 @@
       {% include "dashboard/partials/nav_link.html" with key='modeller' label='Cihaz Modelleri' icon='cpu' simple=1 %}
       {% include "dashboard/partials/nav_link.html" with key='kategoriler' label='Aksesuar Kategorileri' icon='folder' simple=1 %}
 
+      {% if access.content %}
       <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">İÇERİK</div>
       {% include "dashboard/partials/nav_link.html" with key='duyurular' label='Duyurular / Slider' icon='image' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='urunler' label='Ürünler' icon='phone' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='yorumlar' label='Yorumlar' icon='star' crud=1 %}
       {% include "dashboard/partials/nav_link.html" with key='sss' label='S.S.S.' icon='help' crud=1 %}
+      {% endif %}
 
-      {% if perms.stock.view_money %}
+      {% comment %} Personel ve Hareket Kayıtları tik değildir: yalnızca Patron.
+         Aksi halde bir personel kendine yetki verebilirdi. {% endcomment %}
+      {% if access.content or access.patron %}
       <div class="text-xs font-semibold px-3 pt-4 pb-1" style="color:var(--muted)">SİSTEM</div>
+      {% if access.content %}
       {% include "dashboard/partials/nav_link.html" with url='dashboard:settings' key='ayarlar' label='Site Ayarları' icon='settings' %}
+      {% endif %}
+      {% if access.patron %}
+      {% include "dashboard/partials/nav_link.html" with url='staff:list' key='personel' label='Personel' icon='user-check' %}
+      {% include "dashboard/partials/nav_link.html" with url='staff:logs' key='loglar' label='Hareket Kayıtları' icon='activity' %}
+      {% endif %}
       {% endif %}
     </nav>
 
@@ -144,7 +160,8 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span class="hidden sm:inline" x-text="busy ? 'Yükleniyor…' : 'Uygulama Olarak Yükle'">Uygulama Olarak Yükle</span>
         </button>
-        <span class="hidden sm:block" style="color:var(--muted)">👤 {{ request.user.username }}</span>
+        <a href="{% url 'staff:password' %}" class="hidden sm:block hover:text-white"
+           style="color:var(--muted)" title="Şifremi değiştir">👤 {{ request.user.username }}</a>
       </div>
     </header>
 
@@ -152,9 +169,15 @@
     {% if messages %}
     <div class="px-5 pt-4 space-y-2">
       {% for m in messages %}
+      {% if m.level_tag == 'error' or m.level_tag == 'warning' %}
+      <div class="glass rounded-xl px-4 py-3 text-sm flex items-center gap-2" style="border-color:rgba(226,58,72,.4)">
+        <span style="color:#ff8b95">✕</span> {{ m }}
+      </div>
+      {% else %}
       <div class="glass rounded-xl px-4 py-3 text-sm flex items-center gap-2" style="border-color:rgba(37,211,102,.3)">
         <span style="color:#25d366">✓</span> {{ m }}
       </div>
+      {% endif %}
       {% endfor %}
     </div>
     {% endif %}

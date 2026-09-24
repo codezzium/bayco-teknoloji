@@ -1,0 +1,35 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}Hareket Kayıtları{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div>
+    <h2 class="font-display font-extrabold text-xl">Hareket Kayıtları</h2>
+    <p class="text-sm" style="color:var(--muted)">
+      Paneldeki her işlem, giriş ve yetkisiz deneme. 1 yıldan eski kayıtlar otomatik silinir.
+    </p>
+  </div>
+</div>
+
+<form id="log-filters" class="glass rounded-2xl p-4 mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
+      hx-get="{% url 'staff:logs' %}" hx-target="#log-results" hx-swap="outerHTML"
+      hx-push-url="true" hx-trigger="change, keyup changed delay:400ms from:input[name=q]">
+  <select name="kullanici" class="select">
+    <option value="">Tüm kullanıcılar</option>
+    {% for user in users %}
+    <option value="{{ user.pk }}" {% if kullanici == user.pk|stringformat:"s" %}selected{% endif %}>{{ user.username }}</option>
+    {% endfor %}
+  </select>
+  <select name="tur" class="select">
+    <option value="">Tüm türler</option>
+    {% for value, label in kinds %}
+    <option value="{{ value }}" {% if tur == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="baslangic" value="{{ baslangic }}" class="input" aria-label="Başlangıç">
+  <input type="date" name="bitis" value="{{ bitis }}" class="input" aria-label="Bitiş">
+  <input type="search" name="q" value="{{ q }}" class="input" placeholder="Ara…" aria-label="İşlem, kayıt veya kullanıcı ara">
+</form>
+
+{% include "staff/partials/log_rows.html" %}
+{% endblock %}

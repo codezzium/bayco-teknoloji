@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from .. import reports as rpt
-from .base import can_see_money, money_required, panel_required
+from .base import access_required, can_see_money, has_access, panel_required
 
 PERIODS = {
     "bugun": ("Bugün", 0),
@@ -30,21 +30,23 @@ def _period(request):
 
 @panel_required
 def overview(request):
+    user = request.user
     context = {
         "active": "stok",
-        "kpis": rpt.dashboard_kpis(request.user),
-        "show_money": can_see_money(request.user),
+        "kpis": rpt.dashboard_kpis(user),
+        "show_money": can_see_money(user),
         "low_stock": rpt.low_stock()[:6],
         "negative_stock": rpt.negative_stock()[:6],
         "expiring": rpt.expiring_warranty()[:6],
     }
     if context["show_money"]:
         context["chart"] = rpt.revenue_series(12)
+    if has_access(user, "receivables"):
         context["overdue"] = rpt.overdue_receivables().select_related("customer")[:6]
     return render(request, "stock/overview.html", context)
 
 
-@money_required
+@access_required("reports")
 def reports(request):
     key, start, end = _period(request)
     return render(request, "stock/reports.html", {

@@ -13,10 +13,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.catalog.models import Brand
+from apps.staff.testing import grant
 from apps.stock import services
 from apps.stock.labels import LABEL_FORMATS
-from apps.stock.models import (Accessory, Contact, Device, DeviceModel,
-                               Expense, Sale)
+from apps.stock.models import Accessory, Contact, Device, DeviceModel, Expense, Sale
 from apps.stock.permissions import GROUP_PATRON, GROUP_PERSONEL
 
 TL = Decimal
@@ -91,26 +91,38 @@ class ScreenTestCase(TestCase):
             reverse("stock:sale_list") + "?filtre=vadesi&q=BYC",
             reverse("stock:sale_detail", kwargs={"pk": self.sale.pk}),
             reverse("stock:receipt", kwargs={"pk": self.sale.pk}),
-            reverse("stock:contact_list"),
-            reverse("stock:contact_list") + "?q=ahmet&rol=musteri",
+            # Yeni cari eklemek tiksiz açık: kasadaki "+ Yeni Müşteri".
             reverse("stock:contact_create"),
-            reverse("stock:contact_detail", kwargs={"pk": self.contact.pk}),
-            reverse("stock:contact_edit", kwargs={"pk": self.contact.pk}),
             reverse("stock:intake"),
             reverse("stock:stocktake"),
         ]
 
-    def money_urls(self):
+    def contact_urls(self):
+        return [
+            reverse("stock:contact_list"),
+            reverse("stock:contact_list") + "?q=ahmet&rol=musteri",
+            reverse("stock:contact_detail", kwargs={"pk": self.contact.pk}),
+            reverse("stock:contact_edit", kwargs={"pk": self.contact.pk}),
+        ]
+
+    def report_urls(self):
         return [
             reverse("stock:reports"),
             reverse("stock:reports") + "?donem=bugun",
             reverse("stock:reports") + "?donem=ay",
             reverse("stock:reports") + "?donem=yil",
+        ]
+
+    def expense_urls(self):
+        return [
             reverse("stock:expense_list"),
             reverse("stock:expense_list") + "?tur=kira&kapsam=genel",
             reverse("stock:expense_create"),
             reverse("stock:expense_create") + f"?cihaz={self.device.pk}",
         ]
+
+    def money_urls(self):
+        return self.report_urls() + self.expense_urls()
 
 
 class PatronScreenTests(ScreenTestCase):
@@ -118,7 +130,7 @@ class PatronScreenTests(ScreenTestCase):
         self.client.force_login(self.patron)
 
     def test_all_screens_render(self):
-        for url in self.urls() + self.money_urls():
+        for url in self.urls() + self.contact_urls() + self.money_urls():
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200, url)
@@ -155,12 +167,32 @@ class PersonelPermissionTests(ScreenTestCase):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200, url)
 
-    def test_personel_is_redirected_away_from_money_screens(self):
-        for url in self.money_urls():
+    def test_personel_is_redirected_away_from_ticked_screens(self):
+        for url in self.money_urls() + self.contact_urls():
             with self.subTest(url=url):
                 response = self.client.get(url)
-                self.assertEqual(response.status_code, 302, url)
-                self.assertIn("giris", response["Location"])
+                # Giriş yapmış kullanıcı login'e değil, mesajla ana sayfaya döner.
+                self.assertRedirects(response, reverse("dashboard:home"),
+                                     fetch_redirect_response=False)
+
+    def test_each_tick_opens_only_its_own_screens(self):
+        for key, urls, closed in (
+                ("reports", self.report_urls(), self.expense_urls()),
+                ("expenses", self.expense_urls(), self.contact_urls()),
+                ("contacts", self.contact_urls(), [])):
+            grant(self.personel, key)
+            for url in urls:
+                with self.subTest(key=key, url=url):
+                    self.assertEqual(self.client.get(url).status_code, 200, url)
+            for url in closed:
+                with self.subTest(key=key, closed=url):
+                    self.assertEqual(self.client.get(url).status_code, 302, url)
+
+    def test_new_customer_from_pos_returns_to_pos(self):
+        response = self.client.post(reverse("stock:contact_create"),
+                                    {"full_name": "Yeni Müşteri", "phone": "0555 111 22 33",
+                                     "is_customer": "on"})
+        self.assertRedirects(response, reverse("stock:pos"), fetch_redirect_response=False)
 
     def test_cost_never_reaches_personel_html(self):
         """Maliyet ne listede ne detayda ne de htmx parçasında görünmemeli."""
@@ -193,6 +225,32 @@ class PersonelPermissionTests(ScreenTestCase):
         self.device.refresh_from_db()
         self.assertEqual(self.device.purchase_price, TL("16000.00"))
 
+    def device_post(self, **overrides):
+        data = {"device_model": self.model.pk, "condition": "ikinci_el",
+                "imei1": "351234567890123", "imei2": "", "serial_no": "",
+                "storage": "256GB", "color": "Grafit", "shelf": "", "defect_note": "",
+                "purchase_date": "2026-01-01", "list_price": "18500",
+                "warranty_months": 12}
+        data.update(overrides)
+        return self.client.post(
+            reverse("stock:device_edit", kwargs={"pk": self.device.pk}), data)
+
+    def test_price_is_locked_on_edit_without_price_tick(self):
+        """Kasadaki fiyat kilidi kartı düzenleyerek aşılamamalı."""
+        self.device_post(list_price="1")
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.list_price, TL("18500.00"))
+
+        grant(self.personel, "price")
+        self.device_post(list_price="17000")
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.list_price, TL("17000.00"))
+
+    def test_price_can_be_entered_for_a_new_device(self):
+        response = self.client.get(reverse("stock:device_create"))
+        self.assertContains(response, 'name="list_price"')
+        self.assertNotContains(response, "Fiyat değiştirme yetkiniz yok")
+
     def test_personel_is_kept_out_of_django_admin(self):
         """is_staff=False olduğu için /yonetim/ maliyeti göstermez."""
         response = self.client.get("/yonetim/")
@@ -201,7 +259,7 @@ class PersonelPermissionTests(ScreenTestCase):
 
 class AnonymousTests(ScreenTestCase):
     def test_all_stock_screens_require_login(self):
-        for url in self.urls() + self.money_urls():
+        for url in self.urls() + self.contact_urls() + self.money_urls():
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 302, url)

@@ -12,33 +12,48 @@
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
   {% include "stock/partials/kpi_card.html" with label="Stoktaki Cihaz" value=kpis.devices_in_stock icon="📱" href=devices_url|add:"?durum=stokta" %}
   {% include "stock/partials/kpi_card.html" with label="Aksesuar Adedi" value=kpis.accessory_units icon="📦" href=accessories_url %}
-  {% if show_money %}
+  {% comment %} Her para kartı kendi tikine bağlı (ana sayfadaki kartlarla aynı
+     kural): tik yoksa yuvaya paraya dokunmayan bir kart gelir. {% endcomment %}
+  {% if access.revenue_today %}
   {% include "stock/partials/kpi_card.html" with label="Bugünkü Ciro" value=kpis.revenue_today|tl0 icon="💰" tone="brand" hint=kpis.sales_today|stringformat:"s"|add:" satış" %}
-  {% include "stock/partials/kpi_card.html" with label="Bu Ay Net Kâr" value=kpis.net_month|tl0 icon="📈" tone="brand" hint=kpis.margin_month|pct|add:" net marj" %}
   {% else %}
   {% include "stock/partials/kpi_card.html" with label="Bugünkü Satış" value=kpis.sales_today icon="🧾" href=sales_url %}
+  {% endif %}
+  {% if show_money %}
+  {% include "stock/partials/kpi_card.html" with label="Bu Ay Net Kâr" value=kpis.net_month|tl0 icon="📈" tone="brand" hint=kpis.margin_month|pct|add:" net marj" %}
+  {% else %}
   {% include "stock/partials/kpi_card.html" with label="Kritik Stok" value=kpis.low_stock_count icon="⚠️" href=accessories_url|add:"?filtre=kritik" %}
   {% endif %}
 </div>
 
-{% if show_money %}
+{% if show_money or access.receivables %}
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+  {% if show_money %}
   {% include "stock/partials/kpi_card.html" with label="Bağlı Sermaye" value=kpis.capital|tl0 icon="🏦" hint="Stoktaki malın maliyeti" %}
+  {% endif %}
+  {% if access.receivables %}
   {% include "stock/partials/kpi_card.html" with label="Tahsil Edilmemiş" value=kpis.receivables|tl0 icon="⏳" tone="danger" href=sales_url|add:"?filtre=acik" hint=kpis.overdue_count|stringformat:"s"|add:" fiş vadesi geçmiş" %}
+  {% endif %}
+  {% if show_money %}
   {% include "stock/partials/kpi_card.html" with label="Kritik Stok" value=kpis.low_stock_count icon="⚠️" href=accessories_url|add:"?filtre=kritik" %}
+  {% endif %}
   {% include "stock/partials/kpi_card.html" with label="Garantisi Bitiyor" value=kpis.expiring_warranty_count icon="🛡️" hint="30 gün içinde" %}
 </div>
+{% endif %}
 
+{% if show_money %}
 <div class="card p-5 mb-6">
   <div class="flex items-center justify-between mb-4">
     <h2 class="font-display font-bold">Ciro ve Kâr (12 Ay)</h2>
+    {% if access.reports %}
     <a href="{% url 'stock:reports' %}" class="text-sm hover:text-white" style="color:var(--muted)">Detaylı rapor →</a>
+    {% endif %}
   </div>
   <div style="height:300px"><canvas id="revenue-chart"></canvas></div>
 </div>
 {% endif %}
 
-<div class="grid gap-5 lg:grid-cols-{% if show_money %}3{% else %}2{% endif %}">
+<div class="grid gap-5 lg:grid-cols-{% if access.receivables %}3{% else %}2{% endif %}">
   <div class="card p-5">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-display font-bold">Kritik Stok</h2>
@@ -83,7 +98,7 @@
     </div>
   </div>
 
-  {% if show_money %}
+  {% if access.receivables %}
   <div class="card p-5">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-display font-bold">Vadesi Geçen</h2>

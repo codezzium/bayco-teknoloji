@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.catalog.models import Brand
+from apps.staff.testing import grant
 from apps.stock import cart as cart_utils
 from apps.stock import services
 from apps.stock.models import (
@@ -370,28 +371,48 @@ class PersonelLimitTests(EdgeCaseTestCase):
     def setUp(self):
         self.client.force_login(self.personel)
 
-    def test_personel_cannot_delete_or_void(self):
+    def test_personel_cannot_delete_void_return_or_write_off(self):
         sale = self.sell_accessory()
-        for url in (reverse("stock:device_delete", kwargs={"pk": self.device.pk}),
-                    reverse("stock:contact_delete", kwargs={"pk": self.customer.pk}),
-                    reverse("stock:simple_delete",
-                            kwargs={"key": "kategoriler", "pk": self.category.pk}),
-                    reverse("stock:sale_void", kwargs={"pk": sale.pk})):
+        item = sale.items.get()
+        for url, data in (
+                (reverse("stock:device_delete", kwargs={"pk": self.device.pk}), {}),
+                (reverse("stock:contact_delete", kwargs={"pk": self.customer.pk}), {}),
+                (reverse("stock:simple_delete",
+                         kwargs={"key": "kategoriler", "pk": self.category.pk}), {}),
+                (reverse("stock:sale_void", kwargs={"pk": sale.pk}), {"reason": "deneme"}),
+                (reverse("stock:sale_item_return",
+                         kwargs={"pk": sale.pk, "item_id": item.pk}), {"refund": "1"}),
+                (reverse("stock:device_status", kwargs={"pk": self.device.pk}),
+                 {"status": Device.Status.KAYIP}),
+                (reverse("stock:accessory_adjust", kwargs={"pk": self.accessory.pk}),
+                 {"mode": "fire", "quantity": "2"})):
             with self.subTest(url=url):
-                response = self.client.post(url, {"reason": "deneme"})
-                self.assertEqual(response.status_code, 302)
-                self.assertTrue(response["Location"].startswith(reverse("dashboard:login")))
+                response = self.client.post(url, data)
+                self.assertRedirects(response, reverse("dashboard:home"),
+                                     fetch_redirect_response=False)
         self.assertTrue(Device.objects.filter(pk=self.device.pk).exists())
+        self.device.refresh_from_db()
+        self.assertNotEqual(self.device.status, Device.Status.KAYIP)
         self.assertTrue(Contact.objects.filter(pk=self.customer.pk).exists())
         self.assertTrue(AccessoryCategory.objects.filter(pk=self.category.pk).exists())
         sale.refresh_from_db()
         self.assertEqual(sale.status, Sale.Status.TAMAMLANDI)
+        item.refresh_from_db()
+        self.assertIsNone(item.returned_at)
+        self.accessory.refresh_from_db()
+        self.assertEqual(self.accessory.stock_qty, 9)   # 10 − satılan 1, fire yok
 
-    def test_personel_does_not_see_delete_or_void_buttons(self):
+    def test_personel_does_not_see_delete_void_or_return_buttons(self):
+        grant(self.personel, "contacts")
         sale = self.sell_accessory()
+        item = sale.items.get()
         for page, hidden in (
             (reverse("stock:device_detail", kwargs={"pk": self.device.pk}),
              reverse("stock:device_delete", kwargs={"pk": self.device.pk})),
+            (reverse("stock:device_detail", kwargs={"pk": self.device.pk}),
+             f'value="{Device.Status.KAYIP}"'),
+            (reverse("stock:accessory_detail", kwargs={"pk": self.accessory.pk}),
+             'value="fire"'),
             (reverse("stock:contact_detail", kwargs={"pk": self.customer.pk}),
              reverse("stock:contact_delete", kwargs={"pk": self.customer.pk})),
             (reverse("stock:simple_list", kwargs={"key": "kategoriler"}),
@@ -399,13 +420,30 @@ class PersonelLimitTests(EdgeCaseTestCase):
                      kwargs={"key": "kategoriler", "pk": self.category.pk})),
             (reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
              reverse("stock:sale_void", kwargs={"pk": sale.pk})),
+            (reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
+             reverse("stock:sale_item_return", kwargs={"pk": sale.pk, "item_id": item.pk})),
+            (reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
+             'value="iade"'),
         ):
-            with self.subTest(page=page):
+            with self.subTest(page=page, hidden=hidden):
                 response = self.client.get(page)
                 self.assertEqual(response.status_code, 200)
                 self.assertNotContains(response, hidden)
 
-    def test_personel_can_still_sell_and_return(self):
+    def test_refund_payment_needs_delete_tick(self):
+        sale = self.sell_accessory()
+        url = reverse("stock:sale_payment", kwargs={"pk": sale.pk})
+        data = {"amount": "50", "method": "nakit", "kind": "iade", "note": "",
+                "paid_at": "2026-09-01T12:00"}
+        self.client.post(url, data)
+        self.assertFalse(sale.payments.filter(kind="iade").exists())
+
+        grant(self.personel, "delete")
+        self.client.post(url, data)
+        self.assertTrue(sale.payments.filter(kind="iade").exists())
+
+    def test_delete_tick_allows_return(self):
+        grant(self.personel, "delete")
         sale = self.sell_accessory()
         item = sale.items.get()
         self.client.post(reverse("stock:sale_item_return",
@@ -413,3 +451,31 @@ class PersonelLimitTests(EdgeCaseTestCase):
                          {"reason": "", "refund": "1"})
         item.refresh_from_db()
         self.assertIsNotNone(item.returned_at)
+
+    def test_price_and_trade_in_need_price_tick(self):
+        cart, _ = cart_utils.add_item(cart_utils.empty_cart(), self.accessory)
+        lid = cart["lines"][0]["lid"]
+        unit = cart["lines"][0]["unit"]
+        session = self.client.session
+        session[cart_utils.SESSION_KEY] = cart
+        session.save()
+
+        def cart_unit():
+            return self.client.session[cart_utils.SESSION_KEY]["lines"][0]["unit"]
+
+        price_url = reverse("stock:cart_price", kwargs={"lid": lid})
+        response = self.client.post(price_url, {"price": "1"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response["HX-Refresh"], "true")
+        self.assertEqual(cart_unit(), unit)
+        response = self.client.post(reverse("stock:cart_trade_in"),
+                                    {"device_model": self.model.pk, "amount": "5000"},
+                                    HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 204)
+        pos = self.client.get(reverse("stock:pos")).content.decode()
+        self.assertNotIn(price_url, pos)
+
+        grant(self.personel, "price")
+        response = self.client.post(price_url, {"price": "100"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(cart_unit(), unit)

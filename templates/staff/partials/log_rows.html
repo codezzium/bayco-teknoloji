@@ -1,0 +1,56 @@
+<div id="log-results" class="space-y-2">
+  {# CSV bağlantısı bu parçada: filtre değişince htmx onu da yeniler. #}
+  <div class="flex items-center justify-between gap-3">
+    <p class="text-xs" style="color:var(--muted)">{{ total }} kayıt</p>
+    <a href="{% url 'staff:logs' %}?{{ csv_qs }}{% if csv_qs %}&{% endif %}format=csv"
+       class="btn btn-ghost btn-sm" hx-boost="false">⬇ Excel (CSV) indir</a>
+  </div>
+  {% for log in page %}
+  <details class="card p-3 group">
+    <summary class="flex flex-wrap items-center gap-x-3 gap-y-1 cursor-pointer list-none">
+      <span class="text-xs font-mono shrink-0" style="color:var(--muted)">{{ log.at|date:"d.m.Y H:i:s" }}</span>
+      <span class="font-semibold text-sm">{{ log.username|default:"—" }}</span>
+      {% if log.kind == 'islem' %}
+      <span class="text-sm">{{ log.action }}</span>
+      {% elif log.kind == 'yetkisiz' %}
+      <span class="chip" style="font-size:11px;color:#ff8b95;border-color:rgba(226,58,72,.3)">{{ log.get_kind_display }}</span>
+      <span class="text-sm">{{ log.action }}</span>
+      {% elif log.kind == 'hatali_giris' %}
+      {# Kullanıcı adı sütunu denenen addır; ayrıca hedef yazmaya gerek yok. #}
+      <span class="chip" style="font-size:11px;color:#ff8b95;border-color:rgba(226,58,72,.3)">{{ log.get_kind_display }}</span>
+      {% else %}
+      <span class="chip" style="font-size:11px">{{ log.get_kind_display }}</span>
+      {% endif %}
+      {% if log.target and log.kind != 'hatali_giris' %}
+      {% if log.target_url %}
+      <a href="{{ log.target_url }}" class="text-sm hover:underline" style="color:var(--muted)"
+         onclick="event.stopPropagation()">{{ log.target }}</a>
+      {% else %}
+      <span class="text-sm" style="color:var(--muted)">{{ log.target }}</span>
+      {% endif %}
+      {% endif %}
+    </summary>
+    <div class="mt-3 pt-3 text-xs space-y-1" style="border-top:1px solid var(--line);color:var(--muted)">
+      {% for label, value in log.detail_rows %}
+      <div class="flex gap-2"><span class="shrink-0" style="min-width:9rem">{{ label }}</span><span style="color:var(--ink)" class="break-all">{{ value }}</span></div>
+      {% endfor %}
+      <div class="flex gap-2"><span class="shrink-0" style="min-width:9rem">IP</span><span>{{ log.ip|default:"—" }}</span></div>
+      <div class="flex gap-2"><span class="shrink-0" style="min-width:9rem">Cihaz</span><span class="break-all">{{ log.user_agent|default:"—" }}</span></div>
+      {% if log.path %}<div class="flex gap-2"><span class="shrink-0" style="min-width:9rem">Adres</span><span class="break-all">{{ log.path }}{% if log.status_code %} · {{ log.status_code }}{% endif %}</span></div>{% endif %}
+    </div>
+  </details>
+  {% empty %}
+  <div class="card p-12 text-center">
+    <div class="text-4xl mb-3">📜</div>
+    <p class="font-semibold">Kayıt yok</p>
+  </div>
+  {% endfor %}
+
+  {% if page.has_next %}
+  <button class="btn btn-ghost btn-block"
+          hx-get="{% url 'staff:logs' %}?{{ qs }}&sayfa={{ page.next_page_number }}"
+          hx-target="#log-results" hx-swap="outerHTML" hx-push-url="true">
+    Daha Fazla Yükle ({{ page.number }}/{{ page.paginator.num_pages }} · {{ total }} kayıt)
+  </button>
+  {% endif %}
+</div>

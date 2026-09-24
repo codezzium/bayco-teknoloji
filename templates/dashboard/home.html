@@ -60,8 +60,11 @@
       <div class="icon-box">📱</div>
     </div>
   </a>
-  {% if show_money %}
-  <a href="{% url 'stock:reports' %}" class="card card-hover p-5">
+  {% comment %} Personel sayfasındaki iki Genel Bakış tiki bu iki yuvayı ayrı
+     ayrı açar; tik yoksa yuva boş kalmasın diye paraya dokunmayan bir kart
+     gelir (4'lü grid bozulmaz). {% endcomment %}
+  {% if access.revenue_today %}
+  <a href="{% if access.reports %}{% url 'stock:reports' %}?donem=bugun{% else %}{% url 'stock:sale_list' %}{% endif %}" class="card card-hover p-5">
     <div class="flex items-center justify-between">
       <div>
         <div class="text-xs" style="color:var(--muted)">Bugünkü Ciro</div>
@@ -71,6 +74,18 @@
       <div class="icon-box">💰</div>
     </div>
   </a>
+  {% else %}
+  <a href="{% url 'stock:sale_list' %}" class="card card-hover p-5">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs" style="color:var(--muted)">Bugünkü Satış</div>
+        <div class="text-3xl font-display font-extrabold mt-1">{{ stock.sales_today }}</div>
+      </div>
+      <div class="icon-box">🧾</div>
+    </div>
+  </a>
+  {% endif %}
+  {% if access.receivables %}
   <a href="{% url 'stock:sale_list' %}?filtre=acik" class="card card-hover p-5">
     <div class="flex items-center justify-between">
       <div>
@@ -91,16 +106,6 @@
       <div class="icon-box">⚠️</div>
     </div>
   </a>
-  {# Barkod kartı yerine bu: tarayıcı artık sayfanın en üstünde gömülü. #}
-  <a href="{% url 'stock:sale_list' %}" class="card card-hover p-5">
-    <div class="flex items-center justify-between">
-      <div>
-        <div class="text-xs" style="color:var(--muted)">Bugünkü Satış</div>
-        <div class="text-3xl font-display font-extrabold mt-1">{{ stock.sales_today }}</div>
-      </div>
-      <div class="icon-box">🧾</div>
-    </div>
-  </a>
   {% endif %}
 </div>
 
@@ -119,8 +124,10 @@
   </div>
 </div>
 
+{% if access.leads or access.content %}
 <div class="text-xs font-semibold mb-3" style="color:var(--muted)">SİTE İÇERİĞİ</div>
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-8">
+  {% if access.leads %}
   <a href="{% url 'dashboard:leads' %}?tab=quote" class="card card-hover p-5">
     <div class="flex items-center justify-between">
       <div>
@@ -148,6 +155,8 @@
       <div class="icon-box">✉️</div>
     </div>
   </a>
+  {% endif %}
+  {% if access.content %}
   <a href="{% url 'dashboard:crud_list' key='urunler' %}" class="card card-hover p-5">
     <div class="flex items-center justify-between">
       <div><div class="text-xs" style="color:var(--muted)">Toplam Ürün</div><div class="text-3xl font-display font-extrabold mt-1">{{ stats.products }}</div></div>
@@ -166,8 +175,11 @@
       <div class="icon-box">⭐</div>
     </div>
   </a>
+  {% endif %}
 </div>
+{% endif %}
 
+{% if access.leads %}
 <!-- Son talepler -->
 <div class="grid gap-6 lg:grid-cols-2">
   <div class="card p-5">
@@ -206,6 +218,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% comment %} dashboard/base.html zxing ve scan.js'i yüklemez; tarayıcı widget'ı

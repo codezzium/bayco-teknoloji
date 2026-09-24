@@ -10,6 +10,7 @@ from django.urls import reverse
 from apps.catalog.models import Brand, Product
 from apps.leads.models import ContactMessage, QuoteRequest, ServiceRequest
 from apps.sitecore.models import FAQ, SiteSettings, Slider, Testimonial
+from apps.staff.testing import grant
 from apps.stock.models import Accessory, DeviceModel
 from apps.stock.permissions import GROUP_PATRON, GROUP_PERSONEL
 
@@ -131,7 +132,29 @@ class PanelPageTests(PanelTestCase):
         self.client.force_login(self.personel)
         response = self.client.get(reverse("dashboard:home"))
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["show_money"])
+        for key in ("revenue_today", "receivables", "net_month", "capital"):
+            self.assertNotIn(key, response.context["stock"])
+        body = response.content.decode()
+        self.assertNotIn("Bugünkü Ciro", body)
+        self.assertNotIn("Tahsil Edilmemiş", body)
+        self.assertIn("Bugünkü Satış", body)
+        self.assertIn("Kritik Stok", body)
+
+    def test_home_money_cards_follow_their_own_ticks(self):
+        grant(self.personel, "revenue_today")
+        self.client.force_login(self.personel)
+        response = self.client.get(reverse("dashboard:home"))
+        body = response.content.decode()
+        self.assertIn("Bugünkü Ciro", body)
+        self.assertNotIn("Tahsil Edilmemiş", body)
+        self.assertNotIn("receivables", response.context["stock"])
+        # Raporlar tiki yoksa kart satış listesine gider, rapora değil.
+        self.assertNotIn(reverse("stock:reports"), body)
+
+        grant(self.personel, "receivables")
+        body = self.client.get(reverse("dashboard:home")).content.decode()
+        self.assertIn("Tahsil Edilmemiş", body)
+        self.assertNotIn("Kritik Stok", body)
 
     def test_anonymous_and_outsiders_are_sent_to_login(self):
         for user in (None, self.outsider):
@@ -296,21 +319,27 @@ class PersonelLimitTests(PanelTestCase):
         self.client.force_login(self.personel)
 
     def test_personel_cannot_delete_site_records(self):
+        # İçerik tiki var, Silme tiki yok: ret silme yüzünden olmalı.
+        grant(self.personel, "content")
         for key, record in self.records().items():
             with self.subTest(key=key):
                 response = self.client.post(
                     reverse("dashboard:crud_delete", kwargs={"key": key, "pk": record.pk}),
                     HTTP_HX_REQUEST="true")
-                self.assertEqual(response.status_code, 302)
+                # htmx'e yönlendirme verilmez (hedefin içine swap ederdi).
+                self.assertEqual(response.status_code, 204)
+                self.assertEqual(response["HX-Refresh"], "true")
                 self.assertTrue(type(record).objects.filter(pk=record.pk).exists())
 
     def test_personel_cannot_delete_leads(self):
+        grant(self.personel, "leads")
         for tip, record in (("quote", self.quote), ("service", self.service),
                             ("contact", self.message)):
             with self.subTest(tip=tip):
                 response = self.client.post(
                     reverse("dashboard:lead_delete", kwargs={"tip": tip, "pk": record.pk}))
-                self.assertEqual(response.status_code, 302)
+                self.assertRedirects(response, reverse("dashboard:home"),
+                                     fetch_redirect_response=False)
                 self.assertTrue(type(record).objects.filter(pk=record.pk).exists())
 
     def test_personel_cannot_open_or_change_site_settings(self):
@@ -319,25 +348,48 @@ class PersonelLimitTests(PanelTestCase):
         self.client.post(url, {"brand_name": "Başka", "whatsapp_number": "900000000000"})
         self.assertNotEqual(SiteSettings.load().whatsapp_number, "900000000000")
 
-    def test_personel_does_not_see_delete_buttons_or_settings(self):
+    def test_personel_does_not_see_delete_buttons(self):
+        grant(self.personel, "content", "leads")
         body = self.client.get(reverse("dashboard:crud_list",
                                        kwargs={"key": "urunler"})).content.decode()
         self.assertNotIn(reverse("dashboard:crud_delete",
                                  kwargs={"key": "urunler", "pk": self.product.pk}), body)
-        self.assertNotIn(reverse("dashboard:settings"), body)
         body = self.client.get(reverse("dashboard:leads")).content.decode()
         self.assertNotIn(reverse("dashboard:lead_delete",
                                  kwargs={"tip": "quote", "pk": self.quote.pk}), body)
 
-    def test_personel_can_still_add_edit_and_handle_leads(self):
+    def test_personel_without_ticks_sees_no_content_leads_or_settings(self):
+        body = self.client.get(reverse("dashboard:home")).content.decode()
+        for url in (reverse("dashboard:settings"), reverse("dashboard:leads"),
+                    reverse("dashboard:crud_list", kwargs={"key": "urunler"}),
+                    reverse("staff:list"), reverse("staff:logs")):
+            with self.subTest(url=url):
+                self.assertFalse(f'href="{url}"' in body)
+                self.assertRedirects(self.client.get(url), reverse("dashboard:home"),
+                                     fetch_redirect_response=False)
+        # Markalar tiksizdir: stok kartlarının zorunlu üst kaydı.
+        markalar = reverse("dashboard:crud_list", kwargs={"key": "markalar"})
+        self.assertEqual(self.client.get(markalar).status_code, 200)
+
+    def test_content_tick_opens_content_and_settings(self):
+        grant(self.personel, "content")
+        body = self.client.get(reverse("dashboard:home")).content.decode()
+        self.assertIn(reverse("dashboard:settings"), body)
+        self.assertEqual(self.client.get(reverse("dashboard:settings")).status_code, 200)
+
+    def test_personel_with_ticks_can_add_edit_and_handle_leads(self):
         response = self.client.post(reverse("dashboard:crud_create", kwargs={"key": "markalar"}),
                                     {"name": "Anker", "order": "0"})
         self.assertEqual(response.status_code, 302)
         toggle = reverse("dashboard:crud_toggle", kwargs={"key": "urunler",
                                                           "pk": self.product.pk,
                                                           "field": "is_active"})
-        self.assertEqual(self.client.post(toggle).status_code, 200)
         lead = reverse("dashboard:lead_toggle", kwargs={"tip": "quote", "pk": self.quote.pk})
+        self.assertEqual(self.client.post(toggle).status_code, 302)
+        self.assertEqual(self.client.post(lead).status_code, 302)
+
+        grant(self.personel, "content", "leads")
+        self.assertEqual(self.client.post(toggle).status_code, 200)
         self.assertEqual(self.client.post(lead).status_code, 200)
 
 

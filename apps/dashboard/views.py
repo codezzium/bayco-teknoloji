@@ -12,7 +12,13 @@ from apps.catalog.models import Brand, Product
 from apps.leads.models import ContactMessage, QuoteRequest, ServiceRequest
 from apps.leads.utils import customer_wa
 from apps.sitecore.models import FAQ, SiteSettings, Slider, Testimonial
-from apps.stock.permissions import can_see_money, in_panel, panel_required, patron_required
+from apps.stock.permissions import (
+    access_required,
+    deny,
+    has_access,
+    in_panel,
+    panel_required,
+)
 
 from .forms import (
     BrandForm,
@@ -30,26 +36,32 @@ from .utils import safe_next, with_param
 staff_required = panel_required
 
 
-# CRUD kayıt defteri: URL slug -> yapılandırma
+# CRUD kayıt defteri: URL slug -> yapılandırma. `access`: bölümü açan
+# Personel tiki (apps/staff/access.py). Markalar tiksizdir: stok kartlarının
+# zorunlu üst kaydıdır ve TANIMLAR'da durur.
 CRUD = {
     "duyurular": {
         "model": Slider, "form": SliderForm, "title": "Duyurular / Slaytlar",
+        "access": "content",
         "singular": "Duyuru", "template": "dashboard/lists/slider.html",
         "toggles": ["is_active"],
     },
     "urunler": {
         "model": Product, "form": ProductForm, "title": "Ürünler",
+        "access": "content",
         "singular": "Ürün", "template": "dashboard/lists/product.html",
         "toggles": ["is_active", "is_featured"],
         "select": ["brand", "source_device__device_model__brand"],
     },
     "yorumlar": {
         "model": Testimonial, "form": TestimonialForm, "title": "Müşteri Yorumları",
+        "access": "content",
         "singular": "Yorum", "template": "dashboard/lists/testimonial.html",
         "toggles": ["is_active"],
     },
     "sss": {
         "model": FAQ, "form": FAQForm, "title": "Sık Sorulan Sorular",
+        "access": "content",
         "singular": "Soru", "template": "dashboard/lists/faq.html",
         "toggles": ["is_active"],
     },
@@ -68,6 +80,11 @@ def _cfg(key):
     if not cfg:
         raise Http404("Bölüm bulunamadı")
     return cfg
+
+
+def _allowed(request, cfg, *extra) -> bool:
+    keys = ([cfg["access"]] if cfg.get("access") else []) + list(extra)
+    return all(has_access(request.user, key) for key in keys)
 
 
 # ---------- Auth ----------
@@ -93,6 +110,13 @@ def login_view(request):
             ):
                 return redirect(nxt)
             return redirect("dashboard:home")
+        if user is not None:
+            # Şifre doğru ama panel grubunda değil: signal'ler bunu "başarılı"
+            # sayar ve hiç loglamaz, çünkü login() hiç çağrılmaz.
+            from apps.staff.audit import record
+            from apps.staff.models import ActivityLog
+            record(kind=ActivityLog.Kind.YETKISIZ, request=request, user=user,
+                   action="Panel yetkisi olmayan hesapla giriş denemesi")
         error = "Kullanıcı adı veya şifre hatalı ya da yetkiniz yok."
     return render(request, "dashboard/login.html", {"error": error})
 
@@ -108,6 +132,8 @@ def logout_view(request):
 def home(request):
     from apps.stock import reports as stock_reports
 
+    user = request.user
+    show_leads = has_access(user, "leads")
     ctx = {
         "active": "home",
         "stats": {
@@ -118,11 +144,10 @@ def home(request):
             "sliders": Slider.objects.filter(is_active=True).count(),
             "testimonials": Testimonial.objects.count(),
         },
-        "stock": stock_reports.dashboard_kpis(request.user),
+        "stock": stock_reports.dashboard_kpis(user),
         "recent_products": stock_reports.recent_products(),
-        "show_money": can_see_money(request.user),
-        "recent_quotes": QuoteRequest.objects.all()[:6],
-        "recent_services": ServiceRequest.objects.all()[:4],
+        "recent_quotes": QuoteRequest.objects.all()[:6] if show_leads else [],
+        "recent_services": ServiceRequest.objects.all()[:4] if show_leads else [],
     }
     return render(request, "dashboard/home.html", ctx)
 
@@ -132,6 +157,8 @@ def home(request):
 @staff_required
 def crud_list(request, key):
     cfg = _cfg(key)
+    if not _allowed(request, cfg):
+        return deny(request)
     items = cfg["model"].objects.all()
     if cfg.get("select"):
         items = items.select_related(*cfg["select"])
@@ -144,6 +171,8 @@ def crud_list(request, key):
 @staff_required
 def crud_form(request, key, pk=None):
     cfg = _cfg(key)
+    if not _allowed(request, cfg):
+        return deny(request)
     instance = get_object_or_404(cfg["model"], pk=pk) if pk else None
     next_url = safe_next(request) if cfg.get("param") else ""
     if request.method == "POST":
@@ -164,10 +193,12 @@ def crud_form(request, key, pk=None):
     })
 
 
-@patron_required
+@staff_required
 @require_POST
 def crud_delete(request, key, pk):
     cfg = _cfg(key)
+    if not _allowed(request, cfg, "delete"):
+        return deny(request)
     obj = get_object_or_404(cfg["model"], pk=pk)
     try:
         obj.delete()
@@ -186,6 +217,8 @@ def crud_delete(request, key, pk):
 @require_POST
 def crud_toggle(request, key, pk, field):
     cfg = _cfg(key)
+    if not _allowed(request, cfg):
+        return deny(request)
     if field not in cfg["toggles"]:
         raise Http404("Geçersiz alan")
     obj = get_object_or_404(cfg["model"], pk=pk)
@@ -198,7 +231,7 @@ def crud_toggle(request, key, pk, field):
 
 # ---------- Talepler (leads) ----------
 
-@staff_required
+@access_required("leads")
 def leads(request):
     quotes = QuoteRequest.objects.all()[:100]
     services = ServiceRequest.objects.all()[:100]
@@ -219,7 +252,7 @@ def leads(request):
 LEAD_MODELS = {"quote": QuoteRequest, "service": ServiceRequest, "contact": ContactMessage}
 
 
-@staff_required
+@access_required("leads")
 @require_POST
 def lead_toggle(request, tip, pk):
     model = LEAD_MODELS.get(tip)
@@ -233,7 +266,7 @@ def lead_toggle(request, tip, pk):
     })
 
 
-@patron_required
+@access_required("leads", "delete")
 @require_POST
 def lead_delete(request, tip, pk):
     model = LEAD_MODELS.get(tip)
@@ -245,7 +278,7 @@ def lead_delete(request, tip, pk):
 
 # ---------- Site Ayarları ----------
 
-@patron_required
+@access_required("content")
 def settings_view(request):
     obj = SiteSettings.load()
     if request.method == "POST":

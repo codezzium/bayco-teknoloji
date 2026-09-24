@@ -1,4 +1,4 @@
-"""Gider ekranları. Tümü money_required — Personel giderleri göremez."""
+"""Gider ekranları. Tümü "Giderler" tikine bağlı; silme ayrıca "Silme" tiki ister."""
 
 from django.contrib import messages
 from django.db.models import Sum
@@ -11,10 +11,10 @@ from django.views.decorators.http import require_POST
 from ..forms import ExpenseForm
 from ..models import Device, Expense
 from ..utils import money
-from .base import money_required, paginate, pick_template, querystring
+from .base import access_required, paginate, pick_template, querystring
 
 
-@money_required
+@access_required("expenses")
 def expense_list(request):
     kind = request.GET.get("tur", "")
     scope = request.GET.get("kapsam", "")
@@ -40,7 +40,7 @@ def expense_list(request):
     })
 
 
-@money_required
+@access_required("expenses")
 def expense_form(request, pk=None):
     instance = get_object_or_404(Expense, pk=pk) if pk else None
     device = None
@@ -73,7 +73,7 @@ def expense_form(request, pk=None):
     })
 
 
-@money_required
+@access_required("expenses", "delete")
 @require_POST
 def expense_delete(request, pk):
     expense = get_object_or_404(Expense, pk=pk)

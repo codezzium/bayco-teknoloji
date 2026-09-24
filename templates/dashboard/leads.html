@@ -34,7 +34,7 @@
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <a href="{{ q.wa }}" target="_blank" rel="noopener" class="btn btn-wa btn-sm">WhatsApp'tan Yanıtla</a>
-          {% if perms.stock.view_money %}
+          {% if access.delete %}
           <button hx-post="{% url 'dashboard:lead_delete' tip='quote' pk=q.pk %}" hx-target="#lead-quote-{{ q.pk }}" hx-swap="outerHTML" hx-confirm="Silinsin mi?" class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
           {% endif %}
         </div>
@@ -62,7 +62,7 @@
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <a href="{{ s.wa }}" target="_blank" rel="noopener" class="btn btn-wa btn-sm">WhatsApp'tan Yanıtla</a>
-          {% if perms.stock.view_money %}
+          {% if access.delete %}
           <button hx-post="{% url 'dashboard:lead_delete' tip='service' pk=s.pk %}" hx-target="#lead-service-{{ s.pk }}" hx-swap="outerHTML" hx-confirm="Silinsin mi?" class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
           {% endif %}
         </div>
@@ -90,7 +90,7 @@
         </div>
         <div class="flex items-center gap-2 shrink-0">
           {% if m.wa %}<a href="{{ m.wa }}" target="_blank" rel="noopener" class="btn btn-wa btn-sm">WhatsApp'tan Yanıtla</a>{% endif %}
-          {% if perms.stock.view_money %}
+          {% if access.delete %}
           <button hx-post="{% url 'dashboard:lead_delete' tip='contact' pk=m.pk %}" hx-target="#lead-contact-{{ m.pk }}" hx-swap="outerHTML" hx-confirm="Silinsin mi?" class="btn btn-sm" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
           {% endif %}
         </div>

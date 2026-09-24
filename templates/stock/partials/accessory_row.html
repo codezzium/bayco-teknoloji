@@ -27,7 +27,7 @@
     </div>
     <div class="text-right">
       <div class="text-sm font-semibold gradient-text">{{ accessory.price|tl }}</div>
-      {% if perms.stock.view_money %}
+      {% if access.money %}
       <div class="text-xs" style="color:var(--muted)">Alış {{ accessory.cost|tl }}</div>
       {% endif %}
     </div>

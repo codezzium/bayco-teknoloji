@@ -34,7 +34,7 @@
         <div class="text-xs" style="color:var(--muted)">{{ device.sold_at|date:"d.m.Y" }}</div>
       {% else %}
         <div class="text-sm font-semibold gradient-text">{{ device.list_price|tl0 }}</div>
-        {% if perms.stock.view_money %}
+        {% if access.money %}
         <div class="text-xs" style="color:var(--muted)">Maliyet {{ device.purchase_price|tl0 }}</div>
         {% endif %}
       {% endif %}
