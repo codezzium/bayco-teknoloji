@@ -238,13 +238,16 @@
     return 1;  // reply[0] === 2: yeni firmware, eski protokol; ya da belirlenemedi
   };
 
-  Client.prototype.print = async function (label, density, copies, onRows) {
-    if ((await this.detectProtocol()) >= 4) return this._printV4(label, density, copies, onRows);
-    return this._printV1(label, density, copies, onRows);
+  // hooks (isteğe bağlı): rows(gönderilen, toplam) ve status({page, p1, p2}) —
+  // ilerleme çubuğu için. Yazıcıya giden baytları etkilemez.
+  Client.prototype.print = async function (label, density, copies, hooks) {
+    hooks = hooks || {};
+    if ((await this.detectProtocol()) >= 4) return this._printV4(label, density, copies, hooks);
+    return this._printV1(label, density, copies, hooks);
   };
 
   // D110_M ve yeni firmware. Donanımda doğrulandı; değerleri değiştirmeyin.
-  Client.prototype._printV4 = async function (label, density, copies, onRows) {
+  Client.prototype._printV4 = async function (label, density, copies, hooks) {
     await this.command(C.SET_LABEL_TYPE, [1]);
     await this.command(C.SET_LABEL_DENSITY, [density]);
     // toplam sayfa, 4 ayrılmış bayt, sayfa rengi, hız, ayrılmış bayrak
@@ -255,29 +258,29 @@
     // parça yüksekliği
     await this.command(C.SET_DIMENSION,
       u16(label.height).concat(u16(label.width), u16(copies), u16(0), [0, 0, 0], u16(0)));
-    await this._sendRows(label, onRows);
+    await this._sendRows(label, hooks);
     await this.command(C.END_PAGE_PRINT, [1]);
-    await this._waitPrinted(function (page) { return page >= copies; });
+    await this._waitPrinted(function (page) { return page >= copies; }, hooks);
     await this.command(C.END_PRINT, [1]);
     // Yem: END_PRINT sonrasındaki ilk paket de yutuluyor.
     await this.write(C.HEARTBEAT, [1]);
   };
 
   // Eski firmware. NiimPrintX'ten olduğu gibi; donanımda doğrulanmadı.
-  Client.prototype._printV1 = async function (label, density, copies, onRows) {
+  Client.prototype._printV1 = async function (label, density, copies, hooks) {
     await this.command(C.SET_LABEL_DENSITY, [density]);
     await this.command(C.SET_LABEL_TYPE, [1]);
     await this.command(C.START_PRINT, [1]);
     await this.command(C.START_PAGE_PRINT, [1]);
     await this.command(C.SET_DIMENSION, u16(label.height).concat(u16(label.width)));
     await this.command(C.SET_QUANTITY, u16(copies));
-    await this._sendRows(label, onRows);
+    await this._sendRows(label, hooks);
     var deadline = Date.now() + T.printWait;
     while (!(await this.command(C.END_PAGE_PRINT, [1]))) {
       if (Date.now() >= deadline) throw printerError("timeout", "Yazıcı sayfa sonunu kabul etmedi");
       await sleep(T.endPageRetry);
     }
-    await this._waitPrinted(function (page) { return page === copies; });
+    await this._waitPrinted(function (page) { return page === copies; }, hooks);
     await this.command(C.END_PRINT, [1]);
   };
 
@@ -285,20 +288,21 @@
   // bağlantı aralığı bekliyor: 320 satır ~19 sn → yanıtsız ~3.6 sn. D110_M'de
   // donanımda doğrulandı (2026-09-25). 10 ms bekleme yazıcıyı zorlamamak için;
   // beklemesiz gönderim doğrulanmadı.
-  Client.prototype._sendRows = async function (label, onRows) {
+  Client.prototype._sendRows = async function (label, hooks) {
     var rows = rowPackets(label);
     for (var i = 0; i < rows.length; i++) {
       await this.t.writeWithoutResponse(rows[i]);
-      if (onRows) onRows(i + 1, rows.length);
+      if (hooks.rows) hooks.rows(i + 1, rows.length);
       if (T.rowDelay) await sleep(T.rowDelay);
     }
   };
 
   // Cevapsız ya da kısa tur hata sayılmaz; beklemeye devam edilir.
-  Client.prototype._waitPrinted = async function (done) {
+  Client.prototype._waitPrinted = async function (done, hooks) {
     var deadline = Date.now() + T.printWait;
     for (;;) {
       var status = await this.printStatus();
+      if (status && hooks.status) hooks.status(status);
       if (status && done(status.page)) return;
       if (Date.now() >= deadline) {
         throw printerError("timeout", "Yazıcı baskının bittiğini 60 sn içinde bildirmedi");
@@ -418,20 +422,41 @@
     state.idleTimer = setTimeout(disconnect, T.idleDisconnect);
   }
 
+  // İlerleme çubuğunda aşamaların payı, D110 / 40×12 sürelerine göre:
+  // bağlanma + hazırlık ~1.8 sn, satırlar ~3.8 sn, yazıcının basması ~2.5 sn.
+  var PHASE_ROWS = 0.15, PHASE_PRINTING = 0.75;
+
+  // Yazıcının bildirdiği baskı ilerlemesi (0..1); bilgi yoksa null. D110'da her sayfa
+  // için önce p1 0→100 (~1.35 sn), sonra p2 0→100 (~0.5 sn) sayar, en son page artar.
+  // END_PAGE_PRINT'ten hemen sonraki ilk cevap bayat: sayfa bitmemişken p1 = p2 = 100
+  // (donanımda görüldü, 2026-09-25). O cevap yok sayılır, yoksa çubuk %100'e atlar.
+  function printedFraction(status, copies) {
+    if (status.page >= copies) return 1;
+    if (status.p1 >= 100 && status.p2 >= 100) return null;
+    var page = 0.75 * Math.min(status.p1, 100) / 100 + 0.25 * Math.min(status.p2, 100) / 100;
+    return Math.min(1, (status.page + page) / copies);
+  }
+
+  // opts.onProgress(metin, oran 0..1) — oran hiç geri gitmez.
   async function printLabel(url, opts) {
     opts = opts || {};
-    var say = opts.onStatus || function () {};
+    var onProgress = opts.onProgress || function () {};
+    var shown = 0;
+    function report(text, fraction) {
+      shown = Math.max(shown, Math.min(1, fraction));
+      onProgress(text, shown);
+    }
     var copies = clampCopies(opts.copies);
     if (state.busy) throw printerError("busy", "Önceki baskı sürüyor.");
     state.busy = true;
     clearTimeout(state.idleTimer);
     try {
-      say("Yazıcıya bağlanılıyor…");
+      report("Yazıcıya bağlanılıyor…", 0);
       var client = await connect();
       var started = Date.now();  // seçim penceresinde geçen süre sayılmaz
       var model = modelFor(state.device.name);
 
-      say("Etiket hazırlanıyor…");
+      report("Etiket hazırlanıyor…", 0.05);
       var label = await loadLabel(url);
       if (label.width > model.width) {
         throw printerError("size", "Etiket genişliği " + label.width + " nokta; " +
@@ -445,9 +470,18 @@
         if (e.code !== "timeout" && e.code !== "packet") throw e;
       }
       await client.detectProtocol();
+      report("Etiket hazırlanıyor…", 0.1);
 
-      await client.print(label, Math.min(DEFAULT_DENSITY, model.density), copies,
-        function (sent, total) { say("Gönderiliyor… %" + Math.round(sent * 100 / total)); });
+      await client.print(label, Math.min(DEFAULT_DENSITY, model.density), copies, {
+        rows: function (sent, total) {
+          report("Gönderiliyor…", PHASE_ROWS + (PHASE_PRINTING - PHASE_ROWS) * sent / total);
+        },
+        status: function (status) {
+          var printed = printedFraction(status, copies);
+          if (printed !== null) report("Basılıyor…", PHASE_PRINTING + (1 - PHASE_PRINTING) * printed);
+        },
+      });
+      report("Basıldı", 1);
       return { seconds: (Date.now() - started) / 1000, battery: battery,
                protocol: client.protocol, printer: state.device.name };
     } catch (e) {
@@ -476,6 +510,7 @@
     // testler için
     _: { C: C, T: T, Client: Client, encodePacket: encodePacket, decodePacket: decodePacket,
          rotate270: rotate270, rowPackets: rowPackets, parseHeartbeat: parseHeartbeat,
+         printedFraction: printedFraction,
          modelFor: modelFor },
   };
 
@@ -489,6 +524,7 @@
     Alpine.data("niimbotPrint", function (cfg) {
       return {
         url: cfg.url, copies: 1, showPrice: true, busy: false, msg: "", err: false,
+        progress: 0, done: false, _doneTimer: null,
         supported: isSupported(),
         init: function () {
           // Fiyat tercihi bu tarayıcıda hatırlanır; depolama kapalıysa fiyat basılır.
@@ -508,17 +544,27 @@
           if (this.busy) return;
           var self = this;
           this.clampCopies();
+          clearTimeout(this._doneTimer);
           this.busy = true;
+          this.done = false;
           this.err = false;
+          this.progress = 0;
           try {
             var r = await printLabel(this.labelUrl(), {
               copies: this.copies,
-              onStatus: function (m) { self.msg = m; },
+              onProgress: function (text, fraction) {
+                self.msg = text;
+                self.progress = Math.round(fraction * 100);
+              },
             });
             this.msg = "Basıldı (" + r.seconds.toFixed(0) + " sn" +
                        (r.battery !== null ? ", pil " + r.battery + "/4" : "") + ")";
+            // Dolu çubuk kısa bir süre görünsün, sonra kaybolsun.
+            this.done = true;
+            this._doneTimer = setTimeout(function () { self.done = false; }, 2000);
           } catch (e) {
             this.err = true;
+            this.progress = 0;
             this.msg = describeError(e);
             if (root.console) console.error("Niimbot:", e);
           } finally {
