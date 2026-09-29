@@ -1,18 +1,24 @@
 """Kasa (POS), satış listesi, fiş ve tahsilat ekranları."""
 
 from django.contrib import messages
+from django.contrib.staticfiles import finders
 from django.db.models import F, Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
+from apps.sitecore.models import SiteSettings
+
 from .. import cart as cart_utils
 from .. import services
 from ..forms import PaymentForm
 from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem
-from ..utils import parse_money, trfold
+from ..receipt_logo import monochrome_logo
+from ..templatetags.stock_extras import tl
+from ..utils import MONEY_MAX, parse_money, trfold
 from .base import (
     access_required,
     can_see_money,
@@ -185,26 +191,51 @@ def cart_trade_in(request):
     return _render_cart(request, cart, f"Takas eklendi: {model} — {amount} ₺")
 
 
+def _payments_from_post(post, payable) -> list[dict] | None:
+    """Kasadaki ödeme satırlarını (yöntem + tutar çiftleri) tahsilatlara çevirir.
+
+    500 nakit + 500 kart gibi bölünmüş ödeme her yöntem için ayrı bir Payment
+    olur; kasa dökümü (reports.cash_by_method) yöntem bazında böyle toplar.
+
+    Tek satır boş bırakılmışsa tutarın tamamı o yöntemle alınmış sayılır. Çok
+    satırda boş satır atlanır, aynı yöntem iki kez girildiyse toplanır.
+    Okunamayan tek bir tutar bile None döndürür: "500 nakit + ??? kart" yarım
+    tahsilatla kaydedilirse kalan sessizce veresiyeye düşerdi.
+    """
+    methods = post.getlist("payment_method")
+    amounts = [raw.strip() for raw in post.getlist("paid_amount")]
+    if len(amounts) <= 1 and not "".join(amounts):
+        rows = [(methods[0] if methods else "", payable)]
+    else:
+        rows = []
+        for index, raw in enumerate(amounts):
+            if not raw:
+                continue
+            amount = parse_money(raw)
+            if amount is None:
+                return None
+            rows.append((methods[index] if index < len(methods) else "", amount))
+
+    totals = {}
+    for method, amount in rows:
+        if method not in Payment.Method.values:
+            method = Payment.Method.NAKIT
+        if amount > 0:
+            totals[method] = totals.get(method, 0) + amount
+    if any(total > MONEY_MAX for total in totals.values()):
+        return None
+    return [{"amount": amount, "method": method} for method, amount in totals.items()]
+
+
 @panel_required
 @require_POST
 def checkout(request):
     cart = cart_utils.get_cart(request)
     payable = cart_utils.summarize(cart, with_money=False)["payable"]
 
-    amount_raw = (request.POST.get("paid_amount") or "").strip()
-    if amount_raw:
-        paid = parse_money(amount_raw)
-        if paid is None:
-            return _render_cart(request, cart, "Geçersiz tahsilat tutarı.")
-    else:
-        paid = payable
-
-    method = request.POST.get("payment_method", "nakit")
-    if method not in Payment.Method.values:
-        method = Payment.Method.NAKIT
-    payments = []
-    if paid > 0:
-        payments.append({"amount": paid, "method": method})
+    payments = _payments_from_post(request.POST, payable)
+    if payments is None:
+        return _render_cart(request, cart, "Geçersiz tahsilat tutarı.")
 
     due_raw = (request.POST.get("due_date") or "").strip()
     try:
@@ -219,9 +250,14 @@ def checkout(request):
             note=cart.get("note", ""),
             confirm_prices=bool(request.POST.get("confirm_prices")),
         )
+        methods = dict(Payment.Method.choices)
+        detail = {"Ödenecek": str(sale.payable_total)}
+        if payments:
+            detail["Ödeme"] = " + ".join(f"{methods[p['method']]} {tl(p['amount'])}"
+                                         for p in payments)
         request.audit = {"target": sale.receipt_no,
                          "target_url": reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
-                         "detail": {"Ödenecek": str(sale.payable_total)}}
+                         "detail": detail}
     except services.PriceChanged as exc:
         context = cart_context(request, cart)
         context["price_changes"] = exc.changes
@@ -234,6 +270,7 @@ def checkout(request):
     return render(request, "stock/partials/cart.html", {
         **cart_context(request),
         "completed_sale": sale,
+        "completed_payments": list(sale.payments.order_by("paid_at", "id")),
     })
 
 
@@ -302,9 +339,29 @@ def receipt(request, pk):
         "sale": sale,
         "items": sale.items.filter(returned_at__isnull=True),
         "trade_ins": sale.trade_ins.all(),
-        "payments": sale.payments.all(),
+        # Fişte giriş sırasıyla: "Nakit 500, Kredi Kartı 500" kasada yazıldığı gibi.
+        "payments": sale.payments.order_by("paid_at", "id"),
         "auto": request.GET.get("auto") == "1",
     })
+
+
+@panel_required
+def receipt_logo(request):
+    """Fişin üstündeki siyah-beyaz logo (Panel → Site Ayarları → Fiş Logosu).
+
+    Yüklenen dosya diskte yoksa ya da resim değilse site logosuna düşülür:
+    bozuk bir yükleme fiş basmayı engellememeli.
+    """
+    upload = SiteSettings.load().receipt_logo
+    png = None
+    if upload:
+        try:
+            png = monochrome_logo(upload.path)
+        except (OSError, ValueError):
+            png = None
+    if png is None:
+        png = monochrome_logo(finders.find("img/logo.png"))
+    return HttpResponse(png, content_type="image/png")
 
 
 @panel_required

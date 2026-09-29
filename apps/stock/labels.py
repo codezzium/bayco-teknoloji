@@ -90,6 +90,12 @@ def barcode_svg(value: str, *, symbology="code128", module_width=0.25,
     return svg[match.start():] if match else ""
 
 
+def ean13_check_digit(body: str) -> int:
+    """EAN-13'ün ilk 12 hanesinden kontrol hanesi (tek sıralar ×1, çiftler ×3)."""
+    total = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(body[:12]))
+    return (10 - total % 10) % 10
+
+
 def ean13_is_valid(code: str) -> bool:
     """13 hane ve kontrol hanesi tutuyor mu.
 
@@ -100,8 +106,7 @@ def ean13_is_valid(code: str) -> bool:
     """
     if len(code) != 13 or not code.isdigit():
         return False
-    total = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(code[:12]))
-    return (10 - total % 10) % 10 == int(code[12])
+    return ean13_check_digit(code) == int(code[12])
 
 
 def symbology_for(code: str) -> str:

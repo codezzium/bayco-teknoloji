@@ -7,6 +7,7 @@ alanlarını yetkisiz kullanıcıdan tamamen kaldıran katmanı ekler.
 
 from django import forms
 from django.urls import reverse
+from django.utils.html import format_html
 
 from apps.catalog.models import Brand
 from apps.dashboard.forms import MoneyField, QtyInput
@@ -123,6 +124,20 @@ class AccessoryForm(MoneyAwareModelForm):
             _simple_create("kategoriler"), back, "kategori")
         if self.instance.pk:
             self.fields.pop("opening_qty", None)
+        # Barkodu olan kartta düğme yok: kodu değiştirmek basılı etiketleri
+        # okunmaz yapar. Düğme alanı sunucudan önerilen kodla yeniden çizer.
+        if not self.instance.barcode:
+            self.fields["barcode"].help_text = format_html(
+                'Ürünün barkodunu okutun. Barkodu yok mu? '
+                '<button type="button" class="underline font-semibold" '
+                'style="color:var(--ink)" hx-get="{}" hx-target="#{}" '
+                'hx-swap="outerHTML">EAN-13 üret</button> — mağaza içi kod, '
+                'mevcut barkodlarla çakışmaz.',
+                # self["barcode"] burada KULLANILMAZ: BoundField help_text'i
+                # oluştuğu anda kopyalar ve bu metin sayfaya hiç çıkmazdı.
+                reverse("stock:accessory_barcode"),
+                self.auto_id % self.add_prefix("barcode"),
+            )
 
 
 class DeviceModelForm(MoneyAwareModelForm):

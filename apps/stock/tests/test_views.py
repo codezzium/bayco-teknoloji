@@ -77,7 +77,9 @@ class ScreenTestCase(TestCase):
             reverse("stock:device_edit", kwargs={"pk": self.device.pk}),
             reverse("stock:accessory_list"),
             reverse("stock:accessory_list") + "?q=sarj&filtre=kritik",
+            reverse("stock:accessory_list") + "?marka=apple&sirala=-stock_qty",
             reverse("stock:accessory_create"),
+            reverse("stock:accessory_barcode"),
             reverse("stock:accessory_detail", kwargs={"pk": self.accessory.pk}),
             reverse("stock:accessory_edit", kwargs={"pk": self.accessory.pk}),
             reverse("stock:simple_list", kwargs={"key": "modeller"}),
@@ -91,6 +93,7 @@ class ScreenTestCase(TestCase):
             reverse("stock:sale_list") + "?filtre=vadesi&q=BYC",
             reverse("stock:sale_detail", kwargs={"pk": self.sale.pk}),
             reverse("stock:receipt", kwargs={"pk": self.sale.pk}),
+            reverse("stock:receipt_logo"),
             # Yeni cari eklemek tiksiz açık: kasadaki "+ Yeni Müşteri".
             reverse("stock:contact_create"),
             reverse("stock:intake"),
@@ -344,10 +347,10 @@ class CheckoutPaymentDefaultTests(ScreenTestCase):
                          {"mode": "sale", "code": self.accessory.barcode})
         body = self.client.get(reverse("stock:pos")).content.decode()
         self.assertIn('name="paid_amount"', body)
-        # Tutar alanı artık type="text" ve Türkçe biçimli ("150,90"); değeri Alpine
-        # x-model="paidText" ile doldurur (static/js/fields.js). Sunucu bu biçimi okur.
-        self.assertIn("paidText: '150,90'", body)
-        self.assertIn('x-model="paidText"', body)
+        # Tutar alanı type="text" ve Türkçe biçimli ("150,90"); ilk ödeme satırını
+        # Alpine x-model="row.text" ile doldurur (static/js/fields.js). Sunucu bu biçimi okur.
+        self.assertIn("text: '150,90'", body)
+        self.assertIn('x-model="row.text"', body)
 
     def test_decimal_values_are_never_localized_in_number_inputs(self):
         import re

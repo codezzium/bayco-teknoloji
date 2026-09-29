@@ -12,6 +12,11 @@
       {% if completed_sale.balance > 0 %} · Kalan borç
         <strong style="color:#ffd48a">{{ completed_sale.balance|tl }}</strong>{% endif %}
     </p>
+    {% if completed_payments|length > 1 %}
+    <p class="text-xs mt-1" style="color:var(--muted)">
+      {% for payment in completed_payments %}{{ payment.get_method_display }} {{ payment.amount|tl }}{% if not forloop.last %} · {% endif %}{% endfor %}
+    </p>
+    {% endif %}
     <div class="flex flex-wrap gap-2 justify-center mt-4">
       <a href="{% url 'stock:receipt' pk=completed_sale.pk %}?auto=1" target="_blank"
          class="btn btn-gradient btn-sm">🧾 Fiş Yazdır</a>
@@ -234,42 +239,74 @@
   {% endif %}
   {% endif %}
 
-  <!-- Ödeme ve tamamla -->
+  <!-- Ödeme ve tamamla. Birden çok satır = bölünmüş ödeme (500 nakit + 500 kart);
+       her satır sunucuda ayrı bir tahsilat olur. Tutarlar kuruş (tam sayı) olarak
+       toplanır: 333,33 + 333,33 + 333,34 kayan noktada 1000'in altında kalır ve
+       yanlış "veresiye" uyarısı çıkarırdı. -->
   {% if cart.lines or cart.trade_ins %}
   <form class="card p-4 space-y-3"
         hx-post="{% url 'stock:checkout' %}" hx-target="#cart" hx-swap="outerHTML"
-        x-data="{ payable: {{ cart.payable|unlocalize }}, paidText: '{{ cart.payable|money_input }}',
-                  get paid() { return BaycoNum.parse(this.paidText); } }">
+        x-data="{ payable: Math.round({{ cart.payable|unlocalize }} * 100),
+                  methods: [{% for value, label in payment_methods %}'{{ value }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+                  seq: 1,
+                  rows: [{ id: 1, method: '{{ payment_methods.0.0 }}', text: '{{ cart.payable|money_input }}' }],
+                  cents(text) { return Math.round(BaycoNum.parse(text) * 100); },
+                  get paid() { return this.rows.reduce((sum, row) => sum + this.cents(row.text), 0); },
+                  tl(cents) { return (cents / 100).toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺'; },
+                  fillRest(row) { row.text = BaycoNum.format(Math.max(0, this.payable - this.paid + this.cents(row.text)) / 100); },
+                  addRow() {
+                    const used = this.rows.map(row => row.method);
+                    const rest = this.payable - this.paid;
+                    this.rows.push({ id: ++this.seq,
+                                     method: this.methods.find(m => !used.includes(m)) || this.methods[0],
+                                     text: rest > 0 ? BaycoNum.format(rest / 100) : '' });
+                  } }">
     {% csrf_token %}
     <h3 class="font-display font-bold text-sm">Ödeme</h3>
-    <div class="grid grid-cols-2 gap-2">
-      <div class="field" style="margin:0">
-        <label class="label">Tahsil Edilen (₺)</label>
-        {# Metin: "18.500,90" biçimi. x-model.number parseFloat'la 18,5 okurdu. #}
-        <input type="text" name="paid_amount" data-money="2" inputmode="decimal" autocomplete="off"
-               class="input" required x-model="paidText">
-        <button type="button" class="text-xs mt-1 hover:underline" style="color:var(--muted)"
-                @click="paidText = BaycoNum.format(payable)">Tamamını yaz</button>
+    <template x-for="(row, i) in rows" :key="row.id">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="field" style="margin:0">
+          <label class="label" x-show="i === 0">Tahsil Edilen (₺)</label>
+          {# Metin: "18.500,90" biçimi. x-model.number parseFloat'la 18,5 okurdu. #}
+          <input type="text" name="paid_amount" data-money="2" inputmode="decimal" autocomplete="off"
+                 class="input" :required="i === 0" x-model="row.text">
+          <button type="button" class="text-xs mt-1 hover:underline" style="color:var(--muted)"
+                  @click="fillRest(row)" x-text="rows.length > 1 ? 'Kalanı yaz' : 'Tamamını yaz'">Tamamını yaz</button>
+        </div>
+        <div class="field" style="margin:0">
+          <label class="label" x-show="i === 0">Ödeme Şekli</label>
+          <div class="flex items-center gap-2">
+            <select name="payment_method" class="select min-w-0" x-model="row.method">
+              {% for value, label in payment_methods %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" x-show="rows.length > 1" @click="rows.splice(i, 1)"
+                    class="btn btn-sm shrink-0" aria-label="Ödeme satırını kaldır"
+                    style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3);padding:4px 10px">✕</button>
+          </div>
+        </div>
       </div>
-      <div class="field" style="margin:0">
-        <label class="label">Ödeme Şekli</label>
-        <select name="payment_method" class="select">
-          {% for value, label in payment_methods %}
-          <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
+    </template>
+    <button type="button" class="text-xs hover:underline" style="color:var(--ink)"
+            x-show="rows.length < methods.length" @click="addRow()">
+      + Ödeme şekli ekle <span style="color:var(--muted)">(ör. nakit + kart)</span>
+    </button>
+    <div class="flex justify-between text-sm pt-2" x-show="rows.length > 1" x-cloak
+         style="border-top:1px solid var(--line)">
+      <span style="color:var(--muted)">Toplam tahsilat</span>
+      <strong x-text="tl(paid)"></strong>
     </div>
 
     <div class="rounded-xl px-3 py-2 text-sm" x-show="paid < payable" x-cloak
          style="background:rgba(245,180,60,.12);color:#ffd48a;border:1px solid rgba(245,180,60,.3)">
-      Kalan <strong x-text="(payable - paid).toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺'"></strong>
+      Kalan <strong x-text="tl(payable - paid)"></strong>
       veresiye olarak takip edilecek.
     </div>
     <div class="rounded-xl px-3 py-2 text-sm" x-show="paid > payable" x-cloak
          style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
       Tahsilat fiş tutarından fazla — müşteriye
-      <strong x-text="(paid - payable).toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺'"></strong>
+      <strong x-text="tl(paid - payable)"></strong>
       iade borcu doğar.
     </div>
 

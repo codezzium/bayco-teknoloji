@@ -9,6 +9,12 @@ class SiteSettings(models.Model):
         "Slogan", max_length=200, blank=True,
         default="Eskişehir'in telefon ve teknoloji adresi",
     )
+    receipt_logo = models.ImageField(
+        "Fiş Logosu", upload_to="site/", blank=True, null=True,
+        help_text="Satış fişinin üstüne basılır. Boş bırakılırsa site logosu kullanılır. "
+                  "Termal yazıcı için otomatik siyah-beyaza çevrilir; düz zeminli bir "
+                  "logo en temiz sonucu verir.",
+    )
 
     # İletişim
     phone = models.CharField("Telefon", max_length=40, default="0850 000 00 00")

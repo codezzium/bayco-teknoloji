@@ -15,6 +15,11 @@
   h1 { font-size: 12pt; text-align:center; margin:0 0 1mm; letter-spacing:.5px; }
   .sub { text-align:center; font-size:8pt; margin-bottom:2mm; }
   hr { border:0; border-top:1px dashed #000; margin:2mm 0; }
+  hr.solid { border-top:1px solid #000; }
+  /* Termal yazıcıda 1-bit görsel: ölçeklenirken gri kenar oluşmasın. */
+  .logo { display:block; width:30mm; height:auto; margin:0 auto 2mm;
+          image-rendering:pixelated; }
+  .info-title { text-align:center; font-size:11pt; font-weight:bold; letter-spacing:2px; }
   .row { display:flex; justify-content:space-between; gap:2mm; font-size:9pt; }
   .row .r { text-align:right; white-space:nowrap; }
   .item { margin-bottom:1.5mm; }
@@ -22,6 +27,7 @@
   .item .meta { font-size:7.5pt; }
   .total { font-size:11pt; font-weight:bold; }
   .foot { text-align:center; font-size:7.5pt; margin-top:3mm; }
+  .legal { text-align:center; font-size:8pt; font-weight:bold; margin-top:2mm; }
   @media screen {
     body { background:#2a1b40; padding:24px; }
     .receipt { background:#fff; margin:0 auto; box-shadow:0 10px 40px rgba(0,0,0,.55); }
@@ -41,6 +47,7 @@
 </div>
 
 <div class="receipt">
+  <img class="logo" src="{% url 'stock:receipt_logo' %}" alt="">
   <h1>{{ site.brand_name|default:"BAYÇO TEKNOLOJİ" }}</h1>
   <div class="sub">
     {% if site.phone %}{{ site.phone }}<br>{% endif %}
@@ -52,7 +59,9 @@
   {% if sale.customer %}
   <div class="row"><span>Müşteri</span><span class="r">{{ sale.customer.full_name }}</span></div>
   {% endif %}
-  <hr>
+  <hr class="solid">
+  <div class="info-title">BİLGİ FİŞİ</div>
+  <hr class="solid">
 
   {% for item in items %}
   <div class="item">
@@ -91,6 +100,7 @@
     {% endif %}{% endfor %}
     Bizi tercih ettiğiniz için teşekkürler.
   </div>
+  <div class="legal">Mali değeri yoktur.</div>
 </div>
 
 {% if auto %}

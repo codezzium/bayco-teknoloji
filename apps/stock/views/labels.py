@@ -52,7 +52,10 @@ def label_print(request):
 
     labels = []
     for obj in objects:
-        label = build_label(obj, fmt, show_price=show_price)
+        if isinstance(obj, Accessory):
+            label = niimbot_label(obj, show_price=show_price)
+        else:
+            label = build_label(obj, fmt, show_price=show_price)
         labels.extend([label] * copies)
 
     return render(request, "stock/labels/print.html", {
@@ -63,6 +66,18 @@ def label_print(request):
         "auto": request.GET.get("auto") == "1",
         "back_url": request.META.get("HTTP_REFERER") or reverse("stock:device_list"),
     })
+
+
+def niimbot_label(accessory, *, show_price=True) -> dict:
+    """Aksesuar etiketi yazıcıdan da Niimbot'ta basılanın aynısı çıksın.
+
+    Tasarım tek yerde (niimbot.py) kalır: sayfa aynı PNG'yi <img> olarak koyar,
+    böylece iki baskı yolu zamanla birbirinden ayrışamaz. Aynı ürünün kopyaları
+    aynı adresi kullandığı için tarayıcı görseli bir kez indirir.
+    """
+    url = reverse("stock:niimbot_png", kwargs={"kind": "aksesuar", "pk": accessory.pk})
+    return {"niimbot": f"{url}?fiyat={'1' if show_price else '0'}",
+            "name": str(accessory), "code": accessory.barcode or accessory.sku}
 
 
 @panel_required

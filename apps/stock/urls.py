@@ -28,6 +28,7 @@ urlpatterns = [
     # --- Aksesuarlar ---
     path("aksesuarlar/", catalog.accessory_list, name="accessory_list"),
     path("aksesuarlar/ekle/", catalog.accessory_form, name="accessory_create"),
+    path("aksesuarlar/barkod-oner/", catalog.accessory_barcode, name="accessory_barcode"),
     path("aksesuar/<int:pk>/", catalog.accessory_detail, name="accessory_detail"),
     path("aksesuar/<int:pk>/duzenle/", catalog.accessory_form, name="accessory_edit"),
     path("aksesuar/<int:pk>/stok/", catalog.accessory_adjust, name="accessory_adjust"),
@@ -56,6 +57,7 @@ urlpatterns = [
     path("satislar/", pos.sale_list, name="sale_list"),
     path("satislar/<int:pk>/", pos.sale_detail, name="sale_detail"),
     path("satislar/<int:pk>/fis/", pos.receipt, name="receipt"),
+    path("satislar/fis-logo.png", pos.receipt_logo, name="receipt_logo"),
     path("satislar/<int:pk>/odeme/", pos.sale_payment, name="sale_payment"),
     path("satislar/<int:pk>/iptal/", pos.sale_void, name="sale_void"),
     path("satislar/<int:pk>/kalem/<int:item_id>/iade/", pos.sale_item_return,

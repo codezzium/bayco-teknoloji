@@ -33,6 +33,7 @@ from .models import (
     StockMovement,
     TradeIn,
 )
+from .labels import ean13_check_digit
 from .utils import MAX_QTY, digits_only, money, next_code, normalize_scan
 
 
@@ -244,6 +245,34 @@ def write_off_accessory(accessory: Accessory, quantity: int, *, user=None,
         raise StockError("Fire miktarı pozitif olmalıdır.")
     return _record_movement(accessory, -quantity, StockMovement.Reason.FIRE,
                             user=user, note=note)
+
+
+# ===========================================================================
+# Mağaza içi barkod
+# ===========================================================================
+
+#: GS1'in mağaza içi (kısıtlı dolaşım) aralığı 200-299'dur ve hiçbir üreticiye
+#: verilmez: buradan üretilen kod gerçek bir ürünün barkoduyla çakışamaz.
+#: 27-29 bazı kasalarda tartılı ürün sayıldığı için 200 kullanılır.
+IN_STORE_EAN_PREFIX = "200"
+
+
+def suggest_accessory_barcode() -> str:
+    """Barkodsuz aksesuar için sıradaki boş mağaza içi EAN-13.
+
+    Kayıtlı en büyük 200… kodunun bir fazlasıdır, dolayısıyla hiçbir mevcut
+    barkodla aynı olamaz (başka önekli ya da başka uzunluktaki kod zaten
+    çakışamaz). Salt okumadır: basılıp kaydedilmeyen öneri hiçbir sayaç
+    tüketmez. İki kişi aynı anda aynı kodu alırsa ikinci kaydı
+    uniq_accessory_barcode kısıtı ve form doğrulaması reddeder.
+    """
+    prefix = IN_STORE_EAN_PREFIX
+    last = (Accessory.objects
+            .filter(barcode__regex=rf"^{prefix}[0-9]{{{13 - len(prefix)}}}$")
+            .order_by("-barcode").values_list("barcode", flat=True).first())
+    number = int(last[len(prefix):12]) + 1 if last else 1
+    body = f"{prefix}{number:0{12 - len(prefix)}d}"
+    return body + str(ean13_check_digit(body))
 
 
 # ===========================================================================

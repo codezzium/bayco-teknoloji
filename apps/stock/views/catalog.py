@@ -45,6 +45,16 @@ DEVICE_ORDERING = {
 }
 DEFAULT_ORDERING = "-updated_at"
 
+#: Aksesuarda "Son İşlem" satış ve mal girişini de kapsar: stok adedi her
+#: harekette yeniden yazıldığı için updated_at güncellenir.
+ACCESSORY_ORDERING = {
+    "-updated_at": "Son İşlem",
+    "-created_at": "Son Eklenen",
+    "name": "Ürün Adı (A→Z)",
+    "stock_qty": "Stok (azdan çoğa)",
+    "-stock_qty": "Stok (çoktan aza)",
+}
+
 #: Stoğu ya da parayı eksilten durum geçişleri: "Silme, iptal, iade" tikine bağlı.
 WRITE_OFF_STATUSES = {Device.Status.KAYIP, Device.Status.IADE}
 
@@ -236,13 +246,17 @@ def device_delete(request, pk):
 def accessory_list(request):
     query = request.GET.get("q", "").strip()
     category = request.GET.get("kategori", "")
+    brand_slug = request.GET.get("marka", "")
     only = request.GET.get("filtre", "")
+    ordering = request.GET.get("sirala", DEFAULT_ORDERING)
 
     accessories = Accessory.objects.select_related("brand", "category")
     if query:
         accessories = accessories.filter(search_blob__contains=trfold(query))
     if category:
         accessories = accessories.filter(category_id=category)
+    if brand_slug:
+        accessories = accessories.filter(brand__slug=brand_slug)
     if only == "kritik":
         accessories = accessories.filter(is_active=True,
                                          stock_qty__lte=F("min_stock_level"))
@@ -252,6 +266,9 @@ def accessory_list(request):
         accessories = accessories.filter(is_active=False)
     else:
         accessories = accessories.filter(is_active=True)
+    if ordering not in ACCESSORY_ORDERING:
+        ordering = DEFAULT_ORDERING
+    accessories = accessories.order_by(ordering, "-id")
 
     if not can_see_money(request.user):
         accessories = accessories.defer("cost")
@@ -260,8 +277,13 @@ def accessory_list(request):
     context = {
         "active": "aksesuarlar", "title": "Aksesuarlar", "singular": "Aksesuar",
         "page": page, "total": page.paginator.count,
-        "q": query, "kategori": category, "filtre": only,
+        "q": query, "kategori": category, "marka": brand_slug, "filtre": only,
+        "sirala": ordering,
         "qs": querystring(request),
+        "orderings": ACCESSORY_ORDERING,
+        # Yalnızca aksesuarı olan markalar: telefon markalarıyla dolu uzun
+        # liste seçimi zorlaştırır.
+        "brands": Brand.objects.filter(accessories__isnull=False).distinct(),
         "categories": AccessoryCategory.objects.all(),
         "formats": LABEL_FORMATS,
         "create_url": reverse("stock:accessory_create"),
@@ -318,6 +340,18 @@ def accessory_form(request, pk=None):
         "back_url": (reverse("stock:accessory_detail", kwargs={"pk": instance.pk})
                      if instance else reverse("stock:accessory_list")),
     })
+
+
+@panel_required
+def accessory_barcode(request):
+    """"EAN-13 üret" düğmesi: barkod alanını önerilen kodla yeniden çizer.
+
+    Alan formun kendisinden render edilir; elle bir <input> yazılsaydı widget
+    öznitelikleri (inputmode, data-scan-fill, stil) zamanla ayrışırdı.
+    """
+    form = AccessoryForm(user=request.user,
+                         initial={"barcode": services.suggest_accessory_barcode()})
+    return HttpResponse(str(form["barcode"]))
 
 
 @panel_required

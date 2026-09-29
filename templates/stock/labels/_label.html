@@ -1,3 +1,6 @@
+{% if lbl.niimbot %}
+<div class="lbl nb"><img src="{{ lbl.niimbot }}" alt="{{ lbl.name }} · {{ lbl.code }}"></div>
+{% else %}
 <div class="lbl">
   <div class="lbl-top">
     <div class="qr">{{ lbl.qr|safe }}</div>
@@ -12,3 +15,4 @@
     <div class="hri">{{ lbl.code }}</div>
   </div>
 </div>
+{% endif %}

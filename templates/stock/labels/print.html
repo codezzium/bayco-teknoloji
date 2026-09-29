@@ -37,6 +37,18 @@
   .b128 svg { display:inline-block; height:{{ fmt.bh }}mm; width:auto; }
   .hri      { text-align:center; font-size:6.5pt; letter-spacing:.04em; margin-top:.3mm; }
 
+  /* Aksesuar: Niimbot'ta basılan 40×12 mm görselin aynısı (apps/stock/niimbot.py).
+     Rulo termalde tam 40×12 mm: 203 dpi nokta ızgarasına birebir oturur. Tabakada
+     hücreyi oranı korunarak doldurur (lazer yazıcı ölçeklemeyi kaldırır). */
+  .lbl.nb   { justify-content:center; align-items:center; }
+  .lbl.nb img { display:block; image-rendering:pixelated; }
+  {% if fmt.kind == "roll" %}
+  .lbl.nb   { padding:0; }
+  .lbl.nb img { width:40mm; height:12mm; }
+  {% else %}
+  .lbl.nb img { width:100%; height:auto; max-height:100%; object-fit:contain; }
+  {% endif %}
+
   {% if fmt.kind == "roll" %}
   .lbl { break-after: page; }
   .lbl:last-child { break-after: auto; }

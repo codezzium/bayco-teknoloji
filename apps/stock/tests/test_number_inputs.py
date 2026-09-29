@@ -135,7 +135,7 @@ class PosTurkishAmountTests(EdgeCaseTestCase):
         self.assertContains(response, 'name="price" data-money="2"')
         self.assertContains(response, 'value="120"')
         self.assertContains(response, 'name="qty" data-qty data-min="1"')
-        self.assertContains(response, 'x-model="paidText"')
+        self.assertContains(response, 'x-model="row.text"')
         self.assertNotContains(response, 'type="number"')
         # fields.js her panel sayfasında; çok satırlı {# #} yorumu sayfaya metin olarak sızmasın.
         self.assertContains(response, "js/fields.js")

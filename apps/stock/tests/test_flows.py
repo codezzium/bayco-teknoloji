@@ -191,6 +191,9 @@ class CatalogFlowTests(PanelFlowTestCase):
         response = self.client.get(reverse("stock:label_print"),
                                    {"ids": device.pk, "acc": accessory.pk})
         self.assertContains(response, device.stock_code)
+        # Aksesuar etiketi Niimbot görselidir; kod görselin içinde ve alt metninde.
+        self.assertContains(response, reverse(
+            "stock:niimbot_png", kwargs={"kind": "aksesuar", "pk": accessory.pk}))
         self.assertContains(response, accessory.barcode)
 
 
