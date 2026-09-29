@@ -45,12 +45,23 @@ def preselected(request, *names) -> dict:
             if request.GET.get(name, "").isdigit()}
 
 
-def define_link(create_url: str, back_url: str, label: str):
+def define_link(create_url: str, back_url: str, label: str, new_tab: bool = False):
     """Seçim alanının altına "listede yoksa ekle" kısayolu üretir.
 
     Dönen değer form alanının help_text'idir; panel form şablonları help_text'i
     `|safe` ile basar, bu yüzden format_html ile kaçışlanmış olması şarttır.
+
+    `new_tab`: form bir pop-up içinde (cihaz formundaki "+ Model Ekle"). Aynı
+    sekmede gezinmek arkadaki cihaz formuna girilen her şeyi silerdi; bu
+    yüzden bağlantı yeni sekmede açılır ve dönüş adresi taşımaz.
     """
+    if new_tab:
+        return format_html(
+            'Listede yok mu? <a href="{}" target="_blank" rel="noopener" '
+            'class="underline" style="color:var(--ink)">Yeni {} ekleyin</a> '
+            '(yeni sekmede açılır), sonra bu pencereyi kapatıp yeniden açın.',
+            create_url, label,
+        )
     target = f"{create_url}?{urlencode({'next': back_url})}"
     return format_html(
         'Listede yok mu? <a href="{}" class="underline" '

@@ -18,14 +18,27 @@ from ..models import Contact
 from ..utils import trfold
 from .base import (
     access_required,
+    created_response,
     deny,
     has_access,
     paginate,
     panel_required,
     pick_template,
     querystring,
+    quick_target,
     safe_next,
 )
+
+
+def _same_phone(raw_phone):
+    """Aynı telefonla kayıtlı ilk cari (yoksa None).
+
+    Telefonda unique kısıtı YOKTUR — aile bireyleri aynı numarayı paylaşır ve
+    kısıt gerçek bir satışı bloke ederdi. Bunun yerine kullanıcıyı uyarırız.
+    """
+    from apps.leads.utils import normalize_tr
+    phone = normalize_tr(raw_phone or "")
+    return Contact.objects.filter(phone_norm=phone).first() if phone else None
 
 
 @access_required("contacts")
@@ -102,14 +115,8 @@ def contact_form(request, pk=None):
     else:
         form = ContactForm(instance=instance, user=request.user)
 
-    # Aynı telefonla kayıtlı cari var mı? Telefonda unique kısıtı YOKTUR —
-    # aile bireyleri aynı numarayı paylaşır ve kısıt gerçek bir satışı bloke
-    # ederdi. Bunun yerine kullanıcıyı uyarırız.
     if instance is None and request.method == "POST":
-        from apps.leads.utils import normalize_tr
-        phone = normalize_tr(request.POST.get("phone", ""))
-        if phone:
-            duplicate = Contact.objects.filter(phone_norm=phone).first()
+        duplicate = _same_phone(request.POST.get("phone"))
 
     return render(request, "stock/form.html", {
         "active": "cariler", "form": form, "title": "Cariler",
@@ -120,6 +127,46 @@ def contact_form(request, pk=None):
                      (reverse("stock:contact_detail", kwargs={"pk": instance.pk})
                       if instance else reverse("stock:contact_list" if can_browse
                                                else "stock:pos"))),
+    })
+
+
+@panel_required
+def contact_quick(request):
+    """Cihaz formundaki "+ Kişi Ekle" pop-up'ı (stock/partials/quick_form.html).
+
+    contact_form'la aynı form ve aynı yetki (yeni cari herkese açık); fark,
+    sayfadan hiç çıkılmamasıdır: kayıttan sonra yönlendirme yerine yeni cari
+    çağıran formun seçim kutusuna eklenip seçilir (created_response). Böylece
+    arkadaki cihaz formuna girilmiş hiçbir değer kaybolmaz. Kasa sepetine
+    dokunmaz.
+
+    Aynı telefonla kayıtlı cari varsa ilk kayıt denemesi durur ve mevcut kaydı
+    seçme önerilir; kullanıcı yine de kaydederse o numara için bir daha
+    sorulmaz (gizli `confirm_phone`).
+    """
+    field_id = quick_target(request, "id_supplier")
+    duplicate = None
+    if request.method == "POST":
+        form = ContactForm(request.POST, user=request.user, auto_id="quick_%s", popup=True)
+        if form.is_valid():
+            phone = form.cleaned_data.get("phone", "")
+            if request.POST.get("confirm_phone") != phone:
+                duplicate = _same_phone(phone)
+            if duplicate is None:
+                contact = form.save()
+                request.audit = {"target": contact, "invalid": False, "target_url": reverse(
+                    "stock:contact_detail", kwargs={"pk": contact.pk})}
+                return created_response(field_id, contact, search=contact.search_blob,
+                                        hint=contact.phone)
+        # htmx pop-up'ı hatada da 200 döner; kayıt "eklendi" diye loglanmasın.
+        request.audit = {"invalid": True}
+    else:
+        # Tedarikçi rolü işaretli gelir: cihaz formundan eklenen kişi bize mal satandır.
+        form = ContactForm(user=request.user, initial={"is_supplier": True},
+                           auto_id="quick_%s", popup=True)
+    return render(request, "stock/partials/quick_form.html", {
+        "form": form, "title": "Yeni Cari", "field_id": field_id,
+        "duplicate": duplicate,
     })
 
 

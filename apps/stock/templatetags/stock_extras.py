@@ -72,6 +72,12 @@ def is_hidden_widget(field):
     return isinstance(field.field.widget, forms.HiddenInput)
 
 
+@register.filter
+def has_quick_add(form):
+    """Formda pop-up'la kayıt eklenebilen bir alan var mı (DeviceForm._quick_add)."""
+    return any(getattr(field, "quick_add", None) for field in form.fields.values())
+
+
 @register.simple_tag
 def status_tone(status):
     """Cihaz durumuna göre rozet rengi."""

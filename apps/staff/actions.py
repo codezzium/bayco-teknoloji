@@ -38,10 +38,12 @@ LABELS = {
     "stock:accessory_adjust": "Aksesuar stoğunu değiştirdi",
     # --- Tanımlar ---
     "stock:simple_create": "{singular} ekledi",
+    "stock:simple_quick": "{singular} ekledi",
     "stock:simple_edit": "{singular} düzenledi",
     "stock:simple_delete": "{singular} sildi",
     # --- Cariler ---
     "stock:contact_create": "Cari ekledi",
+    "stock:contact_quick": "Cari ekledi",
     "stock:contact_edit": "Cariyi düzenledi",
     "stock:contact_delete": "Cariyi sildi",
     # --- Giderler ---
@@ -127,7 +129,9 @@ FORM_PAGES = {
     "stock:accessory_create": "Aksesuar ekleme",
     "stock:accessory_edit": "Aksesuar düzenleme",
     "stock:simple_create": "{title}", "stock:simple_edit": "{title}",
+    "stock:simple_quick": "{title}",
     "stock:contact_create": "Cari ekleme", "stock:contact_edit": "Cari düzenleme",
+    "stock:contact_quick": "Cari ekleme",
     "stock:expense_create": "Gider ekleme", "stock:expense_edit": "Gider düzenleme",
     "dashboard:crud_create": "{title}", "dashboard:crud_edit": "{title}",
     "dashboard:settings": "Site Ayarları",

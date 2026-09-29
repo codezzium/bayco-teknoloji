@@ -6,6 +6,9 @@ her POST"tur; etiketler apps/staff/actions.py'den gelir.
 
 View'lar kayda bilgi ekleyebilir:
     request.audit = {"target": obj_or_text, "target_url": url, "detail": {...}}
+Başarıda da hatada da 200 dönen view'lar (cihaz formundaki pop-up'lar)
+sonucu `"invalid": True/False` ile kendisi bildirir; aşağıdaki 200 = hatalı
+form tahmini onlarda yanlış olurdu.
 """
 
 from django.urls import reverse
@@ -56,8 +59,11 @@ class ActivityLogMiddleware:
         action = info.label
         # Tam sayfa form POST'u 200 dönüyorsa form hatayla yeniden çizilmiştir
         # (başarılı kayıt yönlendirir). htmx parçaları ise başarıda da 200 döner.
-        if (response.status_code == 200 and info.view_name in FORM_PAGES
-                and request.headers.get("HX-Request") != "true"):
+        invalid = extra.get("invalid")
+        if invalid is None:
+            invalid = (response.status_code == 200 and info.view_name in FORM_PAGES
+                       and request.headers.get("HX-Request") != "true")
+        if invalid:
             action += " (form hatalı, kaydedilmedi)"
         audit.record(
             kind=ActivityLog.Kind.ISLEM,

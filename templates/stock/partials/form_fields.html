@@ -1,0 +1,39 @@
+{% load stock_extras %}
+{% comment %} Stok formlarının alan ızgarası: stock/form.html ve pop-up formu
+   (stock/partials/quick_form.html) aynı döngüyü kullanır.
+
+   Alanın `quick_add`'i varsa (DeviceForm._quick_add) yanına "+ Kişi Ekle" gibi
+   bir düğme çizilir; düğme pop-up'ı açar (stock/form.html) ve sayfadan
+   çıkmaz. type="button" ŞART: aksi halde arkadaki formu gönderir. {% endcomment %}
+<div class="grid sm:grid-cols-2 gap-x-5">
+  {% for field in form %}
+    {% if field|is_hidden_widget %}
+      {{ field }}
+    {% else %}
+    <div class="field {% if field|is_checkbox %}flex items-center gap-3{% elif field|is_wide %}sm:col-span-2{% endif %}">
+      {% if field|is_checkbox %}
+        <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+          {{ field }}
+          <span class="label" style="margin:0">{{ field.label }}</span>
+        </label>
+      {% else %}
+        <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {% with quick=field.field.quick_add %}
+        {% if quick %}
+        <div class="flex gap-2 items-start">
+          <div class="flex-1 min-w-0">{{ field }}</div>
+          <button type="button" class="btn btn-ghost btn-sm shrink-0" style="padding-top:12px;padding-bottom:12px"
+                  hx-get="{{ quick.url }}" hx-target="#quick-body"
+                  @click="$dispatch('quick-open')">+ {{ quick.label }}</button>
+        </div>
+        {% else %}
+        {{ field }}
+        {% endif %}
+        {% endwith %}
+      {% endif %}
+      {% if field.help_text %}<p class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text|safe }}</p>{% endif %}
+      {% if field.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ field.errors|striptags }}</p>{% endif %}
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>

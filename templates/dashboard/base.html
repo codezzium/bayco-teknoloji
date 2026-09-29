@@ -189,9 +189,8 @@
     {% comment %} Safari programatik kuruluma izin vermez, Chrome da bazen
        bildirimi hazır bulamaz. İki durumda da elle yapılacak adımlar burada. {% endcomment %}
     <div x-show="help" x-cloak @keydown.escape.window="help=false"
-         class="fixed inset-0 z-[60] grid place-items-center p-5"
-         style="background:rgba(0,0,0,.6)">
-      <div @click.outside="help=false" class="card p-5 w-full" style="max-width:26rem">
+         class="dialog-backdrop fixed inset-0 z-[60] grid place-items-center p-5">
+      <div @click.outside="help=false" class="card dialog-card p-5 w-full" style="max-width:26rem">
         <div class="flex items-start justify-between gap-3 mb-3">
           <h2 class="font-display font-bold" x-text="title"></h2>
           <button type="button" @click="help=false" class="shrink-0 text-xl leading-none"
@@ -220,6 +219,8 @@
 <script src="{% static 'js/install.js' %}" defer></script>
 {# fields.js: tutarda binlik noktası, adette −/+ sayacı; BaycoNum Alpine'dan önce tanımlı olmalı. #}
 <script src="{% static 'js/fields.js' %}" defer></script>
+{# combobox.js: select[data-combobox] aranabilir seçim + pop-up'tan gelen kaydı seçme. #}
+<script src="{% static 'js/combobox.js' %}" defer></script>
 <script src="{% static 'vendor/alpine/alpine.min.js' %}" defer></script>
 </body>
 </html>

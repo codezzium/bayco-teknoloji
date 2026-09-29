@@ -84,6 +84,8 @@ class ScreenTestCase(TestCase):
             reverse("stock:accessory_edit", kwargs={"pk": self.accessory.pk}),
             reverse("stock:simple_list", kwargs={"key": "modeller"}),
             reverse("stock:simple_create", kwargs={"key": "modeller"}),
+            # Cihaz formundaki pop-up'lar (herkese açık: formun kendisi gibi).
+            reverse("stock:simple_quick", kwargs={"key": "modeller"}) + "?alan=id_device_model",
             reverse("stock:simple_list", kwargs={"key": "kategoriler"}),
             reverse("stock:pos"),
             reverse("stock:product_search") + "?q=iphone",
@@ -96,6 +98,7 @@ class ScreenTestCase(TestCase):
             reverse("stock:receipt_logo"),
             # Yeni cari eklemek tiksiz açık: kasadaki "+ Yeni Müşteri".
             reverse("stock:contact_create"),
+            reverse("stock:contact_quick") + "?alan=id_supplier",
             reverse("stock:intake"),
             reverse("stock:stocktake"),
         ]

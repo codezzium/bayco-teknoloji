@@ -36,6 +36,7 @@ urlpatterns = [
     # --- Model kataloğu & kategoriler ---
     path("tanim/<str:key>/", catalog.simple_list, name="simple_list"),
     path("tanim/<str:key>/ekle/", catalog.simple_form, name="simple_create"),
+    path("tanim/<str:key>/hizli-ekle/", catalog.simple_quick, name="simple_quick"),
     path("tanim/<str:key>/<int:pk>/duzenle/", catalog.simple_form, name="simple_edit"),
     path("tanim/<str:key>/<int:pk>/sil/", catalog.simple_delete, name="simple_delete"),
 
@@ -66,6 +67,7 @@ urlpatterns = [
     # --- Cariler ---
     path("cariler/", contacts.contact_list, name="contact_list"),
     path("cariler/ekle/", contacts.contact_form, name="contact_create"),
+    path("cariler/hizli-ekle/", contacts.contact_quick, name="contact_quick"),
     path("cari/<int:pk>/", contacts.contact_detail, name="contact_detail"),
     path("cari/<int:pk>/duzenle/", contacts.contact_form, name="contact_edit"),
     path("cari/<int:pk>/sil/", contacts.contact_delete, name="contact_delete"),

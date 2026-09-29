@@ -152,13 +152,23 @@ class MoneyAwareModelForm(StyledModelForm):
     MONEY_FIELDS: list[str] = []
     PRICE_FIELDS: list[str] = []
 
-    def __init__(self, *args, user=None, back_url="", **kwargs):
+    def __init__(self, *args, user=None, back_url="", popup=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
         #: Formu gösteren view'ın tam adresi. Alt formlara ("yeni model ekle")
         #: `?next=` olarak verilir; boşsa kısayol formun kendi ekleme adresine
         #: döner. Bkz. apps.dashboard.utils.define_link.
         self.back_url = back_url
+        #: Form başka bir formun üstünde pop-up olarak açıldı (cihaz formundaki
+        #: "+ Kişi Ekle"). Kısayollar sayfadan çıkmamalı: bkz. define_link(new_tab).
+        self.popup = popup
+        if popup:
+            # Pasif kayıt çağıran formun seçim listesine girmez (cihaz formu
+            # yalnızca aktif modelleri listeler); pop-up'ta açılan kayıt aktiftir.
+            self.fields.pop("is_active", None)
+            first = next(iter(self.fields.values()), None)
+            if first is not None:
+                first.widget.attrs["autofocus"] = True
         if not can_see_money(user):
             for name in self.MONEY_FIELDS:
                 self.fields.pop(name, None)

@@ -5,12 +5,14 @@ Tasarım sistemi sınıflarını uygulayan mevcut soyutlama yeniden kullanılır
 alanlarını yetkisiz kullanıcıdan tamamen kaldıran katmanı ekler.
 """
 
+from urllib.parse import urlencode
+
 from django import forms
 from django.urls import reverse
 from django.utils.html import format_html
 
 from apps.catalog.models import Brand
-from apps.dashboard.forms import MoneyField, QtyInput
+from apps.dashboard.forms import MoneyField, QtyInput, SearchableSelect
 from apps.dashboard.utils import define_link
 
 from .models import (
@@ -25,8 +27,11 @@ from .models import (
 from .permissions import MoneyAwareModelForm
 from .utils import MAX_QTY
 
-DATE = forms.DateInput(attrs={"type": "date"})       # mobilde yerel tarih seçici
-DATETIME = forms.DateTimeInput(attrs={"type": "datetime-local"})
+# Mobilde yerel tarih seçici. `format` ŞART: tarayıcı type="date" değerini
+# yalnızca ISO biçiminde kabul eder; Türkçe yerel biçimle ("30/09/2026")
+# basılan varsayılan ve kayıtlı tarih boş görünür, form "zorunlu alan" der.
+DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+DATETIME = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
 
 
 def _simple_create(key: str) -> str:
@@ -52,6 +57,8 @@ class DeviceForm(MoneyAwareModelForm):
         ]
         field_classes = {"purchase_price": MoneyField, "list_price": MoneyField}
         widgets = {
+            "device_model": SearchableSelect(),
+            "supplier": SearchableSelect(hint="phone"),
             "purchase_date": DATE,
             "warranty_start": DATE,
             "defect_note": forms.Textarea(attrs={"rows": 2}),
@@ -72,17 +79,28 @@ class DeviceForm(MoneyAwareModelForm):
         # listede "Apple iPhone 13 Pro" olarak görünür. Serbest metin marka/
         # model alanları olsaydı "en çok satan model" raporu anlamsızlaşırdı.
         self.fields["device_model"].empty_label = "— Marka ve model seçin —"
-        self.fields["device_model"].help_text = define_link(
-            _simple_create("modeller"),
-            self.back_url or reverse("stock:device_create"),
-            "model",
-        )
-        self.fields["supplier"].queryset = Contact.objects.filter(is_supplier=True)
-        self.fields["supplier"].empty_label = "— Tedarikçi seçin —"
+        # Tüm cariler listelenir: telefonu bize satan çoğu zaman daha önce
+        # müşterimiz olmuş biridir. Yalnızca tedarikçiler listelenseydi aynı
+        # kişi için ikinci bir cari açılırdı. Seçilen cari kayıtta tedarikçi
+        # olarak da işaretlenir (views.catalog.device_form).
+        self.fields["supplier"].queryset = Contact.objects.all()
+        self.fields["supplier"].empty_label = "— Kişi / firma seçin —"
+        # "Listede yoksa ekle" pop-up'ta açılır (stock/partials/form_fields.html):
+        # başka sayfaya gidilseydi forma girilen IMEI, fiyat vb. kaybolurdu.
+        self._quick_add("device_model", reverse("stock:simple_quick",
+                                                kwargs={"key": "modeller"}), "Model Ekle")
+        self._quick_add("supplier", reverse("stock:contact_quick"), "Kişi Ekle")
         self.fields["warranty_start"].help_text = (
             "Boş bırakılırsa satış günü otomatik atanır. İkinci elde üreticinin "
             "kalan garantisi devrediliyorsa cihazın ilk alım tarihini girin."
         )
+
+    def _quick_add(self, name, url, label):
+        # Pop-up, kaydettiği kaydı bu id'deki <select>'e ekleyip seçer.
+        field_id = self.auto_id % self.add_prefix(name)
+        self.fields[name].quick_add = {
+            "url": f"{url}?{urlencode({'alan': field_id})}", "label": label,
+        }
 
 
 class AccessoryForm(MoneyAwareModelForm):
@@ -144,6 +162,7 @@ class DeviceModelForm(MoneyAwareModelForm):
     class Meta:
         model = DeviceModel
         fields = ["brand", "name", "kind", "is_active"]
+        widgets = {"brand": SearchableSelect()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -152,6 +171,7 @@ class DeviceModelForm(MoneyAwareModelForm):
             _brand_create(),
             self.back_url or _simple_create("modeller"),
             "marka",
+            new_tab=self.popup,
         )
         self.fields["name"].help_text = (
             "Yalnızca model adı — markayı tekrar yazmayın. Tek biçim kullanın: "

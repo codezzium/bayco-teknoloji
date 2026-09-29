@@ -1,0 +1,40 @@
+{% comment %} Pop-up form (views: contacts.contact_quick, catalog.simple_quick).
+   stock/form.html'deki #quick-body'ye yüklenir. Hata olursa sunucu bu parçayı
+   yeniden döner; başarıda gövde boş gelir ve bayco:created olayı pop-up'ı
+   kapatır (static/js/combobox.js). hx-post adresi `?alan=`ı taşır. {% endcomment %}
+<form hx-post="{{ request.get_full_path }}" hx-target="#quick-body" novalidate>
+  {% csrf_token %}
+  <h2 class="font-display font-bold text-lg mb-4 pr-8">{{ title }}</h2>
+
+  {% if form.non_field_errors %}
+  <div class="rounded-xl px-4 py-3 mb-4 text-sm"
+       style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+    {{ form.non_field_errors|striptags }}
+  </div>
+  {% endif %}
+
+  {% if duplicate %}
+  {% comment %} Aynı telefonla kayıtlı cari: "Mevcut kaydı seç" sunucuya gitmez,
+     combobox.js data-created-* değerleriyle bayco:created olayını tetikler.
+     confirm_phone: kullanıcı yine de kaydederse bu numara bir daha sorulmaz. {% endcomment %}
+  <div class="rounded-xl px-4 py-3 mb-4 text-sm"
+       style="background:rgba(245,180,60,.1);color:#ffd48a;border:1px solid rgba(245,180,60,.35)">
+    <p>
+      Bu telefon numarası zaten kayıtlı: <strong>{{ duplicate }}</strong>{% if duplicate.phone %} · {{ duplicate.phone }}{% endif %}.
+      Aynı kişiyse yeni kayıt açmak yerine mevcut kaydı seçin.
+    </p>
+    <button type="button" class="btn btn-gradient btn-sm mt-3"
+            data-created-field="{{ field_id }}" data-created-value="{{ duplicate.pk }}"
+            data-created-label="{{ duplicate }}" data-created-search="{{ duplicate.search_blob }}"
+            data-created-hint="{{ duplicate.phone }}">Mevcut kaydı seç</button>
+    <input type="hidden" name="confirm_phone" value="{{ form.cleaned_data.phone }}">
+  </div>
+  {% endif %}
+
+  {% include "stock/partials/form_fields.html" %}
+
+  <div class="flex flex-wrap items-center gap-3 mt-4 pt-4" style="border-top:1px solid var(--line)">
+    <button class="btn btn-gradient btn-sm">{% if duplicate %}Yine de yeni kayıt aç{% else %}Kaydet{% endif %}</button>
+    <button type="button" class="btn btn-ghost btn-sm" @click="$dispatch('quick-close')">Vazgeç</button>
+  </div>
+</form>

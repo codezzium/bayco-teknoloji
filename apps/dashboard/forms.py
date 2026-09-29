@@ -52,6 +52,32 @@ class QtyInput(forms.TextInput):
         super().__init__({**base, **(attrs or {})})
 
 
+class SearchableSelect(forms.Select):
+    """Aranabilir seçim kutusu (static/js/combobox.js).
+
+    Native <select> formda kalır ve değeri o gönderir; JS yalnızca üstüne bir
+    arama kutusu çizer, yani JS çalışmasa da alan eskisi gibi seçilebilir.
+    Kaydın `search_blob`'u (trfold'lu ad/telefon/firma) seçeneğe `data-search`
+    olarak yazılır; `hint` verilirse o alan sonuç satırında soluk gösterilir.
+    """
+
+    def __init__(self, attrs=None, choices=(), hint=""):
+        self.hint = hint
+        super().__init__({"data-combobox": "1", **(attrs or {})}, choices)
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        instance = getattr(value, "instance", None)  # ModelChoiceIteratorValue
+        if instance is not None:
+            search = getattr(instance, "search_blob", "")
+            if search:
+                option["attrs"]["data-search"] = search
+            hint = getattr(instance, self.hint, "") if self.hint else ""
+            if hint:
+                option["attrs"]["data-hint"] = hint
+        return option
+
+
 def _style(fields):
     """Form alanlarına tasarım sistemi sınıflarını uygular."""
     for name, field in fields.items():

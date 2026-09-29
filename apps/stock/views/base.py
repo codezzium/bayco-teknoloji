@@ -1,6 +1,10 @@
 """Stok view'ları için ortak yardımcılar."""
 
+import json
+import re
+
 from django.core.paginator import Paginator
+from django.http import HttpResponse
 
 from apps.dashboard.utils import (  # noqa: F401  (view modülleri buradan alır)
     preselected,
@@ -44,3 +48,30 @@ def querystring(request, drop=("sayfa",)):
 def pick_template(request, partial: str, full: str) -> str:
     """htmx isteğinde parçayı, normal gezinmede tam sayfayı render eder."""
     return partial if is_htmx(request) else full
+
+
+def quick_target(request, default: str) -> str:
+    """Pop-up'ın kaydı ekleyeceği <select>'in id'si (`?alan=id_supplier`).
+
+    Değer JS'te `getElementById`'ye gider ve şablona yazılır; yalnızca
+    Django'nun ürettiği biçimdeki id'ler kabul edilir.
+    """
+    field_id = request.GET.get("alan", "")
+    return field_id if re.fullmatch(r"id_\w{1,60}", field_id, re.ASCII) else default
+
+
+def created_response(field_id: str, obj, *, search: str = "", hint: str = "") -> HttpResponse:
+    """Pop-up'ta kaydedilen kaydı çağıran formun seçim kutusuna gönderir.
+
+    Gövde boştur (pop-up içeriği temizlenir); static/js/combobox.js
+    `bayco:created` olayında seçeneği <select>'e ekleyip seçer. Etiket
+    str(obj)'dir, ModelChoiceField'ın seçenek etiketiyle aynı. json.dumps
+    varsayılanı (ensure_ascii) ş/ğ/ı'yı \\u kaçışına çevirir: latin-1 dışı
+    karakter HTTP başlığında MIME kodlanır ve htmx JSON'u okuyamazdı.
+    """
+    response = HttpResponse("")
+    response["HX-Trigger"] = json.dumps({"bayco:created": {
+        "field": field_id, "value": str(obj.pk), "label": str(obj),
+        "search": search, "hint": hint,
+    }})
+    return response

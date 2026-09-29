@@ -6,6 +6,9 @@
  *   değil 18500'dür. data-money="0" ondalıksızdır.
  * input[data-qty]: iki yanına − / + düğmeleri eklenir (Niimbot adet sayacıyla
  *   aynı görünüm); sınırlar data-min / data-max. Yalnızca rakam kabul eder.
+ * form[data-guard]: bir alan değiştikten sonra sayfadan çıkılırsa (menü
+ *   bağlantısı, geri tuşu, yenileme) tarayıcı onay ister; gönderimde kalkar.
+ *   data-guard="dirty": form hatayla geri döndü, girilenler zaten ekranda.
  *
  * Alpine'a bağlı değildir; htmx ile sonradan gelen içerikte de çalışır.
  * window.BaycoNum.parse / format Alpine ifadelerinde kullanılır (kasa ödemesi).
@@ -202,4 +205,29 @@
   document.addEventListener("DOMContentLoaded", function () { enhance(document); });
   // htmx ile yerleştirilen her yeni içerik (sepet, sayım listesi…)
   document.addEventListener("htmx:load", function (e) { enhance(e.detail && e.detail.elt); });
+
+  /* ------------------------------------------------------------------ */
+  /* Kaydedilmemiş değişiklik uyarısı                                    */
+  /* ------------------------------------------------------------------ */
+  // Pop-up formlarındaki alanların .form'u pop-up'ın kendi formudur; onlar
+  // arkadaki formu "değişti" saymaz.
+  var dirtyForm = null;
+
+  function markDirty(e) {
+    var form = e.target && e.target.form;
+    if (form && form.hasAttribute("data-guard")) dirtyForm = form;
+  }
+  document.addEventListener("input", markDirty, true);
+  document.addEventListener("change", markDirty, true);
+  document.addEventListener("submit", function (e) {
+    if (e.target === dirtyForm) dirtyForm = null;
+  }, true);
+  document.addEventListener("DOMContentLoaded", function () {
+    dirtyForm = document.querySelector('form[data-guard="dirty"]') || dirtyForm;
+  });
+  window.addEventListener("beforeunload", function (e) {
+    if (!dirtyForm || !document.body.contains(dirtyForm)) return;
+    e.preventDefault();
+    e.returnValue = "";  // eski tarayıcılar onayı ancak bununla gösterir
+  });
 })();

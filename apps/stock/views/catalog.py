@@ -20,11 +20,12 @@ from ..forms import (
     StocktakeForm,
 )
 from ..labels import LABEL_FORMATS
-from ..models import Accessory, AccessoryCategory, Device, DeviceModel
+from ..models import Accessory, AccessoryCategory, Contact, Device, DeviceModel
 from ..utils import trfold
 from .base import (
     access_required,
     can_see_money,
+    created_response,
     deny,
     has_access,
     paginate,
@@ -32,6 +33,7 @@ from .base import (
     pick_template,
     preselected,
     querystring,
+    quick_target,
     safe_next,
     with_param,
 )
@@ -138,11 +140,8 @@ def device_by_code(request, stock_code):
 @panel_required
 def device_form(request, pk=None):
     instance = get_object_or_404(Device, pk=pk) if pk else None
-    # Alan altındaki "yeni model ekle" kısayolu buraya geri döner.
-    back = request.get_full_path()
     if request.method == "POST":
-        form = DeviceForm(request.POST, instance=instance, user=request.user,
-                          back_url=back)
+        form = DeviceForm(request.POST, instance=instance, user=request.user)
         if form.is_valid():
             device = form.save(commit=False)
             if instance is None:
@@ -154,6 +153,10 @@ def device_form(request, pk=None):
                 form.add_error(None, exc)
             else:
                 device.save()
+                # Listede tüm cariler var; bize cihaz satan müşteri artık
+                # tedarikçimizdir de ("Tedarikçi" filtresinde görünsün).
+                Contact.objects.filter(pk=device.supplier_id,
+                                       is_supplier=False).update(is_supplier=True)
                 messages.success(
                     request,
                     f"{device.stock_code} kaydedildi." if instance is None
@@ -166,14 +169,15 @@ def device_form(request, pk=None):
         if scanned and instance is None:
             initial["imei1"] = "".join(ch for ch in scanned if ch.isdigit())
         if instance is None:
-            # "Yeni model ekle"den dönüş: az önce açılan model seçili gelir.
+            # `?device_model=<pk>` ile gelen bağlantılarda model seçili gelir.
             initial.update(preselected(request, "device_model"))
-        form = DeviceForm(instance=instance, user=request.user, initial=initial,
-                          back_url=back)
+        form = DeviceForm(instance=instance, user=request.user, initial=initial)
 
     return render(request, "stock/form.html", {
         "active": "cihazlar", "form": form, "title": "Cihazlar",
         "singular": "Cihaz", "is_edit": instance is not None,
+        # Uzun form: kaydetmeden sayfadan çıkılırsa tarayıcı uyarır (fields.js).
+        "guard": True,
         "back_url": (reverse("stock:device_detail", kwargs={"pk": instance.pk})
                      if instance else reverse("stock:device_list")),
     })
@@ -465,6 +469,31 @@ def simple_form(request, key, pk=None):
         "singular": cfg["singular"], "is_edit": instance is not None,
         "next_url": next_url,
         "back_url": next_url or reverse("stock:simple_list", kwargs={"key": key}),
+    })
+
+
+@panel_required
+def simple_quick(request, key):
+    """Cihaz formundaki "+ Model Ekle" pop-up'ı (bkz. contacts.contact_quick).
+
+    simple_form'un `?next=` zinciri tam sayfa gezindiği için çağıran formdaki
+    girişleri kaybettirirdi; burada kayıt çağıran formun seçim kutusuna
+    eklenip seçilir ve sayfadan çıkılmaz.
+    """
+    cfg = _simple_cfg(key)
+    field_id = quick_target(request, f"id_{cfg['param']}")
+    if request.method == "POST":
+        form = cfg["form"](request.POST, user=request.user, auto_id="quick_%s", popup=True)
+        if form.is_valid():
+            obj = form.save()
+            request.audit = {"target": obj, "invalid": False}
+            return created_response(field_id, obj)
+        # htmx pop-up'ı hatada da 200 döner; kayıt "eklendi" diye loglanmasın.
+        request.audit = {"invalid": True}
+    else:
+        form = cfg["form"](user=request.user, auto_id="quick_%s", popup=True)
+    return render(request, "stock/partials/quick_form.html", {
+        "form": form, "title": f"Yeni {cfg['singular']}", "field_id": field_id,
     })
 
 
