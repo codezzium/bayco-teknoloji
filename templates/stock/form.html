@@ -40,6 +40,16 @@
       <option value="0"><option value="3"><option value="6">
       <option value="12"><option value="18"><option value="24"><option value="36">
     </datalist>
+    {% comment %} Garanti başlangıcı (ilk alım tarihi) girilince süre üretici garantisidir: 24 ay.
+       Yalnızca tarih değişince yazılır; sayfa açılışında kayıtlı süreye dokunulmaz. {% endcomment %}
+    <script>
+      document.addEventListener("change", function (e) {
+        var start = e.target;
+        if (!start.hasAttribute || !start.hasAttribute("data-warranty-months") || !start.value) return;
+        var months = start.form && start.form.elements.warranty_months;
+        if (months) months.value = start.getAttribute("data-warranty-months");
+      });
+    </script>
 
     <div class="flex items-center gap-3 mt-5 pt-5" style="border-top:1px solid var(--line)">
       <button class="btn btn-gradient">Kaydet</button>

@@ -232,11 +232,16 @@ class Device(models.Model):
                                                 editable=False)
 
     # --- garanti ---
+    #: Garanti başlangıcı (ilk alım tarihi) girilen cihazın süresi: üretici
+    #: garantisi o tarihten itibaren 24 aydır. "Kalan ay" yazılsaydı bitiş
+    #: tarihi ilk alımdan sayıldığı için erken çıkardı.
+    MANUFACTURER_WARRANTY_MONTHS = 24
+
     warranty_months = models.PositiveSmallIntegerField(
         "Garanti Süresi (ay)", default=0,
         validators=[MaxValueValidator(120)],
-        help_text="Kalan garanti ay olarak. Üreticinin devreden garantisi için "
-                  "17, 22, 23 gibi ara değerler de girilebilir.",
+        help_text="Garanti başlangıcından itibaren toplam süre. Başlangıç tarihi "
+                  "girilmişse üretici garantisi olarak 24 ay yazılır.",
     )
     warranty_start = models.DateField(
         "Garanti Başlangıcı", null=True, blank=True,

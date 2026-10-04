@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -112,6 +112,34 @@ class CatalogFlowTests(PanelFlowTestCase):
                                                kwargs={"pk": device.pk}))
         self.assertEqual(device.stock_code, "BYC-000001")
         self.assertEqual(device.created_by, self.patron)
+
+    def test_warranty_start_without_months_means_manufacturer_warranty(self):
+        self.client.post(reverse("stock:device_create"),
+                         self.device_payload(warranty_months="0",
+                                             warranty_start="2025-06-15"))
+        device = Device.objects.get()
+        self.assertEqual(device.warranty_months, 24)
+        self.assertEqual(device.warranty_end, date(2027, 6, 15))
+
+    def test_warranty_months_typed_with_start_is_kept(self):
+        self.client.post(reverse("stock:device_create"),
+                         self.device_payload(warranty_months="12",
+                                             warranty_start="2026-09-01"))
+        self.assertEqual(Device.objects.get().warranty_months, 12)
+
+    def test_editing_old_device_leaves_its_warranty_alone(self):
+        device = self.make_device(warranty_months=0, warranty_start=date(2025, 6, 15))
+        self.client.post(
+            reverse("stock:device_edit", kwargs={"pk": device.pk}),
+            self.device_payload(imei1=device.imei1, shelf="B2",
+                                warranty_months="0", warranty_start="2025-06-15"))
+        device.refresh_from_db()
+        self.assertEqual(device.shelf, "B2")
+        self.assertEqual(device.warranty_months, 0)
+
+    def test_device_form_fills_24_months_when_start_is_picked(self):
+        response = self.client.get(reverse("stock:device_create"))
+        self.assertContains(response, 'data-warranty-months="24"')
 
     def test_device_edit_keeps_the_stock_code(self):
         device = self.make_device()

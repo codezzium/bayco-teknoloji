@@ -60,7 +60,11 @@ class DeviceForm(MoneyAwareModelForm):
             "device_model": SearchableSelect(),
             "supplier": SearchableSelect(hint="phone"),
             "purchase_date": DATE,
-            "warranty_start": DATE,
+            # Tarih seçilince süre alanına 24 yazılır (stock/form.html).
+            "warranty_start": forms.DateInput(
+                attrs={"type": "date",
+                       "data-warranty-months": Device.MANUFACTURER_WARRANTY_MONTHS},
+                format="%Y-%m-%d"),
             "defect_note": forms.Textarea(attrs={"rows": 2}),
             "imei1": forms.TextInput(attrs={"inputmode": "numeric",
                                             "autocomplete": "off"}),
@@ -92,8 +96,22 @@ class DeviceForm(MoneyAwareModelForm):
         self._quick_add("supplier", reverse("stock:contact_quick"), "Kişi Ekle")
         self.fields["warranty_start"].help_text = (
             "Boş bırakılırsa satış günü otomatik atanır. İkinci elde üreticinin "
-            "kalan garantisi devrediliyorsa cihazın ilk alım tarihini girin."
+            "garantisi devrediliyorsa cihazın ilk alım tarihini girin; süre 24 ay olur."
         )
+        self.fields["warranty_months"].help_text = (
+            "Başlangıç tarihinden itibaren toplam süre — kalan ay değil. "
+            "Başlangıç boşsa satış gününden sayılır."
+        )
+
+    def clean(self):
+        data = super().clean()
+        # Tarih seçici JS'i çalışmadıysa süre 0 kalır ve bitiş tarihi hiç
+        # hesaplanmaz. Kullanıcının elle yazdığı süreye ve tarihi bu formda
+        # girilmemiş eski kayıtlara dokunulmaz.
+        if ("warranty_start" in self.changed_data and data.get("warranty_start")
+                and not data.get("warranty_months")):
+            data["warranty_months"] = Device.MANUFACTURER_WARRANTY_MONTHS
+        return data
 
     def _quick_add(self, name, url, label):
         # Pop-up, kaydettiği kaydı bu id'deki <select>'e ekleyip seçer.
