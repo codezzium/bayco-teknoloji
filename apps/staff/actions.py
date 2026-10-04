@@ -109,6 +109,8 @@ READ_ONLY = {
     "stock:sale_list": "Satışlar",
     "stock:sale_detail": "Satış",
     "stock:receipt": "Fiş",
+    "stock:receipt_png": "Fiş görseli",
+    "stock:receipt_escpos": "Fiş yazıcıya gönderildi",
     "stock:receipt_logo": "Fiş logosu",
     "stock:contact_list": "Cariler",
     "stock:contact_detail": "Cari",

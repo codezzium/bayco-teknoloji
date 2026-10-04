@@ -95,6 +95,8 @@ class ScreenTestCase(TestCase):
             reverse("stock:sale_list") + "?filtre=vadesi&q=BYC",
             reverse("stock:sale_detail", kwargs={"pk": self.sale.pk}),
             reverse("stock:receipt", kwargs={"pk": self.sale.pk}),
+            reverse("stock:receipt_png", kwargs={"pk": self.sale.pk}),
+            reverse("stock:receipt_escpos", kwargs={"pk": self.sale.pk}),
             reverse("stock:receipt_logo"),
             # Yeni cari eklemek tiksiz açık: kasadaki "+ Yeni Müşteri".
             reverse("stock:contact_create"),

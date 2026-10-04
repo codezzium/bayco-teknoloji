@@ -14,7 +14,7 @@ from PIL import Image
 from apps.catalog.models import Brand
 from apps.sitecore.models import SiteSettings
 from apps.staff.models import ActivityLog
-from apps.stock import services
+from apps.stock import pos58, services
 from apps.stock.labels import ean13_check_digit, ean13_is_valid
 from apps.stock.models import Accessory, Sale
 from apps.stock.niimbot import _bar_left, bar_modules, mm_to_px
@@ -128,9 +128,8 @@ class SplitPaymentTests(ScreenTestCase):
 
     def test_receipt_lists_payments_in_entry_order(self):
         self.checkout(["500", "500"], ["kart", "nakit"])
-        sale = Sale.objects.latest("id")
-        body = self.client.get(reverse("stock:receipt", kwargs={"pk": sale.pk})).content.decode()
-        self.assertLess(body.index("Kredi Kartı"), body.index("Nakit"))
+        texts = [line.text for line in pos58.receipt_lines(Sale.objects.latest("id"))]
+        self.assertLess(texts.index("Kredi Kartı"), texts.index("Nakit"))
 
     def test_pos_offers_adding_a_payment_row(self):
         body = self.client.get(reverse("stock:pos")).content.decode()
@@ -142,13 +141,77 @@ class ReceiptTests(ScreenTestCase):
     def setUp(self):
         self.client.force_login(self.patron)
 
+    def texts(self):
+        return [line.text for line in pos58.receipt_lines(self.sale)]
+
     def test_info_title_sits_between_header_and_items_and_legal_note_is_last(self):
-        body = self.client.get(reverse("stock:receipt", kwargs={"pk": self.sale.pk})).content.decode()
-        title = body.index("BİLGİ FİŞİ")
-        self.assertLess(body.index("Fiş No"), title)
-        self.assertLess(title, body.index(self.accessory.name))
-        self.assertGreater(body.index("Mali değeri yoktur."), body.index("teşekkürler"))
-        self.assertIn(reverse("stock:receipt_logo"), body)
+        lines = pos58.receipt_lines(self.sale)
+        texts = [line.text for line in lines]
+        title = texts.index("BİLGİ FİŞİ")
+        self.assertEqual(lines[0].kind, "logo")
+        self.assertLess(texts.index("Fiş No"), title)
+        self.assertLess(title, texts.index(self.accessory.name))
+        self.assertEqual(texts[-1], "Mali değeri yoktur.")
+        self.assertIn("Bizi tercih ettiğiniz için teşekkürler.", texts)
+
+    def test_items_show_quantity_imei_and_warranty_note(self):
+        texts = self.texts()
+        self.assertIn("2 × 150,90 ₺", texts)
+        self.assertIn(f"IMEI: {self.device.imei1}", texts)
+        self.assertIn(f"{self.device.label} — garanti kapsamı için bu fişi saklayınız.", texts)
+
+    def test_open_balance_and_due_date(self):
+        rows = {line.text: line.right for line in pos58.receipt_lines(self.sale)}
+        self.assertEqual(rows["KALAN"], "8.801,80 ₺")
+        self.assertIn("Vade", rows)
+
+    def test_image_fits_the_print_head(self):
+        response = self.client.get(reverse("stock:receipt_png", kwargs={"pk": self.sale.pk}))
+        self.assertEqual(response["Content-Type"], "image/png")
+        image = png(response)
+        self.assertEqual(image.mode, "1")
+        self.assertEqual(image.width, 384)  # 48 mm × 8 nokta
+        self.assertEqual(image.getextrema(), (0, 255))
+
+    def test_long_text_wraps_inside_the_side_margins(self):
+        lines = [pos58.Line("text", "Çok " * 40),
+                 pos58.Line("row", "Uzun bir açıklama " * 5, right="12.345,67 ₺"),
+                 pos58.Line("center", "Ş" * 60, size="title", bold=True)]
+        image = pos58.render_receipt(lines, logo=Image.new("1", (1, 1), 255))
+        self.assertGreater(image.height, 200)  # sarıldı, tek satıra sıkışmadı
+        for box in ((0, 0, pos58.PAD, image.height),
+                    (image.width - pos58.PAD, 0, image.width, image.height)):
+            self.assertEqual(image.crop(box).getextrema(), (255, 255))
+
+    def test_escpos_is_raster_bands_and_feed(self):
+        image = Image.new("1", (384, 300), 255)
+        image.putpixel((0, 0), 0)
+        data = pos58.escpos(image)
+        self.assertTrue(data.startswith(b"\x1b@\x1dv0\x00" + bytes([48, 0, 128, 0])))
+        # Siyah nokta = 1, en soldaki nokta en yüksek bit.
+        self.assertEqual(data[10], 0x80)
+        self.assertEqual(data[11:10 + 48], bytes(47))
+        self.assertEqual(data.count(b"\x1dv0\x00"), 3)  # 128 + 128 + 44 satır
+        self.assertTrue(data.endswith(b"\x1bJ" + bytes([mm_to_px(pos58.FEED_MM)])))
+        self.assertEqual(len(data), 2 + 3 * 8 + 300 * 48 + 3)
+
+    def test_escpos_endpoint_matches_the_image(self):
+        response = self.client.get(reverse("stock:receipt_escpos", kwargs={"pk": self.sale.pk}))
+        self.assertEqual(response["Content-Type"], "application/octet-stream")
+        self.assertEqual(response.content, pos58.escpos(pos58.receipt_image(self.sale)))
+
+    def test_page_offers_usb_and_browser_printing(self):
+        url = reverse("stock:receipt", kwargs={"pk": self.sale.pk})
+        response = self.client.get(url + "?auto=1")
+        self.assertContains(response, "js/pos58.js")
+        self.assertContains(response, reverse("stock:receipt_png", kwargs={"pk": self.sale.pk}))
+        self.assertContains(
+            response, f'data-url="{reverse("stock:receipt_escpos", kwargs={"pk": self.sale.pk})}"')
+        self.assertContains(response, 'data-auto="1"')
+        self.assertContains(response, "window.print()")
+        height = pos58.height_mm(pos58.receipt_image(self.sale))
+        self.assertContains(response, f"@page {{ size: 58mm {height:.1f}mm; margin: 0; }}")
+        self.assertNotContains(self.client.get(url), 'data-auto="1"')
 
     def test_logo_is_one_bit_and_thermal_width(self):
         response = self.client.get(reverse("stock:receipt_logo"))

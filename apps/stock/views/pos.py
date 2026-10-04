@@ -1,7 +1,6 @@
 """Kasa (POS), satış listesi, fiş ve tahsilat ekranları."""
 
 from django.contrib import messages
-from django.contrib.staticfiles import finders
 from django.db.models import F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,13 +9,12 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
-from apps.sitecore.models import SiteSettings
-
 from .. import cart as cart_utils
-from .. import services
+from .. import pos58, services
 from ..forms import PaymentForm
 from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem
-from ..receipt_logo import monochrome_logo
+from ..niimbot import to_png
+from ..receipt_logo import current_logo
 from ..templatetags.stock_extras import tl
 from ..utils import MONEY_MAX, parse_money, trfold
 from .base import (
@@ -334,34 +332,36 @@ def sale_detail(request, pk):
 
 @panel_required
 def receipt(request, pk):
+    """Fiş sayfası. Fişin kendisi pos58.py'de çizilen görsel; sayfa onu gösterir,
+    USB'den (WebUSB) ya da tarayıcının yazdırma penceresiyle basar."""
     sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
     return render(request, "stock/receipt.html", {
         "sale": sale,
-        "items": sale.items.filter(returned_at__isnull=True),
-        "trade_ins": sale.trade_ins.all(),
-        # Fişte giriş sırasıyla: "Nakit 500, Kredi Kartı 500" kasada yazıldığı gibi.
-        "payments": sale.payments.order_by("paid_at", "id"),
+        # @page yüksekliği: tarayıcıyla basarken kâğıt fiş boyu kadar ilerlesin.
+        # Nokta ile biçimlenir; şablon yerelleştirmesi virgül koyardı.
+        "height_mm": f"{pos58.height_mm(pos58.receipt_image(sale)):.1f}",
         "auto": request.GET.get("auto") == "1",
     })
 
 
 @panel_required
-def receipt_logo(request):
-    """Fişin üstündeki siyah-beyaz logo (Panel → Site Ayarları → Fiş Logosu).
+def receipt_png(request, pk):
+    sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
+    return HttpResponse(to_png(pos58.receipt_image(sale)), content_type="image/png")
 
-    Yüklenen dosya diskte yoksa ya da resim değilse site logosuna düşülür:
-    bozuk bir yükleme fiş basmayı engellememeli.
-    """
-    upload = SiteSettings.load().receipt_logo
-    png = None
-    if upload:
-        try:
-            png = monochrome_logo(upload.path)
-        except (OSError, ValueError):
-            png = None
-    if png is None:
-        png = monochrome_logo(finders.find("img/logo.png"))
-    return HttpResponse(png, content_type="image/png")
+
+@panel_required
+def receipt_escpos(request, pk):
+    """POS58'e olduğu gibi gönderilen ESC/POS baytları (static/js/pos58.js)."""
+    sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
+    return HttpResponse(pos58.escpos(pos58.receipt_image(sale)),
+                        content_type="application/octet-stream")
+
+
+@panel_required
+def receipt_logo(request):
+    """Fişin üstündeki siyah-beyaz logo (Panel → Site Ayarları → Fiş Logosu)."""
+    return HttpResponse(to_png(current_logo()), content_type="image/png")
 
 
 @panel_required
