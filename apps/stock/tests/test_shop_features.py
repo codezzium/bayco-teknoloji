@@ -183,35 +183,25 @@ class ReceiptTests(ScreenTestCase):
                     (image.width - pos58.PAD, 0, image.width, image.height)):
             self.assertEqual(image.crop(box).getextrema(), (255, 255))
 
-    def test_escpos_is_raster_bands_and_feed(self):
-        image = Image.new("1", (384, 300), 255)
-        image.putpixel((0, 0), 0)
-        data = pos58.escpos(image)
-        self.assertTrue(data.startswith(b"\x1b@\x1dv0\x00" + bytes([48, 0, 128, 0])))
-        # Siyah nokta = 1, en soldaki nokta en yüksek bit.
-        self.assertEqual(data[10], 0x80)
-        self.assertEqual(data[11:10 + 48], bytes(47))
-        self.assertEqual(data.count(b"\x1dv0\x00"), 3)  # 128 + 128 + 44 satır
-        self.assertTrue(data.endswith(b"\x1bJ" + bytes([mm_to_px(pos58.FEED_MM)])))
-        self.assertEqual(len(data), 2 + 3 * 8 + 300 * 48 + 3)
+    def test_image_ends_with_tear_off_space(self):
+        image = pos58.receipt_image(self.sale)
+        tail = mm_to_px(pos58.FEED_MM)
+        self.assertEqual(image.crop((0, image.height - tail, image.width, image.height))
+                         .getextrema(), (255, 255))
+        # Hemen üstünde son satır ("Mali değeri yoktur.") basılı.
+        self.assertEqual(image.crop((0, image.height - tail - 20, image.width,
+                                     image.height - tail)).getextrema()[0], 0)
 
-    def test_escpos_endpoint_matches_the_image(self):
-        response = self.client.get(reverse("stock:receipt_escpos", kwargs={"pk": self.sale.pk}))
-        self.assertEqual(response["Content-Type"], "application/octet-stream")
-        self.assertEqual(response.content, pos58.escpos(pos58.receipt_image(self.sale)))
-
-    def test_page_offers_usb_and_browser_printing(self):
+    def test_page_prints_the_image_with_the_browser(self):
         url = reverse("stock:receipt", kwargs={"pk": self.sale.pk})
         response = self.client.get(url + "?auto=1")
-        self.assertContains(response, "js/pos58.js")
         self.assertContains(response, reverse("stock:receipt_png", kwargs={"pk": self.sale.pk}))
-        self.assertContains(
-            response, f'data-url="{reverse("stock:receipt_escpos", kwargs={"pk": self.sale.pk})}"')
-        self.assertContains(response, 'data-auto="1"')
-        self.assertContains(response, "window.print()")
+        self.assertContains(response, 'onclick="window.print()"')
+        self.assertContains(response, "setTimeout(window.print, 250)")
         height = pos58.height_mm(pos58.receipt_image(self.sale))
         self.assertContains(response, f"@page {{ size: 58mm {height:.1f}mm; margin: 0; }}")
-        self.assertNotContains(self.client.get(url), 'data-auto="1"')
+        self.assertNotContains(response, "pos58.js")
+        self.assertNotContains(self.client.get(url), "setTimeout(window.print, 250)")
 
     def test_logo_is_one_bit_and_thermal_width(self):
         response = self.client.get(reverse("stock:receipt_logo"))

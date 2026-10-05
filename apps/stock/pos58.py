@@ -1,18 +1,16 @@
-"""POS58 termal fiş yazıcısı: fiş görseli ve ESC/POS komutları.
+"""POS58 termal fiş görseli.
 
-Fiş burada 1-bit görsel olarak çizilir; aynı görsel hem fiş sayfasında
-gösterilir (tarayıcıyla yazdırma) hem de ESC/POS raster olarak yazıcıya
-gider (static/js/pos58.js, WebUSB). Tasarım tek yerde kalır, iki baskı yolu
-birbirinden ayrışamaz.
+Fiş burada 1-bit görsel olarak çizilir; fiş sayfası (templates/stock/receipt.html)
+onu 48 mm genişlikte gösterir ve tarayıcının yazdırma penceresiyle POS58'in
+Windows sürücüsüne basar. Görsel yazıcının nokta ızgarasına birebir oturur:
+sürücü griyi noktalarla taklit etmez (dither), ince yazı bozulmaz.
 
 Yazıcı (STMicroelectronics "POS58 Printer USB", USB 0416):
 - 58 mm rulo, kafa 48 mm = 384 nokta, 203 dpi (1 nokta = 0.125 mm).
-- Yazı yazıcının kendi fontuyla basılmaz: kod sayfası modele göre değişiyor
-  ve Türkçe harfler / ₺ güvenilir çıkmıyor. Her şey görsel.
-- Kafadan yırtma dişine ~15 mm var; fiş sonunda o kadar kâğıt ilerletilir.
+- Kafadan yırtma dişine ~15 mm var; fişin altına o kadar boşluk eklenir.
 
-Donanımda doğrulandı (2026-10-04, ham baskı): 384 noktanın tamamı basılıyor,
-128 satırlık şeritler arasında boşluk yok, varsayılan koyuluk yeterli.
+Donanımda doğrulandı (2026-10-04, ham ESC/POS baskı): 384 noktanın tamamı
+basılıyor, varsayılan koyuluk yeterli, 15 mm boşluk son satırı dişten geçiriyor.
 """
 
 from dataclasses import dataclass
@@ -30,10 +28,9 @@ WIDTH = 384
 #: Kenarda boş bırakılan nokta. Kafa 384 noktanın hepsini basıyor; bu yalnızca
 #: rulo yana kaydığında yazının kâğıttan taşmaması için.
 PAD = 8
+#: Fişin altındaki boşluk: kâğıt bu kadar ilerlemezse son satır yazıcının içinde
+#: kalır, yırtınca kesilir.
 FEED_MM = 15
-#: Bir GS v 0 komutundaki satır sayısı. Ucuz kartlar uzun görseli tek komutta
-#: alınca arabelleği taşırıp çöp basabiliyor.
-BAND_ROWS = 128
 
 SIZES = {"title": 32, "info": 28, "total": 28, "body": 23, "small": 21, "foot": 20}
 
@@ -225,39 +222,9 @@ def render_receipt(lines: list[Line], logo: Image.Image | None = None) -> Image.
 
 
 def receipt_image(sale) -> Image.Image:
-    return render_receipt(receipt_lines(sale))
+    return render_receipt(receipt_lines(sale) + [Line("gap", space=mm_to_px(FEED_MM))])
 
 
 def height_mm(image: Image.Image) -> float:
     return image.height * 25.4 / DPI
 
-
-# ---------------------------------------------------------------------------
-# ESC/POS
-# ---------------------------------------------------------------------------
-
-def escpos(image: Image.Image, feed_mm: float = FEED_MM) -> bytes:
-    """ESC @ + GS v 0 raster şeritleri + ESC J ilerletme.
-
-    Yazıcı bu baytları olduğu gibi basar; sürücü gerekmez.
-    """
-    image = image.convert("1")
-    if image.width % 8:
-        padded = Image.new("1", ((image.width + 7) // 8 * 8, image.height), 255)
-        padded.paste(image, (0, 0))
-        image = padded
-    row_bytes = image.width // 8
-
-    out = bytearray(b"\x1b@")  # ESC @: yazıcıyı sıfırla
-    for top in range(0, image.height, BAND_ROWS):
-        band = image.crop((0, top, image.width, min(top + BAND_ROWS, image.height)))
-        # PIL'de 1 = beyaz, ESC/POS'ta 1 = basılan nokta.
-        data = bytes(b ^ 0xFF for b in band.tobytes())
-        out += b"\x1dv0\x00" + row_bytes.to_bytes(2, "little") \
-            + band.height.to_bytes(2, "little") + data
-
-    feed = mm_to_px(feed_mm)
-    while feed > 0:  # ESC J n: n nokta ilerlet (n ≤ 255)
-        out += b"\x1bJ" + bytes([min(feed, 255)])
-        feed -= 255
-    return bytes(out)

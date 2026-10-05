@@ -59,7 +59,6 @@ urlpatterns = [
     path("satislar/<int:pk>/", pos.sale_detail, name="sale_detail"),
     path("satislar/<int:pk>/fis/", pos.receipt, name="receipt"),
     path("satislar/<int:pk>/fis.png", pos.receipt_png, name="receipt_png"),
-    path("satislar/<int:pk>/fis.bin", pos.receipt_escpos, name="receipt_escpos"),
     path("satislar/fis-logo.png", pos.receipt_logo, name="receipt_logo"),
     path("satislar/<int:pk>/odeme/", pos.sale_payment, name="sale_payment"),
     path("satislar/<int:pk>/iptal/", pos.sale_void, name="sale_void"),

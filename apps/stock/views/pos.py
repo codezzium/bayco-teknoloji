@@ -332,8 +332,8 @@ def sale_detail(request, pk):
 
 @panel_required
 def receipt(request, pk):
-    """Fiş sayfası. Fişin kendisi pos58.py'de çizilen görsel; sayfa onu gösterir,
-    USB'den (WebUSB) ya da tarayıcının yazdırma penceresiyle basar."""
+    """Fiş sayfası. Fişin kendisi pos58.py'de çizilen görsel; sayfa onu gösterir
+    ve tarayıcının yazdırma penceresiyle basar."""
     sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
     return render(request, "stock/receipt.html", {
         "sale": sale,
@@ -348,14 +348,6 @@ def receipt(request, pk):
 def receipt_png(request, pk):
     sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
     return HttpResponse(to_png(pos58.receipt_image(sale)), content_type="image/png")
-
-
-@panel_required
-def receipt_escpos(request, pk):
-    """POS58'e olduğu gibi gönderilen ESC/POS baytları (static/js/pos58.js)."""
-    sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
-    return HttpResponse(pos58.escpos(pos58.receipt_image(sale)),
-                        content_type="application/octet-stream")
 
 
 @panel_required

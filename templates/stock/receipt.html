@@ -1,4 +1,4 @@
-{% load static %}<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -9,13 +9,14 @@
    planı ve tam ekran gradient'i siyah sayfa bastırır.
 
    Fişin kendisi apps/stock/pos58.py'de 384 noktalık (48 mm, 203 dpi) görsel olarak
-   çizilir; USB'den basılan da tarayıcıyla basılan da aynı görseldir. {% endcomment %}
+   çizilir; sayfa onu gösterir ve yazdırma penceresiyle POS58'e basar. {% endcomment %}
 <style>
-  /* 58 mm kâğıt; kafa ortadaki 48 mm'yi basar, iki yanda 5 mm. Yükseklik fişin boyu:
-     sürücü fiş bitince boş kâğıt ilerletmesin. */
+  /* 58 mm kâğıt; kafa ortadaki 48 mm'yi basar, iki yanda 5 mm. Yükseklik fişin boyu
+     (yırtma payı dahil): sürücü fiş bitince boş kâğıt ilerletmesin.
+     Yazdırma penceresinde: Kenar boşlukları "Yok", Ölçek "Varsayılan". */
   @page { size: 58mm {{ height_mm }}mm; margin: 0; }
   html, body { margin:0; padding:0; background:#fff; }
-  .receipt { display:block; width:48mm; height:auto; margin:0 5mm;
+  .receipt { display:block; width:48mm; height:auto; margin:0 auto;
              image-rendering:pixelated; }
   @media screen {
     body { background:#2a1b40; padding:24px; font:14px system-ui,sans-serif; color:#fff; }
@@ -26,28 +27,23 @@
     .bar button, .bar a { font:600 14px system-ui,sans-serif; padding:9px 18px;
       border-radius:999px; border:0; cursor:pointer; text-decoration:none;
       background:#b4357f; color:#fff; margin:4px; display:inline-block; }
-    .bar button:disabled { opacity:.5; cursor:default; }
     .bar .alt { background:rgba(255,255,255,.15); }
-    .status { text-align:center; min-height:1.4em; margin:0 0 12px; font-size:13px; opacity:.85; }
-    .status.err { color:#ffb4c8; opacity:1; }
   }
   @media print { .no-print { display:none !important; } }
 </style>
 </head>
 <body>
 <div class="bar no-print">
-  {# POS58'e USB ile doğrudan baskı (static/js/pos58.js); yalnızca Chrome / Edge. #}
-  <button type="button" data-pos58-print
-          data-url="{% url 'stock:receipt_escpos' pk=sale.pk %}"{% if auto %} data-auto="1"{% endif %}>Fiş Yazıcısına Bas</button>
-  <button type="button" class="alt" onclick="window.print()">Tarayıcıyla Yazdır</button>
+  <button type="button" onclick="window.print()">Yazdır</button>
   <a class="alt" href="{% url 'stock:sale_detail' pk=sale.pk %}">Geri</a>
 </div>
-<p class="status no-print" data-pos58-status role="status"></p>
 
 <div class="paper">
   <img class="receipt" src="{% url 'stock:receipt_png' pk=sale.pk %}" alt="Fiş {{ sale.receipt_no }}">
 </div>
 
-<script src="{% static 'js/pos58.js' %}"></script>
+{% if auto %}
+<script>window.addEventListener("load", function () { setTimeout(window.print, 250); });</script>
+{% endif %}
 </body>
 </html>
