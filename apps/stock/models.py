@@ -261,6 +261,12 @@ class Device(models.Model):
                                    editable=False, db_index=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
                                    null=True, blank=True, related_name="+")
+    # updated_at'i değiştiren son kişi ("Son İşlem Gören Ürünler"de gösterilir).
+    # save() kullanıcıyı bilemez; her yazma yolu (servisler, formlar, admin)
+    # kendisi atar ve update_fields'a ekler.
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                   null=True, blank=True, editable=False,
+                                   related_name="+", verbose_name="Son İşlemi Yapan")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -458,6 +464,10 @@ class Accessory(models.Model):
     is_active = models.BooleanField("Aktif", default=True)
     search_blob = models.CharField(max_length=400, blank=True, default="",
                                    editable=False, db_index=True)
+    # Device.updated_by ile aynı sözleşme.
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                   null=True, blank=True, editable=False,
+                                   related_name="+", verbose_name="Son İşlemi Yapan")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

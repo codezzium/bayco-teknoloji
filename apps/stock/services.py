@@ -121,7 +121,7 @@ def resolve_scan(raw_code: str):
 
 @transaction.atomic
 def create_device(*, user=None, **fields) -> Device:
-    device = Device(created_by=user, **fields)
+    device = Device(created_by=user, updated_by=user, **fields)
     device.full_clean(exclude=["stock_code", "warranty_end", "search_blob"])
     device.save()
     DeviceStatusLog.objects.create(
@@ -155,7 +155,8 @@ def set_device_status(device: Device, new_status: str, *, user=None, note="",
 
     old = device.status
     device.status = new_status
-    device.save(update_fields=["status", "updated_at"])
+    device.updated_by = user
+    device.save(update_fields=["status", "updated_by", "updated_at"])
     DeviceStatusLog.objects.create(
         device=device, from_status=old, to_status=new_status,
         sale=sale, note=note[:200], created_by=user,
@@ -177,16 +178,22 @@ def _current_balance(accessory: Accessory) -> int:
         t=Coalesce(Sum("quantity"), Value(0)))["t"]
 
 
-def _resync_accessory_qty(accessory: Accessory) -> int:
+def _resync_accessory_qty(accessory: Accessory, *, user=None) -> int:
     """Accessory.stock_qty'nin TEK yazarı.
 
     Defterden yeniden toplar — asla artırımlı çalışmaz. Bu sayede önbellek
     kendi kendini onarır; kaçırılmış bir azaltma diye bir hata sınıfı kalmaz.
+
+    `user` yoksa (onarım komutu) son işlemi yapan kişiye dokunulmaz.
     """
     balance = _current_balance(accessory)
     if accessory.stock_qty != balance:
         accessory.stock_qty = balance
-        accessory.save(update_fields=["stock_qty", "updated_at"])
+        fields = ["stock_qty", "updated_at"]
+        if user is not None:
+            accessory.updated_by = user
+            fields.append("updated_by")
+        accessory.save(update_fields=fields)
     return balance
 
 
@@ -205,7 +212,7 @@ def _record_movement(accessory: Accessory, quantity: int, reason: str, *,
         unit_cost=unit_cost, sale_item=sale_item, balance_after=balance,
         note=note[:200], created_by=user,
     )
-    _resync_accessory_qty(accessory)
+    _resync_accessory_qty(accessory, user=user)
     return movement
 
 
@@ -223,7 +230,8 @@ def receive_accessory_stock(accessory: Accessory, quantity: int, *, user=None,
     # satırlar unit_cost snapshot'ı taşıdığı için eski kâr rakamları bozulmaz.
     if unit_cost is not None and unit_cost != accessory.cost:
         accessory.cost = unit_cost
-        accessory.save(update_fields=["cost", "updated_at"])
+        accessory.updated_by = user
+        accessory.save(update_fields=["cost", "updated_by", "updated_at"])
     return movement
 
 
@@ -442,9 +450,10 @@ def _sell_device(device: Device, *, sale: Sale, item: SaleItem, user) -> None:
     if device.warranty_months and not device.warranty_start:
         device.warranty_start = sold_date
     device.status = Device.Status.SATILDI
+    device.updated_by = user
     device.save(update_fields=["sold_to", "sold_at", "sold_price", "days_in_stock",
                                "warranty_start", "warranty_end", "status",
-                               "search_blob", "updated_at"])
+                               "search_blob", "updated_by", "updated_at"])
     DeviceStatusLog.objects.create(
         device=device, from_status=Device.Status.STOKTA,
         to_status=Device.Status.SATILDI, sale=sale,
@@ -504,11 +513,14 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
         purchase_price=amount,
         acquisition=Device.Acquisition.TAKAS,
         created_by=user,
+        updated_by=user,
     )
     note = f"Takas girişi — fiş {sale.receipt_no}"
     if previous:
         _move_identifiers(previous, device)
-        previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_at"])
+        previous.updated_by = user
+        previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_by",
+                                     "updated_at"])
         device.color = device.color or previous.color
         device.storage = device.storage or previous.storage
         note = f"{note} · önceki kayıt {previous.stock_code}"
@@ -601,8 +613,9 @@ def return_sale_item(item: SaleItem, *, user=None, reason="", refund=True) -> Sa
         device.sold_at = None
         device.sold_price = None
         device.days_in_stock = None
+        device.updated_by = user
         device.save(update_fields=["status", "sold_to", "sold_at", "sold_price",
-                                   "days_in_stock", "updated_at"])
+                                   "days_in_stock", "updated_by", "updated_at"])
         DeviceStatusLog.objects.create(
             device=device, from_status=Device.Status.SATILDI,
             to_status=Device.Status.STOKTA, sale=item.sale,
@@ -661,7 +674,9 @@ def void_sale(sale: Sale, *, user=None, reason: str = "") -> Sale:
         device.delete()
         if previous:
             _move_identifiers(device, previous)
-            previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_at"])
+            previous.updated_by = user
+            previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_by",
+                                         "updated_at"])
             DeviceStatusLog.objects.create(
                 device=previous, from_status=previous.status, to_status=previous.status,
                 sale=sale, note="Takas fişi iptal edildi, IMEI geri alındı",
@@ -870,7 +885,8 @@ def publish_device_to_site(device: Device, *, user=None) -> Product:
 
     if device.published_product_id != product.pk:
         device.published_product = product
-        device.save(update_fields=["published_product", "updated_at"])
+        device.updated_by = user
+        device.save(update_fields=["published_product", "updated_by", "updated_at"])
     return product
 
 

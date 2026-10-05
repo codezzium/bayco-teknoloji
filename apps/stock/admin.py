@@ -35,6 +35,14 @@ class MoneyGatedAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
 
+class StampUpdatedByAdmin(MoneyGatedAdmin):
+    """Admin'den yapılan düzenleme de "Son İşlemi Yapan"ı günceller."""
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
+
+
 @admin.register(DeviceModel)
 class DeviceModelAdmin(admin.ModelAdmin):
     list_display = ("brand", "name", "kind", "is_active")
@@ -57,7 +65,7 @@ class ContactAdmin(admin.ModelAdmin):
 
 
 @admin.register(Device)
-class DeviceAdmin(MoneyGatedAdmin):
+class DeviceAdmin(StampUpdatedByAdmin):
     list_display = ("stock_code", "device_model", "status", "imei1", "sold_at")
     list_filter = ("status", "condition", "acquisition", "device_model__brand")
     search_fields = ("stock_code", "imei1", "imei2", "serial_no")
@@ -66,7 +74,7 @@ class DeviceAdmin(MoneyGatedAdmin):
 
 
 @admin.register(Accessory)
-class AccessoryAdmin(MoneyGatedAdmin):
+class AccessoryAdmin(StampUpdatedByAdmin):
     list_display = ("sku", "name", "variant", "stock_qty", "price", "is_active")
     list_filter = ("is_active", "category", "brand")
     search_fields = ("sku", "barcode", "name", "variant")

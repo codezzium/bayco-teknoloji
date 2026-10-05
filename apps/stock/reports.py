@@ -448,16 +448,20 @@ def recent_products(limit=20) -> list[dict]:
     Dönen satırlarda PARA YOKTUR (durum rozeti, adet ve "N önce" yeter). Bu
     bilinçlidir: can_see_money + defer("purchase_price", "sold_price") kalıbına
     hiç gerek kalmaz, Personel rolüne maliyet sızma yolu açılmaz.
+
+    `by`: o `updated_at`'i yazan kişi (updated_by); bilinmiyorsa None.
     """
     devices = (Device.objects
-               .select_related("device_model__brand")
+               .select_related("device_model__brand", "updated_by")
                .order_by("-updated_at")[:limit])
     accessories = (Accessory.objects
-                   .select_related("brand")
+                   .select_related("brand", "updated_by")
                    .order_by("-updated_at")[:limit])
 
-    rows = [{"kind": "cihaz", "device": d, "at": d.updated_at} for d in devices]
-    rows += [{"kind": "aksesuar", "accessory": a, "at": a.updated_at}
+    rows = [{"kind": "cihaz", "device": d, "at": d.updated_at, "by": d.updated_by}
+            for d in devices]
+    rows += [{"kind": "aksesuar", "accessory": a, "at": a.updated_at,
+              "by": a.updated_by}
              for a in accessories]
     rows.sort(key=lambda row: row["at"], reverse=True)
     return rows[:limit]

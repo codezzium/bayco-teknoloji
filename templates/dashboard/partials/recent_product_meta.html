@@ -1,0 +1,9 @@
+{% comment %} recent_product_row.html'in sağ sütunu: ne zaman + kim.
+   row.by boşsa (eski kayıt, sistem işlemi) kişi satırı hiç çizilmez. {% endcomment %}
+<div class="shrink-0 text-right text-xs" style="color:var(--muted)">
+  <div title="{{ row.at|date:'d.m.Y H:i' }}">{{ row.at|timesince }} önce</div>
+  {% if row.by %}
+  <div class="mt-0.5 truncate" style="max-width:9rem;color:var(--ink)"
+       title="İşlemi yapan: {{ row.by.get_full_name|default:row.by.username }}">👤 {{ row.by.get_full_name|default:row.by.username }}</div>
+  {% endif %}
+</div>

@@ -146,6 +146,7 @@ def device_form(request, pk=None):
             device = form.save(commit=False)
             if instance is None:
                 device.created_by = request.user
+            device.updated_by = request.user
             try:
                 device.full_clean(exclude=["stock_code", "warranty_end",
                                            "search_blob", "created_by"])
@@ -318,6 +319,7 @@ def accessory_form(request, pk=None):
         form = AccessoryForm(request.POST, instance=instance, user=request.user,
                              back_url=back)
         if form.is_valid():
+            form.instance.updated_by = request.user
             accessory = form.save()
             opening = form.cleaned_data.get("opening_qty") or 0
             if instance is None and opening > 0:

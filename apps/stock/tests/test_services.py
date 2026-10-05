@@ -441,3 +441,26 @@ class PublishTests(StockTestCase):
         services.set_device_status(device, Device.Status.SERVISTE, user=self.user)
         with self.assertRaises(services.StockError):
             services.publish_device_to_site(device, user=self.user)
+
+
+class RecentProductsTests(StockTestCase):
+    def test_last_actor_is_recorded_and_listed(self):
+        device = self.make_device()
+        accessory = self.make_accessory(qty=5)
+        self.assertEqual(device.updated_by, self.user)
+        self.assertEqual(accessory.updated_by, self.user)
+
+        kasiyer = User.objects.create_user("kasiyer", password="x",
+                                           first_name="Ayşe", last_name="Kaya")
+        cart = {"customer_id": self.customer.pk,
+                "lines": [{"lid": "d", "kind": "cihaz", "id": device.pk,
+                           "name": device.label, "qty": 1, "unit": "18500"},
+                          {"lid": "a", "kind": "aksesuar", "id": accessory.pk,
+                           "name": accessory.name, "qty": 1, "unit": "150.90"}]}
+        services.create_sale_from_cart(cart, user=kasiyer)
+
+        from apps.stock.reports import recent_products
+        by = {(row["kind"], (row.get("device") or row.get("accessory")).pk): row["by"]
+              for row in recent_products()}
+        self.assertEqual(by[("cihaz", device.pk)], kasiyer)
+        self.assertEqual(by[("aksesuar", accessory.pk)], kasiyer)

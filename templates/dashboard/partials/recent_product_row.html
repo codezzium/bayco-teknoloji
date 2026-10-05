@@ -1,5 +1,5 @@
 {% comment %} Genel Bakış'taki "Son İşlem Gören Ürünler" listesinin tek satırı.
-   Bekler: row = {kind, device|accessory, at} (stock.reports.recent_products).
+   Bekler: row = {kind, device|accessory, at, by} (stock.reports.recent_products).
 
    stock/partials/device_row.html ve accessory_row.html KULLANILAMAZ: ikisi de
    dışarıdaki etiket yazdırma formuna (form="lblform") bağlı bir checkbox
@@ -14,8 +14,7 @@
       {% include "stock/partials/status_badge.html" with device=row.device %}
     </div>
   </div>
-  <span class="shrink-0 text-xs" style="color:var(--muted)"
-        title="{{ row.at|date:'d.m.Y H:i' }}">{{ row.at|timesince }} önce</span>
+  {% include "dashboard/partials/recent_product_meta.html" %}
 </a>
 {% else %}
 <a href="{% url 'stock:accessory_detail' pk=row.accessory.pk %}"
@@ -30,7 +29,6 @@
       </span>
     </div>
   </div>
-  <span class="shrink-0 text-xs" style="color:var(--muted)"
-        title="{{ row.at|date:'d.m.Y H:i' }}">{{ row.at|timesince }} önce</span>
+  {% include "dashboard/partials/recent_product_meta.html" %}
 </a>
 {% endif %}
