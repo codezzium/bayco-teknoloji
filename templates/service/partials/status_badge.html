@@ -1,0 +1,4 @@
+{% load service_extras %}
+{% comment %} Servis kaydı ya da teknik servis işi durumu. Parametreler: status, label {% endcomment %}
+{% service_tone status as tone %}
+<span class="chip shrink-0" style="font-size:11px;background:{{ tone.0 }};color:{{ tone.1 }};border-color:{{ tone.2 }}">{{ label }}</span>

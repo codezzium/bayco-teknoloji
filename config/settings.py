@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.dashboard",
     "apps.stock",
     "apps.staff",
+    "apps.service",
 ]
 
 MIDDLEWARE = [

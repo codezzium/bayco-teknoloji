@@ -43,7 +43,7 @@ SIZES = {"title": 32, "info": 28, "total": 28, "body": 23, "small": 21, "foot": 
 class Line:
     """Fişin bir satırı.
 
-    kind: "logo" | "center" | "row" | "text" | "rule" | "gap"
+    kind: "logo" | "center" | "row" | "text" | "rule" | "gap" | "image"
     """
 
     kind: str
@@ -53,6 +53,7 @@ class Line:
     bold: bool = False
     dashed: bool = True  # rule
     space: int = 0       # gap: nokta
+    image: Image.Image | None = None  # image: ortalanır (servis fişindeki QR)
 
 
 def _row(left, right, size="body", bold=False):
@@ -175,6 +176,11 @@ def _draw_line(line: Line, logo: Image.Image) -> Image.Image:
         return image
     if line.kind == "gap":
         return _strip(line.space)[0]
+    if line.kind == "image":
+        picture = line.image.convert("1")
+        image, _ = _strip(picture.height)
+        image.paste(picture, ((WIDTH - picture.width) // 2, 0))
+        return image
     if line.kind == "rule":
         image, draw = _strip(18)
         y = 8

@@ -4,12 +4,15 @@
 <meta charset="UTF-8">
 {# Müşteri satış verisi içerir — arama motoruna kesinlikle girmemeli. #}
 <meta name="robots" content="noindex, nofollow">
-<title>Fiş {{ sale.receipt_no }}</title>
+<title>{{ doc_title }}</title>
 {% comment %} Bağımsız sayfa — dashboard/base.html extend EDİLMEZ: o şablonun koyu arka
    planı ve tam ekran gradient'i siyah sayfa bastırır.
 
    Fişin kendisi apps/stock/pos58.py'de 384 noktalık (48 mm, 203 dpi) görsel olarak
-   çizilir; sayfa onu gösterir ve yazdırma penceresiyle POS58'e basar. {% endcomment %}
+   çizilir; sayfa onu gösterir ve yazdırma penceresiyle POS58'e basar.
+
+   Satış fişi ve teknik servis fişi aynı sayfayı kullanır: görsel adresi (png_url),
+   geri dönüş adresi (back_url) ve başlık (doc_title) view'dan gelir. {% endcomment %}
 <style>
   /* 58 mm kâğıt; kafa ortadaki 48 mm'yi basar, iki yanda 5 mm. Yükseklik fişin boyu
      (yırtma payı dahil): sürücü fiş bitince boş kâğıt ilerletmesin.
@@ -35,11 +38,11 @@
 <body>
 <div class="bar no-print">
   <button type="button" onclick="window.print()">Yazdır</button>
-  <a class="alt" href="{% url 'stock:sale_detail' pk=sale.pk %}">Geri</a>
+  <a class="alt" href="{{ back_url }}">Geri</a>
 </div>
 
 <div class="paper">
-  <img class="receipt" src="{% url 'stock:receipt_png' pk=sale.pk %}" alt="Fiş {{ sale.receipt_no }}">
+  <img class="receipt" src="{{ png_url }}" alt="{{ doc_title }}">
 </div>
 
 {% if auto %}

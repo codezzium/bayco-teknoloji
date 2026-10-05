@@ -388,6 +388,9 @@ def receipt(request, pk):
     sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
     return render(request, "stock/receipt.html", {
         "sale": sale,
+        "doc_title": f"Fiş {sale.receipt_no}",
+        "png_url": reverse("stock:receipt_png", kwargs={"pk": sale.pk}),
+        "back_url": reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
         # @page yüksekliği: tarayıcıyla basarken kâğıt fiş boyu kadar ilerlesin.
         # Nokta ile biçimlenir; şablon yerelleştirmesi virgül koyardı.
         "height_mm": f"{pos58.height_mm(pos58.receipt_image(sale)):.1f}",

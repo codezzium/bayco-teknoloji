@@ -61,6 +61,8 @@ def overview(request):
 
 @access_required("reports")
 def reports(request):
+    from apps.service import reports as service_rpt
+
     key, start, end = _period(request)
     return render(request, "stock/reports.html", {
         "active": "rapor",
@@ -78,6 +80,8 @@ def reports(request):
         "receivables_total": rpt.receivables_total(),
         "overdue": rpt.overdue_receivables().select_related("customer")[:10],
         "chart": rpt.revenue_series(12),
+        # Teknik servis kârı mağaza Net Kârı'na EKLENMEZ; kendi kartında durur.
+        "service": service_rpt.report_widget(start, end),
         "show_money": True,
     })
 

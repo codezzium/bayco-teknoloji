@@ -58,6 +58,24 @@ LABELS = {
     "stock:stocktake_mark": "Sayımda ürün okuttu",
     "stock:stocktake_finish": "Sayımı bitirdi",
     "stock:stocktake_clear": "Sayımı temizledi",
+    # --- Teknik servis ---
+    "service:ticket_create": "Servis kaydı açtı",
+    "service:ticket_edit": "Servis kaydını düzenledi",
+    "service:ticket_status": "Servis durumunu değiştirdi",
+    "service:ticket_payment": "Servis ödemesi kaydetti",
+    "service:ticket_close": "Servis cihazını teslim etti/iade etti",
+    "service:ticket_reopen": "Servis kaydını yeniden açtı",
+    "service:ticket_delete": "Servis kaydını sildi",
+    "service:cost_add": "Servise maliyet ekledi",
+    "service:cost_delete": "Servis maliyetini sildi",
+    "service:outsource_send": "Cihazı teknik servise gönderdi",
+    "service:outsource_return": "Teknik servisten dönüşü kaydetti",
+    "service:outsource_cost": "Teknik servis bedelini değiştirdi",
+    "service:outsource_cancel": "Teknik servis gönderimini iptal etti",
+    "service:shop_create": "Teknik servis ekledi",
+    "service:shop_edit": "Teknik servisi düzenledi",
+    "service:shop_payment": "Teknik servise ödeme yaptı",
+    "service:shop_payment_delete": "Teknik servis ödemesini sildi",
     # --- Site içeriği ---
     "dashboard:crud_create": "{singular} ekledi",
     "dashboard:crud_edit": "{singular} düzenledi",
@@ -126,6 +144,13 @@ READ_ONLY = {
     "stock:niimbot_png": "Etiket görseli",
     "stock:reports": "Raporlar",
     "stock:staff_report": "Personel raporu",
+    "service:ticket_list": "Servis Kayıtları",
+    "service:ticket_detail": "Servis kaydı",
+    "service:ticket_pdf": "Servis kabul formu (PDF)",
+    "service:ticket_slip": "Servis fişi",
+    "service:ticket_slip_png": "Servis fişi görseli",
+    "service:shop_list": "Teknik Servisler",
+    "service:shop_detail": "Teknik servis ekstresi",
     "staff:list": "Personel",
     "staff:logs": "Hareket Kayıtları",
     "staff:notifications": "Bildirimler",
@@ -143,6 +168,9 @@ FORM_PAGES = {
     "stock:contact_quick": "Cari ekleme",
     "stock:expense_create": "Gider ekleme", "stock:expense_edit": "Gider düzenleme",
     "stock:sale_seller_change": "Satıcı değiştirme",
+    "service:ticket_create": "Servis kaydı açma",
+    "service:ticket_edit": "Servis kaydı düzenleme",
+    "service:shop_create": "Teknik servis ekleme", "service:shop_edit": "Teknik servis düzenleme",
     "dashboard:crud_create": "{title}", "dashboard:crud_edit": "{title}",
     "dashboard:settings": "Site Ayarları",
     "staff:create": "Personel ekleme", "staff:edit": "Personel düzenleme",
@@ -182,6 +210,8 @@ def _target_model(view_name, kwargs):
     name = view_name.split(":", 1)[-1]
     if view_name == "staff:edit":
         return get_user_model()
+    if view_name.startswith("service:"):
+        return _service_model(name)
     for prefix, model in (("device_", Device), ("sell_device", Device),
                           ("accessory_", Accessory), ("sale_", Sale),
                           ("receipt", Sale), ("contact_", Contact),
@@ -189,6 +219,27 @@ def _target_model(view_name, kwargs):
         if name.startswith(prefix):
             return model
     return None
+
+
+def _service_model(name):
+    """Teknik servis rotasındaki <pk>'nın modeli."""
+    from apps.service.models import (
+        RepairShop,
+        RepairShopPayment,
+        ServiceCost,
+        ServiceOutsource,
+        ServiceTicket,
+    )
+
+    if name == "cost_delete":
+        return ServiceCost
+    if name == "shop_payment_delete":
+        return RepairShopPayment
+    if name.startswith("shop_"):
+        return RepairShop
+    if name in ("outsource_return", "outsource_cost", "outsource_cancel"):
+        return ServiceOutsource
+    return ServiceTicket
 
 
 def _format_target(obj) -> str:
@@ -279,6 +330,11 @@ FIELD_LABELS = {
     "purchase_price": "Alış fiyatı", "cost": "Alış fiyatı",
     "imei1": "IMEI 1", "imei2": "IMEI 2", "storage": "Hafıza", "color": "Renk",
     "seller": "Satışı yapan", "to_user": "Yeni satıcı", "decision": "Karar",
+    "complaint": "Arıza", "diagnosis": "Tespit", "estimated_price": "Tahmini ücret",
+    "final_price": "Servis ücreti", "deposit": "Kapora", "deposit_method": "Kapora şekli",
+    "outcome": "Sonuç",
+    "payment": "Tahsil edilen", "next_status": "Sonraki durum", "shop": "Teknik servis",
+    "work": "Yapılacak iş", "technician": "Sorumlu",
 }
 
 

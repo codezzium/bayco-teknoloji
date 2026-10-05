@@ -1,0 +1,9 @@
+{% comment %} Salt okunur desen (servis detayı). pattern: views.pattern_preview() {% endcomment %}
+<svg viewBox="0 0 300 300" class="pattern-pad pattern-static" role="img" aria-label="Ekran deseni">
+  {% if pattern.line %}<polyline points="{{ pattern.line }}" class="pattern-line"/>{% endif %}
+  {% if pattern.start %}<circle cx="{{ pattern.start.x }}" cy="{{ pattern.start.y }}" r="27" class="pattern-start"/>{% endif %}
+  {% for dot in pattern.dots %}
+  <circle cx="{{ dot.x }}" cy="{{ dot.y }}" r="16" class="pattern-dot{% if dot.order %} on{% endif %}"/>
+  {% if dot.order %}<text x="{{ dot.x }}" y="{{ dot.y|add:5 }}" text-anchor="middle" class="pattern-order">{{ dot.order }}</text>{% endif %}
+  {% endfor %}
+</svg>

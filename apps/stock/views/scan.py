@@ -58,6 +58,11 @@ def scan_resolve(request):
     code = _scanned_code(request)
     obj = services.resolve_scan(code) if code else None
 
+    if obj is None and mode == "lookup":
+        ticket_url = _service_ticket_url(request, code)
+        if ticket_url:
+            return HttpResponse(status=204, headers={"HX-Redirect": ticket_url})
+
     if obj is None:
         return _rendered(request, "stock/partials/scan_result.html", {
             "code": code, "found": False, "mode": mode,
@@ -75,6 +80,24 @@ def scan_resolve(request):
            if isinstance(obj, Device)
            else reverse("stock:accessory_detail", kwargs={"pk": obj.pk}))
     return HttpResponse(status=204, headers={"HX-Redirect": url})
+
+
+def _service_ticket_url(request, code):
+    """Servis fişindeki / kabul formundaki QR (SRV-000123) → servis kaydı.
+
+    Yalnızca hızlı aramada: satış, stok girişi ve sayımda servis cihazı
+    (müşterinin malı) hiçbir şekilde stoğa karışmamalı.
+    """
+    from apps.service.models import ServiceTicket
+
+    from ..utils import normalize_scan
+    from .base import has_access
+
+    code = normalize_scan(code)
+    if not code.startswith("SRV-") or not has_access(request.user, "service"):
+        return ""
+    ticket = ServiceTicket.objects.filter(ticket_no__iexact=code).only("pk").first()
+    return reverse("service:ticket_detail", kwargs={"pk": ticket.pk}) if ticket else ""
 
 
 def _scan_into_cart(request, obj):

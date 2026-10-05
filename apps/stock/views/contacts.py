@@ -85,6 +85,8 @@ def contact_detail(request, pk):
         "bought": contact.bought_devices.select_related("device_model__brand")[:30],
         "open_sales": open_sales,
         "balance": balance,
+        "service_tickets": (contact.service_tickets.select_related("device_model__brand")[:30]
+                            if has_access(request.user, "service") else []),
     })
 
 
@@ -162,7 +164,9 @@ def contact_quick(request):
         request.audit = {"invalid": True}
     else:
         # Tedarikçi rolü işaretli gelir: cihaz formundan eklenen kişi bize mal satandır.
-        form = ContactForm(user=request.user, initial={"is_supplier": True},
+        # Servis kabul formundan (?rol=musteri) eklenen kişi ise cihazını tamire getirendir.
+        initial = {} if request.GET.get("rol") == "musteri" else {"is_supplier": True}
+        form = ContactForm(user=request.user, initial=initial,
                            auto_id="quick_%s", popup=True)
     return render(request, "stock/partials/quick_form.html", {
         "form": form, "title": "Yeni Cari", "field_id": field_id,
@@ -175,10 +179,10 @@ def contact_quick(request):
 def contact_delete(request, pk):
     contact = get_object_or_404(Contact, pk=pk)
     if (contact.sales.exists() or contact.supplied_devices.exists()
-            or contact.bought_devices.exists()):
+            or contact.bought_devices.exists() or contact.service_tickets.exists()):
         messages.error(
             request,
-            "Bu cariye bağlı satış/cihaz kaydı var; silinemez. "
+            "Bu cariye bağlı satış/cihaz/servis kaydı var; silinemez. "
             "Kaydı düzenleyebilir veya notunu güncelleyebilirsiniz.",
         )
         return redirect("stock:contact_detail", pk=pk)

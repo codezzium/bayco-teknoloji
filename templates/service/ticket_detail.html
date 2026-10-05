@@ -1,0 +1,380 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}{{ ticket.ticket_no }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-2 text-sm mb-5" style="color:var(--muted)">
+  <a href="{% url 'service:ticket_list' %}" class="hover:text-white">Servis Kayıtları</a>
+  <span>/</span><span style="color:var(--ink)">{{ ticket.ticket_no }}</span>
+</div>
+
+{% if is_new %}
+<div class="rounded-xl px-4 py-3 mb-5 text-sm flex flex-wrap items-center justify-between gap-3"
+     style="background:rgba(37,211,102,.1);color:#7ff0ab;border:1px solid rgba(37,211,102,.3)">
+  <span>Kayıt açıldı. Kabul formunu müşteriye imzalatın, servis fişini verin.</span>
+  <div class="flex gap-2">
+    <a href="{% url 'service:ticket_pdf' pk=ticket.pk %}" target="_blank" class="btn btn-gradient btn-sm">📄 Kabul Formu (PDF)</a>
+    <a href="{% url 'service:ticket_slip' pk=ticket.pk %}?auto=1" target="_blank" class="btn btn-ghost btn-sm">🧾 Servis Fişi</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-5">
+  <div class="lg:col-span-2 space-y-5">
+
+    <!-- Başlık -->
+    <div class="card p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="font-display font-extrabold text-2xl">{{ ticket.ticket_no }}</h2>
+            {% include "service/partials/status_badge.html" with status=ticket.status label=ticket.get_status_display %}
+          </div>
+          <p class="text-sm mt-1" style="color:var(--muted)">
+            Teslim alındı {{ ticket.received_at|date:"d.m.Y H:i" }}
+            {% if ticket.created_by %} · {{ ticket.created_by.get_full_name|default:ticket.created_by.username }}{% endif %}
+            {% if ticket.technician %} · Sorumlu: <span style="color:var(--ink)">{{ ticket.technician.get_full_name|default:ticket.technician.username }}</span>{% endif %}
+            {% if ticket.closed_at %} · Kapandı {{ ticket.closed_at|date:"d.m.Y H:i" }}{% endif %}
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="{% url 'service:ticket_pdf' pk=ticket.pk %}" target="_blank" class="btn btn-gradient btn-sm">📄 Kabul Formu</a>
+          <a href="{% url 'service:ticket_slip' pk=ticket.pk %}?auto=1" target="_blank" class="btn btn-ghost btn-sm">🧾 {% if ticket.is_closed %}Teslim Fişi{% else %}Servis Fişi{% endif %}</a>
+          <a href="{% url 'service:ticket_edit' pk=ticket.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
+        </div>
+      </div>
+
+      <div class="glass rounded-xl px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-xs" style="color:var(--muted)">Müşteri</div>
+          {% if access.contacts %}
+          <a href="{% url 'stock:contact_detail' pk=ticket.customer.pk %}" class="font-semibold hover:underline">{{ ticket.customer.full_name }}</a>
+          {% else %}<span class="font-semibold">{{ ticket.customer.full_name }}</span>{% endif %}
+          {% if ticket.customer.phone %}<a href="tel:{{ ticket.customer.phone }}" class="text-sm hover:underline" style="color:var(--muted)"> · {{ ticket.customer.phone }}</a>{% endif %}
+        </div>
+        {% if wa_url %}
+        <a href="{{ wa_url }}" target="_blank" rel="noopener" class="btn btn-sm shrink-0"
+           style="background:rgba(37,211,102,.15);color:#7ff0ab;border:1px solid rgba(37,211,102,.3)">
+          WhatsApp ile bilgilendir
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <div><div class="text-xs" style="color:var(--muted)">Cihaz</div><div class="font-semibold">{{ ticket.device_label }}</div></div>
+        <div><div class="text-xs" style="color:var(--muted)">IMEI / Seri No</div>
+          <div class="font-mono">{{ ticket.imei|default:"—" }}{% if ticket.serial_no %} · {{ ticket.serial_no }}{% endif %}</div></div>
+        <div><div class="text-xs" style="color:var(--muted)">Teslim Alınan Aksesuarlar</div>
+          <div>{{ ticket.received_labels|join:", "|default:"Yok (yalnızca cihaz)" }}</div></div>
+        <div><div class="text-xs" style="color:var(--muted)">Fiziksel Durum</div><div>{{ ticket.condition_note|default:"—"|linebreaksbr }}</div></div>
+        <div class="sm:col-span-2"><div class="text-xs" style="color:var(--muted)">Müşteri Şikâyeti / Arıza</div><div>{{ ticket.complaint|linebreaksbr }}</div></div>
+        {% if ticket.diagnosis %}
+        <div class="sm:col-span-2"><div class="text-xs" style="color:var(--muted)">Tespit / Yapılan İşlem</div><div>{{ ticket.diagnosis|linebreaksbr }}</div></div>
+        {% endif %}
+        {% if ticket.estimated_ready %}
+        <div><div class="text-xs" style="color:var(--muted)">Tahmini Teslim</div><div>{{ ticket.estimated_ready|date:"d.m.Y" }}</div></div>
+        {% endif %}
+        {% if ticket.note %}
+        <div class="sm:col-span-2"><div class="text-xs" style="color:var(--muted)">İç Not</div><div>{{ ticket.note|linebreaksbr }}</div></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Ekran kilidi -->
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Ekran Kilidi</h3>
+      {% if ticket.is_closed %}
+      <p class="text-sm" style="color:var(--muted)">Cihaz müşteriye geri verildiği için ekran kilidi bilgisi silindi.</p>
+      {% elif ticket.has_lock %}
+      <div class="flex flex-wrap items-start gap-6" x-data="{ show: false }">
+        <div>
+          <div class="text-xs" style="color:var(--muted)">Parola / PIN</div>
+          {% if ticket.lock_pin %}
+          <div class="flex items-center gap-2 mt-1">
+            <span class="font-mono text-xl font-bold" x-show="show" x-cloak>{{ ticket.lock_pin }}</span>
+            <span class="font-mono text-xl font-bold" x-show="!show">••••••</span>
+            <button type="button" class="btn btn-ghost btn-sm" @click="show = !show" x-text="show ? 'Gizle' : 'Göster'">Göster</button>
+          </div>
+          {% else %}<div class="mt-1">—</div>{% endif %}
+          <p class="text-xs mt-3" style="color:var(--muted);max-width:18rem">
+            Kabul formunun servis nüshasına basılır. Cihaz teslim edilince sistemden silinir.
+          </p>
+        </div>
+        {% if ticket.lock_pattern %}
+        <div>
+          <div class="text-xs mb-1" style="color:var(--muted)">Desen ({{ ticket.lock_pattern }})</div>
+          {% include "service/partials/pattern_view.html" %}
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      <p class="text-sm" style="color:var(--muted)">Parola veya desen girilmedi. <a href="{% url 'service:ticket_edit' pk=ticket.pk %}" class="underline">Düzenle</a></p>
+      {% endif %}
+    </div>
+
+    <!-- Teknik servis -->
+    <div class="card p-5" x-data="{ send: false }">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <h3 class="font-display font-bold">Teknik Servise Gönderim</h3>
+        {% if ticket.is_open and not active_job %}
+        <button type="button" class="btn btn-ghost btn-sm" @click="send = !send">↗ Teknik Servise Gönder</button>
+        {% endif %}
+      </div>
+
+      <div class="space-y-3 text-sm">
+        {% for job in jobs %}
+        <div class="pb-3" style="border-bottom:1px solid var(--line)">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="min-w-0">
+              {% if show_money %}<a href="{% url 'service:shop_detail' pk=job.shop.pk %}" class="font-semibold hover:underline">{{ job.shop }}</a>
+              {% else %}<span class="font-semibold">{{ job.shop }}</span>{% endif %}
+              <span style="color:var(--muted)"> · {{ job.work }}</span>
+            </div>
+            {% include "service/partials/status_badge.html" with status=job.status label=job.get_status_display %}
+          </div>
+          <div class="text-xs mt-1" style="color:var(--muted)">
+            Gönderim {{ job.sent_at|date:"d.m.Y" }}{% if job.returned_at %} · Dönüş {{ job.returned_at|date:"d.m.Y" }}{% endif %}
+            {% if show_money %} · Bedel: <span style="color:var(--ink)">{{ job.cost|tl }}</span>{% if job.status == 'gonderildi' and job.cost is not None %} (anlaşılan){% endif %}{% endif %}
+            {% if job.note %} · {{ job.note }}{% endif %}
+          </div>
+          {% if show_money and job.status == 'dondu' %}
+          <form method="post" action="{% url 'service:outsource_cost' pk=job.pk %}" class="flex flex-wrap items-end gap-2 mt-2">
+            {% csrf_token %}
+            <input type="text" name="cost" class="input" style="max-width:10rem" value="{{ job.cost|money_input }}"
+                   data-money="2" inputmode="decimal" autocomplete="off" placeholder="Bedel">
+            <button class="btn btn-ghost btn-sm">Bedeli Güncelle</button>
+          </form>
+          {% endif %}
+        </div>
+        {% empty %}
+        <p style="color:var(--muted)">Cihaz teknik servise gönderilmedi.</p>
+        {% endfor %}
+      </div>
+
+      {% if active_job %}
+      <form method="post" action="{% url 'service:outsource_return' pk=active_job.pk %}" class="mt-4 pt-4 space-y-2" style="border-top:1px solid var(--line)">
+        {% csrf_token %}
+        <h4 class="font-semibold text-sm">Teknik Servisten Dönüş — {{ active_job.shop }}</h4>
+        <div class="grid sm:grid-cols-2 gap-x-4">
+          {% for field in return_form %}
+          <div class="field">
+            <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<p class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text }}</p>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-gradient btn-sm">Dönüşü Kaydet</button>
+        </div>
+      </form>
+      <form method="post" action="{% url 'service:outsource_cancel' pk=active_job.pk %}" class="mt-2"
+            onsubmit="return confirm('Gönderim iptal edilsin mi? Teknik servise borç yazılmaz, cihaz Tamirde durumuna döner.')">
+        {% csrf_token %}
+        <button class="text-xs hover:underline" style="color:#ff8b95">Gönderimi iptal et (cihaz işlem görmeden geri alındı)</button>
+      </form>
+      {% elif ticket.is_open %}
+      <form method="post" action="{% url 'service:outsource_send' pk=ticket.pk %}" x-show="send" x-cloak
+            class="mt-4 pt-4 space-y-2" style="border-top:1px solid var(--line)">
+        {% csrf_token %}
+        {% if not has_shops %}
+        <p class="text-sm" style="color:#ffd48a">Kayıtlı teknik servis yok.
+          <a href="{% url 'service:shop_create' %}?next={{ request.path|urlencode }}" class="underline">Teknik servis ekleyin</a>.</p>
+        {% else %}
+        <div class="grid sm:grid-cols-2 gap-x-4">
+          {% for field in send_form %}
+          <div class="field">
+            <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<p class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text }}</p>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <button class="btn btn-gradient btn-sm">Gönder</button>
+          <a href="{% url 'service:shop_create' %}?next={{ request.path|urlencode }}" class="text-xs underline" style="color:var(--muted)">Listede yok mu? Teknik servis ekle</a>
+        </div>
+        {% endif %}
+      </form>
+      {% endif %}
+    </div>
+
+    {% if show_money %}
+    <!-- İç maliyet ve kâr -->
+    <div class="card p-5" x-data="{ add: false }">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <h3 class="font-display font-bold">Maliyet ve Kâr</h3>
+        <button type="button" class="btn btn-ghost btn-sm" @click="add = !add">+ Maliyet Ekle</button>
+      </div>
+      <div class="space-y-2 text-sm">
+        {% for cost in costs %}
+        <div class="flex items-center justify-between gap-2 py-1.5" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <span class="font-semibold">{{ cost.title }}</span>
+            <span class="text-xs ml-1" style="color:var(--muted)">{{ cost.get_kind_display }} · {{ cost.spent_on|date:"d.m.Y" }}</span>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <span>{{ cost.amount|tl }}</span>
+            {% if access.delete %}
+            <form method="post" action="{% url 'service:cost_delete' pk=cost.pk %}" onsubmit="return confirm('Maliyet silinsin mi?')">
+              {% csrf_token %}<button class="text-xs hover:underline" style="color:#ff8b95">Sil</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% empty %}<p style="color:var(--muted)">İç maliyet (parça, işçilik) girilmedi.</p>{% endfor %}
+      </div>
+
+      <form method="post" action="{% url 'service:cost_add' pk=ticket.pk %}" x-show="add" x-cloak
+            class="mt-4 pt-4" style="border-top:1px solid var(--line)">
+        {% csrf_token %}
+        <div class="grid sm:grid-cols-2 gap-x-4">
+          {% for field in cost_form %}
+          <div class="field">
+            <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+          </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-gradient btn-sm">Maliyeti Kaydet</button>
+      </form>
+
+      <div class="mt-4 pt-4 space-y-1.5 text-sm" style="border-top:1px solid var(--line)">
+        <div class="flex justify-between"><span style="color:var(--muted)">Servis ücreti</span><span>{{ ticket.final_price|tl }}</span></div>
+        <div class="flex justify-between"><span style="color:var(--muted)">İç maliyet (parça/işçilik)</span><span>− {{ internal_cost|tl }}</span></div>
+        <div class="flex justify-between"><span style="color:var(--muted)">Teknik servis bedeli</span><span>− {{ external_cost|tl }}</span></div>
+        <div class="flex justify-between text-lg font-display font-extrabold pt-2" style="border-top:1px solid var(--line)">
+          <span>Servis kârı</span>
+          {% if profit is None %}
+          <span style="color:var(--muted)" class="text-sm font-sans font-normal">Kesin ücret girilince hesaplanır</span>
+          {% else %}
+          <span style="color:{% if profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ profit|tl }}</span>
+          {% endif %}
+        </div>
+        <p class="text-xs pt-1" style="color:var(--muted)">Teknik servis bedeli, cihaz teknik servisten döndüğünde maliyete yazılır.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Zaman çizelgesi -->
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Geçmiş</h3>
+      <div class="space-y-2 text-sm">
+        {% for log in logs %}
+        <div class="flex items-start justify-between gap-3 py-1.5" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <span class="font-semibold">{{ log.to_label }}</span>
+            {% if log.note %}<span style="color:var(--muted)"> — {{ log.note }}</span>{% endif %}
+          </div>
+          <span class="text-xs shrink-0 text-right" style="color:var(--muted)">
+            {{ log.created_at|date:"d.m.Y H:i" }}{% if log.created_by %}<br>{{ log.created_by.username }}{% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-5">
+    <!-- Ücret ve tahsilat -->
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Ücret ve Tahsilat</h3>
+      <div class="space-y-1.5 text-sm mb-4">
+        <div class="flex justify-between"><span style="color:var(--muted)">Tahmini ücret</span><span>{{ ticket.estimated_price|tl }}</span></div>
+        <div class="flex justify-between font-semibold"><span>Servis ücreti (kesin)</span><span>{{ ticket.final_price|tl }}</span></div>
+        <div class="flex justify-between"><span style="color:var(--muted)">Tahsil edilen</span><span>{{ ticket.paid_total|tl }}</span></div>
+        {% if ticket.balance is not None %}
+        <div class="flex justify-between text-lg font-display font-extrabold pt-2" style="border-top:1px solid var(--line)">
+          <span>Kalan</span>
+          <span style="color:{% if ticket.balance > 0 %}#ffd48a{% elif ticket.balance < 0 %}#ff8b95{% else %}#7ff0ab{% endif %}">{{ ticket.balance|tl }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="space-y-2 text-sm mb-4">
+        {% for payment in payments %}
+        <div class="flex items-center justify-between gap-2 py-1.5" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <span class="font-semibold" style="color:{% if payment.kind == 'iade' %}#ff8b95{% else %}#7ff0ab{% endif %}">
+              {% if payment.kind == 'iade' %}−{% else %}+{% endif %}{{ payment.amount|tl0 }}
+            </span>
+            <span class="text-xs ml-1" style="color:var(--muted)">{{ payment.get_method_display }}{% if payment.note %} · {{ payment.note }}{% endif %}</span>
+          </div>
+          <span class="text-xs shrink-0" style="color:var(--muted)">{{ payment.paid_at|date:"d.m.Y" }}</span>
+        </div>
+        {% empty %}<p style="color:var(--muted)">Ödeme kaydı yok.</p>{% endfor %}
+      </div>
+
+      <form method="post" action="{% url 'service:ticket_payment' pk=ticket.pk %}" class="space-y-2">
+        {% csrf_token %}
+        {% for field in payment_form %}
+        <div class="field" style="margin:0">
+          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        </div>
+        {% endfor %}
+        <button class="btn btn-ghost btn-sm btn-block">Ödeme Kaydet</button>
+      </form>
+    </div>
+
+    {% if ticket.is_open %}
+      {% if ticket.at_shop %}
+      <div class="card p-5 text-sm" style="color:var(--muted)">
+        Cihaz <strong style="color:var(--ink)">{{ active_job.shop }}</strong> teknik servisinde.
+        Durum değiştirmek ve teslim etmek için önce dönüşünü kaydedin.
+      </div>
+      {% else %}
+      <!-- Durum -->
+      <form method="post" action="{% url 'service:ticket_status' pk=ticket.pk %}" class="card p-5 space-y-2">
+        {% csrf_token %}
+        <h3 class="font-display font-bold mb-1">Durumu Değiştir</h3>
+        {% for field in status_form %}
+        <div class="field" style="margin:0">
+          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        </div>
+        {% endfor %}
+        <button class="btn btn-ghost btn-sm btn-block">Kaydet</button>
+      </form>
+
+      <!-- Teslim / iade -->
+      <form method="post" action="{% url 'service:ticket_close' pk=ticket.pk %}" class="card p-5 space-y-2"
+            onsubmit="return confirm('Cihaz müşteriye geri veriliyor. Ekran kilidi bilgisi silinecek. Devam edilsin mi?')">
+        {% csrf_token %}
+        <h3 class="font-display font-bold mb-1">Müşteriye Teslim</h3>
+        {% for field in close_form %}
+        <div class="field" style="margin:0">
+          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<p class="text-xs mt-1" style="color:var(--muted)">{{ field.help_text }}</p>{% endif %}
+        </div>
+        {% endfor %}
+        <button class="btn btn-gradient btn-sm btn-block">Teslimi Kaydet</button>
+      </form>
+      {% endif %}
+    {% else %}
+    <div class="card p-5 text-sm">
+      <div class="font-semibold mb-1">{{ ticket.get_status_display }}</div>
+      <p style="color:var(--muted)">Cihaz {{ ticket.closed_at|date:"d.m.Y H:i" }} tarihinde müşteriye geri verildi.</p>
+      {% if access.delete %}
+      <form method="post" action="{% url 'service:ticket_reopen' pk=ticket.pk %}" class="mt-3"
+            onsubmit="return confirm('Kayıt yeniden açılsın mı? (Teslime Hazır durumuna döner)')">
+        {% csrf_token %}
+        <button class="btn btn-ghost btn-sm btn-block">Yeniden Aç</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if access.delete and not payments and not jobs %}
+    <form method="post" action="{% url 'service:ticket_delete' pk=ticket.pk %}" class="card p-5"
+          onsubmit="return confirm('{{ ticket.ticket_no }} kalıcı olarak silinsin mi?')">
+      {% csrf_token %}
+      <h3 class="font-display font-bold mb-2">Kaydı Sil</h3>
+      <p class="text-xs mb-3" style="color:var(--muted)">Yanlış açılan kayıtlar için. Ödeme ya da teknik servis işi olan kayıt silinemez.</p>
+      <button class="btn btn-sm btn-block" style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">Sil</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

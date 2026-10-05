@@ -9,7 +9,7 @@
     {% csrf_token %}
     <div class="grid sm:grid-cols-2 gap-x-5">
       {% for field in form %}
-      <div class="field {% if field.field.widget.input_type == 'checkbox' %}sm:col-span-2 flex items-center gap-3{% elif field.name in 'hero_subtitle,footer_about,maps_embed,hero_title' %}sm:col-span-2{% endif %}">
+      <div class="field {% if field.field.widget.input_type == 'checkbox' %}sm:col-span-2 flex items-center gap-3{% elif field.name in 'hero_subtitle,footer_about,maps_embed,hero_title,service_terms' %}sm:col-span-2{% endif %}">
         {% if field.field.widget.input_type == 'checkbox' %}
           <label class="inline-flex items-center gap-3 cursor-pointer select-none">
             {{ field }} <span class="label" style="margin:0">{{ field.label }}</span>

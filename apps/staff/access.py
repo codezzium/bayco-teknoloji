@@ -48,6 +48,11 @@ ACCESS = {
     "leads": Access(
         "staff.access_leads", "Talepler", SECTION_PAGES,
         "Teklif, servis ve iletişim talepleri (müşteri adı ve telefonu)."),
+    "service": Access(
+        "staff.access_service", "Teknik Servis", SECTION_PAGES,
+        "Servis kayıtları, cihaz kabul formu/fişi, teknik servise gönderme ve "
+        "servis tahsilatı. İç maliyet, teknik servis bedeli ve teknik servis hesabı "
+        "ayrıca \"Maliyet ve kâr\" ister."),
     "contacts": Access(
         "staff.access_contacts", "Cariler", SECTION_PAGES,
         "Müşteri/tedarikçi listesi ve bakiyeleri. Kasadan yeni müşteri "

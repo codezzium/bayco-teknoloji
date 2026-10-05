@@ -373,7 +373,7 @@ class ActionRegistryTests(TestCase):
                 if isinstance(pattern, URLResolver):
                     walk(pattern.url_patterns, pattern.namespace or namespace)
                 elif isinstance(pattern, URLPattern) and namespace in (
-                        "stock", "dashboard", "staff") and pattern.name:
+                        "stock", "dashboard", "staff", "service") and pattern.name:
                     name = f"{namespace}:{pattern.name}"
                     if name not in LABELS and name not in READ_ONLY:
                         missing.append(name)

@@ -1,0 +1,40 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Teknik Servis{% endblock %}
+
+{% block content %}
+{% include "stock/partials/list_header.html" %}
+
+<div class="grid gap-4 grid-cols-3 mb-5">
+  <a href="?durum=acik" class="card card-hover p-4">
+    <div class="text-xs" style="color:var(--muted)">Açık Kayıt</div>
+    <div class="text-2xl font-display font-extrabold mt-1">{{ counts.open }}</div>
+  </a>
+  <a href="?durum=hazir" class="card card-hover p-4">
+    <div class="text-xs" style="color:var(--muted)">Teslime Hazır</div>
+    <div class="text-2xl font-display font-extrabold mt-1" style="color:#7ff0ab">{{ counts.ready }}</div>
+  </a>
+  <a href="?durum=dis_servis" class="card card-hover p-4">
+    <div class="text-xs" style="color:var(--muted)">Teknik Serviste</div>
+    <div class="text-2xl font-display font-extrabold mt-1" style="color:#f3a6d2">{{ counts.at_shop }}</div>
+  </a>
+</div>
+
+<form id="ticket-filters" class="glass rounded-2xl p-4 mb-5" method="get"
+      hx-get="{% url 'service:ticket_list' %}" hx-target="#ticket-results" hx-swap="outerHTML"
+      hx-push-url="true" hx-trigger="input changed delay:300ms from:input[name=q], submit">
+  <input type="hidden" name="durum" value="{{ durum }}">
+  <input type="search" name="q" value="{{ q }}" class="input mb-3" autocomplete="off"
+         placeholder="Servis no, müşteri adı, telefon, IMEI veya model ara…">
+  <div class="flex flex-wrap gap-2">
+    {% for chip in chips %}
+    <a href="?durum={{ chip.key }}{% if q %}&q={{ q|urlencode }}{% endif %}"
+       class="filter-chip {% if durum == chip.key %}active{% endif %}">
+      {{ chip.label }}{% if chip.count %} · {{ chip.count }}{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</form>
+
+{% include "service/partials/ticket_rows.html" %}
+{% endblock %}

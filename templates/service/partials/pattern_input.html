@@ -1,0 +1,27 @@
+{% comment %} Ekran deseni girişi (apps/service/forms.PatternWidget). Etkileşim
+   static/js/pattern.js'te (Alpine "baycoPattern"). Noktalar sunucuda çizilir:
+   Alpine'ın x-for'u SVG içindeki <template>'i işleyemez. Değer gizli input'ta
+   "1-5-9-6"; JS çalışmazsa boş gider ve form yine kaydolur. {% endcomment %}
+<div x-data="baycoPattern('{{ value }}')" class="flex flex-wrap items-start gap-4">
+  <input type="hidden" name="{{ name }}" id="{{ id }}" value="{{ value }}" :value="value">
+  {% comment %} touchstart/touchmove.prevent: iOS Safari touch-action'ı her sürümde
+     uygulamaz; sayfa kayarsa pointercancel gelir ve çizim yarıda kesilirdi.
+     pointerup.window: yakalama (setPointerCapture) desteklenmezse parmak ızgara
+     dışında kalksa da çizim biter. {% endcomment %}
+  <svg x-ref="pad" viewBox="0 0 300 300" class="pattern-pad" role="img"
+       aria-label="Ekran deseni: noktaları birleştirerek çizin"
+       @pointerdown.prevent="down($event)" @pointermove="move($event)"
+       @pointerup.window="up()" @pointercancel="up()"
+       @touchstart.prevent @touchmove.prevent>
+    <polyline :points="line" class="pattern-line" points=""/>
+    {% for dot in dots %}
+    <circle cx="{{ dot.x }}" cy="{{ dot.y }}" r="16" class="pattern-dot" :class="on({{ dot.n }}) && 'on'"/>
+    <text x="{{ dot.x }}" y="{{ dot.y|add:5 }}" text-anchor="middle" class="pattern-order" x-text="order({{ dot.n }})"></text>
+    {% endfor %}
+  </svg>
+  <div class="text-sm space-y-2 pt-1">
+    <div style="color:var(--muted)" x-text="value ? 'Sıra: ' + value.split('-').join(' → ') : 'Desen girilmedi'">Desen girilmedi</div>
+    <div class="text-xs" style="color:#ffd48a" x-show="tooShort" x-cloak>En az 4 nokta birleştirin.</div>
+    <button type="button" class="btn btn-ghost btn-sm" @click="clear()" x-show="value" x-cloak>Temizle</button>
+  </div>
+</div>

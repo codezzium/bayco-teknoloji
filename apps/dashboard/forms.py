@@ -149,4 +149,5 @@ class SiteSettingsForm(StyledModelForm):
             "hero_subtitle": forms.Textarea(attrs={"rows": 2}),
             "footer_about": forms.Textarea(attrs={"rows": 3}),
             "maps_embed": forms.Textarea(attrs={"rows": 2}),
+            "service_terms": forms.Textarea(attrs={"rows": 6}),
         }

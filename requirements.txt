@@ -12,6 +12,9 @@ whitenoise>=6.12,<7
 # Stok modülü — etiket üretimi (ikisi de saf Python, transitive bağımlılık yok)
 segno>=1.6,<2
 python-barcode>=0.16,<0.17
+# Teknik servis — A4 cihaz kabul formu PDF'i (saf Python wheel; Pillow +
+# charset-normalizer ister, ikisi de zaten var/hafif).
+reportlab>=4.2,<5
 # TruncMonth + USE_TZ: sistem tz veritabanı olmayan slim imajlarda sessizce
 # UTC'ye düşer ve akşam satışları yanlış aya yazılır.
 tzdata

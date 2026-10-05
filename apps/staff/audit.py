@@ -18,8 +18,11 @@ logger = logging.getLogger(__name__)
 
 RETENTION_DAYS = 365
 
-#: Adında bunlardan biri geçen POST alanı loga HİÇ yazılmaz.
-SECRET_MARKERS = ("password", "sifre", "şifre", "csrf", "token")
+#: Adında bunlardan biri geçen POST alanı loga HİÇ yazılmaz. lock_pin /
+#: lock_pattern: müşteri cihazının ekran kilidi — servis kaydından teslimde
+#: silinir, logda bir yıl kalmamalı.
+SECRET_MARKERS = ("password", "sifre", "şifre", "csrf", "token", "lock_pin",
+                  "lock_pattern")
 MAX_VALUE = 200
 MAX_FIELDS = 40
 

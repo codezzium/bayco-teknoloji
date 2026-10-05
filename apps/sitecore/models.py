@@ -1,5 +1,16 @@
 from django.db import models
 
+#: Teknik servis kabul formunun (PDF) altındaki şartlar. Her satır bir madde.
+DEFAULT_SERVICE_TERMS = """\
+Cihaz, bu formda yazılı arıza, fiziksel durum ve aksesuarlarla teslim alınmıştır. Formda yazılı olmayan aksesuarlardan servisimiz sorumlu değildir.
+Arıza tespitinden sonra kesinleşen ücret müşteriye bildirilir; müşteri onayı alınmadan ücretli işlem yapılmaz.
+Tamir sırasında cihazdaki veriler silinebilir. Verilerin yedeklenmesi müşterinin sorumluluğundadır; veri kaybından servisimiz sorumlu tutulamaz.
+Sıvı teması, darbe görmüş ya da daha önce başka bir serviste açılmış cihazlarda tamir sırasında veya sonrasında farklı arızalar ortaya çıkabilir.
+Ekran kilidi bilgisi yalnızca arıza tespiti ve test için alınır; cihaz teslim edildiğinde kayıtlarımızdan silinir.
+Tamiri tamamlanan ya da tamirine onay verilmeyen cihaz, müşteriye haber verildiği tarihten itibaren 30 gün içinde teslim alınmalıdır.
+Cihaz, yalnızca bu form veya servis fişi ibraz edilerek teslim edilir.
+Kişisel verileriniz 6698 sayılı KVKK kapsamında yalnızca servis işlemi ve sizinle iletişim amacıyla işlenir."""
+
 
 class SiteSettings(models.Model):
     """Site geneli ayarlar — tekil (singleton) kayıt. Panelden yönetilir."""
@@ -14,6 +25,10 @@ class SiteSettings(models.Model):
         help_text="Satış fişinin üstüne basılır. Boş bırakılırsa site logosu kullanılır. "
                   "Termal yazıcı için otomatik siyah-beyaza çevrilir; düz zeminli bir "
                   "logo en temiz sonucu verir.",
+    )
+    service_terms = models.TextField(
+        "Teknik Servis Şartları", blank=True, default=DEFAULT_SERVICE_TERMS,
+        help_text="Cihaz kabul formunun (PDF) altına basılır. Her satır ayrı bir madde olur.",
     )
 
     # İletişim

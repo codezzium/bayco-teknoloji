@@ -1,0 +1,49 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Teknik Servisler{% endblock %}
+
+{% block content %}
+{% include "stock/partials/list_header.html" %}
+
+<div class="card p-5 mb-5">
+  <div class="text-xs" style="color:var(--muted)">Teknik servislere toplam borç</div>
+  <div class="text-3xl font-display font-extrabold mt-1" style="color:{% if debt_total > 0 %}#ffd48a{% else %}#7ff0ab{% endif %}">{{ debt_total|tl }}</div>
+  <p class="text-xs mt-2" style="color:var(--muted)">
+    Borç, cihaz teknik servisten döndüğünde yazılan bedeldir; ödemeler düşülmüştür.
+    Eksi bakiye teknik servise verilmiş avanstır. Bu hesap mağaza giderlerinden ayrı tutulur.
+  </p>
+</div>
+
+<div class="card p-5">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm" style="min-width:640px">
+      <thead>
+        <tr style="color:var(--muted)">
+          <th class="text-left py-2 font-medium">Teknik Servis</th>
+          <th class="text-right py-2 font-medium">Şu An Orada</th>
+          <th class="text-right py-2 font-medium">Toplam İş</th>
+          <th class="text-right py-2 font-medium">Ödenen</th>
+          <th class="text-right py-2 font-medium">Bakiye</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr style="border-top:1px solid var(--line)">
+          <td class="py-2">
+            <a href="{% url 'service:shop_detail' pk=row.shop.pk %}" class="font-semibold hover:underline">{{ row.shop.name }}</a>
+            {% if not row.shop.is_active %}<span class="text-xs" style="color:var(--muted)"> · pasif</span>{% endif %}
+            <div class="text-xs" style="color:var(--muted)">{{ row.shop.contact_name }}{% if row.shop.contact_name and row.shop.phone %} · {% endif %}{{ row.shop.phone }}</div>
+          </td>
+          <td class="py-2 text-right">{{ row.at_shop }} cihaz</td>
+          <td class="py-2 text-right">{{ row.debt|tl }}</td>
+          <td class="py-2 text-right">{{ row.paid|tl }}</td>
+          <td class="py-2 text-right font-semibold" style="color:{% if row.balance > 0 %}#ffd48a{% elif row.balance < 0 %}#9cccff{% else %}#7ff0ab{% endif %}">{{ row.balance|tl }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="py-8 text-center" style="color:var(--muted)">Henüz teknik servis eklenmedi.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -129,6 +129,55 @@
   </div>
 </div>
 
+<!-- Teknik servis (mağaza kârından ayrı) -->
+{% with sv=service.profit %}
+<div class="card p-5 mb-6">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+    <h2 class="font-display font-bold">Teknik Servis</h2>
+    <div class="flex flex-wrap gap-2">
+      {% if access.service %}
+      <a href="{% url 'service:ticket_list' %}" class="btn btn-ghost btn-sm">Servis Kayıtları</a>
+      {% if access.money %}<a href="{% url 'service:shop_list' %}" class="btn btn-ghost btn-sm">Teknik Servisler</a>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+  <p class="text-xs mb-4" style="color:var(--muted)">
+    Mağaza satış kârından <strong>ayrı</strong> hesaplanır; yukarıdaki Net Kâr'a eklenmez.
+    Dönemde müşteriye geri verilen {{ sv.count }} kayıt ({{ sv.delivered }} teslim, tamirsiz iadeler dahil).
+    Parça/işçilik ve teknik servis bedeli, kaydın kapandığı döneme yazılır.
+  </p>
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-5">
+    {% include "stock/partials/kpi_card.html" with label="Servis Cirosu" value=sv.revenue|tl0 icon="🛠️" tone="brand" hint=sv.count|stringformat:"s"|add:" kayıt" %}
+    {% include "stock/partials/kpi_card.html" with label="Servis Maliyeti" value=sv.cost|tl0 icon="🔩" tone="danger" hint="Parça/işçilik + teknik servis" %}
+    {% include "stock/partials/kpi_card.html" with label="Net Servis Kârı" value=sv.net|tl0 icon="📈" tone="brand" %}
+    {% include "stock/partials/kpi_card.html" with label="Servis Marjı" value=sv.margin|pct icon="%" %}
+  </div>
+
+  <div class="grid gap-5 lg:grid-cols-2">
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span style="color:var(--muted)">Servis cirosu (kesin ücretler)</span><span>{{ sv.revenue|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">İç maliyet (parça/işçilik)</span><span>− {{ sv.internal|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Teknik servis bedelleri</span><span>− {{ sv.external|tl }}</span></div>
+      <div class="flex justify-between text-lg font-display font-extrabold pt-2" style="border-top:1px solid var(--line)">
+        <span>Net servis kârı</span>
+        <span style="color:{% if sv.net > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ sv.net|tl }}</span>
+      </div>
+    </div>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span style="color:var(--muted)">Servis tahsilatı (kapora dahil)</span><span class="font-semibold">{{ service.cash|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Teknik servislere ödenen</span><span>{{ service.shop_paid|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Teknik servislere güncel borç</span><span class="font-semibold" style="color:#ffd48a">{{ service.shop_debt|tl }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">Müşteriden servis alacağı</span><span class="font-semibold" style="color:#ffd48a">{{ service.receivables|tl }}</span></div>
+      <div class="flex justify-between pt-2" style="border-top:1px solid var(--line)">
+        <span style="color:var(--muted)">Şu an açık / hazır / teknik serviste</span>
+        <span>{{ service.counts.open }} / {{ service.counts.ready }} / {{ service.counts.at_shop }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+
 <div class="grid gap-5 lg:grid-cols-2 mb-6">
   <!-- Sermaye & devir -->
   <div class="card p-5">

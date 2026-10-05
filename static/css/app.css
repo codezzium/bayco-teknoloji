@@ -661,3 +661,28 @@ select[data-combobox][hidden] { display: none; }
 .htmx-indicator { opacity: 0; transition: opacity .15s; }
 .htmx-request .htmx-indicator,
 .htmx-request.htmx-indicator { opacity: 1; }
+
+/* ---------- Teknik servis ---------- */
+/* Ekran deseni ızgarası (templates/service/partials/pattern_*.html) */
+.pattern-pad {
+  width: 180px; height: 180px; flex: none;
+  border-radius: 16px; border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair;
+}
+.pattern-static { width: 132px; height: 132px; cursor: default; }
+.pattern-line {
+  fill: none; stroke: #25d366; stroke-width: 10; opacity: .9;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.pattern-dot { fill: rgba(255,255,255,.22); transition: fill .12s; }
+.pattern-dot.on { fill: #fff; }
+.pattern-start { fill: none; stroke: #25d366; stroke-width: 3; opacity: .8; }
+.pattern-order { fill: #150c22; font: 700 15px Inter, sans-serif; pointer-events: none; }
+
+/* Seçilebilir etiket (ChipCheckboxes): gizli checkbox seçiliyse .active görünümü */
+.chip-check:has(input:checked) {
+  background: var(--brand); color: #fff;
+  border-color: transparent; box-shadow: var(--shadow-glow);
+}
+.chip-check:has(input:focus-visible) { outline: 2px solid var(--magenta); outline-offset: 2px; }

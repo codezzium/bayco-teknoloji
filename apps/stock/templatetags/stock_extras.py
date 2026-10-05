@@ -63,8 +63,10 @@ def is_checkbox(field):
 
 @register.filter
 def is_wide(field):
-    """Textarea ve gizli olmayan geniş alanlar formda iki sütun kaplar."""
-    return isinstance(field.field.widget, forms.Textarea)
+    """Textarea ve `wide = True` diyen widget'lar (ör. servis formundaki
+    aksesuar etiketleri) formda iki sütun kaplar."""
+    widget = field.field.widget
+    return isinstance(widget, forms.Textarea) or getattr(widget, "wide", False)
 
 
 @register.filter
