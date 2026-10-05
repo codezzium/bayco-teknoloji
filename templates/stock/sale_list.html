@@ -16,7 +16,17 @@
              hx-target="#sale-results" hx-swap="outerHTML"
              hx-push-url="true" hx-indicator="#list-spin">
     </div>
-    <span id="list-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Yükleniyor…</span>
+    <div class="flex items-center gap-3">
+      <span id="list-spin" class="htmx-indicator text-sm" style="color:var(--muted)">Yükleniyor…</span>
+      <select name="personel" class="select" style="min-width:12rem" aria-label="Personel"
+              hx-get="{% url 'stock:sale_list' %}" hx-include="#sale-filters"
+              hx-target="#sale-results" hx-swap="outerHTML" hx-push-url="true">
+        <option value="">Tüm personel</option>
+        {% for person in sellers %}
+        <option value="{{ person.pk }}" {% if personel == person.pk|stringformat:"s" %}selected{% endif %}>{{ person.get_full_name|default:person.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
   <div class="flex flex-wrap items-center gap-2 mt-4 pt-4" style="border-top:1px solid var(--line)">
     {% for value, label in filter_options %}
@@ -33,4 +43,5 @@
 </div>
 
 {% include "stock/partials/sale_rows.html" %}
+{% include "stock/partials/seller_modal.html" %}
 {% endblock %}

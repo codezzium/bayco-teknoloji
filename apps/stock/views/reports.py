@@ -2,7 +2,9 @@
 
 from datetime import timedelta
 
-from django.shortcuts import render
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
 from .. import reports as rpt
@@ -26,6 +28,17 @@ def _period(request):
         return key, today.replace(month=1, day=1), today
     label, days = PERIODS.get(key, PERIODS["30g"])
     return key, today - timedelta(days=days), today
+
+
+def _report_people():
+    """Personel seçimindeki kişiler: panel ekibi (pasifler dahil) ve satışı
+    olan herkes — ayrılmış personelin geçmiş satışları da raporlanabilsin."""
+    from apps.staff.notify import panel_members
+
+    return (get_user_model().objects
+            .filter(Q(pk__in=panel_members().values("pk")) | Q(sales__isnull=False))
+            .distinct()
+            .order_by("-is_active", "first_name", "username"))
 
 
 @panel_required
@@ -59,9 +72,33 @@ def reports(request):
         "turnover": rpt.turnover(start, end),
         "aging": rpt.aging_buckets(),
         "top_models": rpt.top_models(start, end),
+        "staff_sales": rpt.sales_by_staff(start, end),
+        "people": _report_people(),
         "cash": rpt.cash_by_method(start, end),
         "receivables_total": rpt.receivables_total(),
         "overdue": rpt.overdue_receivables().select_related("customer")[:10],
         "chart": rpt.revenue_series(12),
         "show_money": True,
+    })
+
+
+@access_required("reports")
+def staff_report(request, pk):
+    """Tek personelin satış raporu: cihaz/aksesuar kırılımı, iadeler, grafik.
+
+    Raporlar tikine bağlıdır (Raporlar sayfasındaki Personel Satışları
+    tablosundan açılır); Patron'a Personel sayfasından da bağlantı verilir.
+    """
+    person = get_object_or_404(get_user_model(), pk=pk)
+    key, start, end = _period(request)
+    return render(request, "stock/staff_report.html", {
+        "active": "rapor",
+        "person": person,
+        "people": _report_people(),
+        "period": key, "periods": PERIODS,
+        "start": start, "end": end,
+        "summary": rpt.staff_sales_summary(start, end, person),
+        "breakdown": rpt.staff_breakdown(start, end, person),
+        "top_models": rpt.top_models(start, end, cashier=person),
+        "chart": rpt.revenue_series(12, cashier=person),
     })

@@ -12,6 +12,7 @@ from .models import (
     Payment,
     Sale,
     SaleItem,
+    SellerChange,
     StockMovement,
     TradeIn,
 )
@@ -99,8 +100,26 @@ class SaleAdmin(MoneyGatedAdmin):
     search_fields = ("receipt_no", "customer__full_name", "items__item_imei")
     date_hierarchy = "sold_at"
     inlines = [SaleItemInline]
-    readonly_fields = ("receipt_no", "grand_total", "trade_in_total",
+    # cashier salt okunur: satıcı yalnızca panelin onaylı akışıyla değişir
+    # (services.request_seller_change), burada iz bırakmadan değişmesin.
+    readonly_fields = ("receipt_no", "cashier", "grand_total", "trade_in_total",
                        "payable_total", "paid_total")
+
+
+@admin.register(SellerChange)
+class SellerChangeAdmin(MoneyGatedAdmin):
+    """Salt okunur geçmiş: değişiklik panelden yapılır."""
+
+    list_display = ("requested_at", "sale", "from_user", "to_user", "status",
+                    "requested_by", "decided_by")
+    list_filter = ("status",)
+    search_fields = ("sale__receipt_no", "reason")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Payment)

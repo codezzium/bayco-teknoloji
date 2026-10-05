@@ -30,6 +30,7 @@ from .models import (
     Payment,
     Sale,
     SaleItem,
+    SellerChange,
     StockMovement,
     TradeIn,
 )
@@ -308,11 +309,15 @@ def check_cart_prices(cart: dict) -> list[dict]:
 
 @transaction.atomic
 def create_sale_from_cart(cart: dict, *, user, payments=None, due_date=None,
-                          note="", confirm_prices=False) -> Sale:
+                          note="", confirm_prices=False, seller=None) -> Sale:
     """Oturumdaki sepeti tek atomik işlemde fişe dönüştürür.
 
     Hiçbir şey değiştirilmeden ÖNCE tüm doğrulamalar yapılır; aksi halde yarım
     kalan bir satış cihazı "satıldı" bırakıp stok hareketini yazmayabilir.
+
+    `seller` satışın yazılacağı kişidir (Sale.cashier; boşsa `user`). Stok ve
+    kasa hareketlerinin created_by'ı her zaman işlemi yapan `user`dır. Kimin
+    başkası adına satış yazabileceği view'ın kararıdır (bkz. pos.checkout).
     """
     lines = cart.get("lines") or []
     trade_ins = cart.get("trade_ins") or []
@@ -375,7 +380,7 @@ def create_sale_from_cart(cart: dict, *, user, payments=None, due_date=None,
     now = timezone.now()
     sale = Sale.objects.create(
         customer=customer, status=Sale.Status.TAMAMLANDI, sold_at=now,
-        due_date=due_date, note=note or cart.get("note", ""), cashier=user,
+        due_date=due_date, note=note or cart.get("note", ""), cashier=seller or user,
         receipt_no=next_code("sale", "BYC-S"),
     )
 
@@ -663,6 +668,7 @@ def void_sale(sale: Sale, *, user=None, reason: str = "") -> Sale:
                 created_by=user,
             )
 
+    _close_pending_seller_changes(sale)
     sale.status = Sale.Status.IPTAL
     sale.voided_at = timezone.now()
     sale.voided_by = user
@@ -671,6 +677,143 @@ def void_sale(sale: Sale, *, user=None, reason: str = "") -> Sale:
                              "updated_at"])
     sale.recalculate()
     return sale
+
+
+# ===========================================================================
+# Satıcı değişikliği
+# ===========================================================================
+# Yanlış kişinin adına düşen satış iade + yeniden satışla DÜZELTİLMEZ: o yol
+# stok, kasa ve iade kayıtlarını sahte hareketlerle doldurur. Yalnızca
+# Sale.cashier değişir; iz SellerChange tablosunda kalır. Patron doğrudan
+# değiştirir, personelin talebi patron onayını bekler.
+
+def _sale_label(sale: Sale) -> str:
+    return sale.receipt_no or f"Satış #{sale.pk}"
+
+
+def _sale_url(sale: Sale) -> str:
+    from django.urls import reverse
+
+    return reverse("stock:sale_detail", kwargs={"pk": sale.pk})
+
+
+def _close_pending_seller_changes(sale: Sale, *, keep=None) -> None:
+    """Bekleyen talebi geçersiz kılar: fiş iptal edildi ya da satıcı başka
+    bir yoldan (patronun doğrudan değişikliği) değişti."""
+    pending = SellerChange.objects.filter(sale=sale, status=SellerChange.Status.BEKLIYOR)
+    if keep is not None:
+        pending = pending.exclude(pk=keep.pk)
+    pending.update(status=SellerChange.Status.GECERSIZ, decided_at=timezone.now())
+
+
+def _apply_seller_change(change: SellerChange, *, actor, approved: bool) -> None:
+    from apps.staff.notify import display_name, notify
+
+    sale = change.sale
+    Sale.objects.filter(pk=sale.pk).update(cashier=change.to_user,
+                                           updated_at=timezone.now())
+    sale.cashier = change.to_user
+    _close_pending_seller_changes(sale, keep=change)
+
+    label, url = _sale_label(sale), _sale_url(sale)
+    notified = {actor.pk}
+
+    def send(user, message):
+        if user is not None and user.pk not in notified:
+            notified.add(user.pk)
+            notify([user], message, url)
+
+    if approved:
+        send(change.requested_by, f"{label}: satıcı değişikliği talebiniz onaylandı "
+                                  f"({display_name(change.to_user)}).")
+    send(change.to_user, f"{label} satışı sizin adınıza yazıldı. Gerekçe: {change.reason}")
+    send(change.from_user, f"{label} satışı {display_name(change.to_user)} adına "
+                           f"aktarıldı. Gerekçe: {change.reason}")
+
+
+@transaction.atomic
+def request_seller_change(sale: Sale, *, to_user, reason: str, user) -> SellerChange:
+    """Satıcı değişikliği. Patron için anında uygulanır, personel için patron
+    onayına düşer (patronlara bildirim gider)."""
+    from apps.staff.notify import active_patrons, display_name, notify
+
+    from .permissions import in_panel, is_patron
+
+    sale = Sale.objects.select_for_update().select_related("cashier").get(pk=sale.pk)
+    reason = (reason or "").strip()[:200]
+    patron = is_patron(user)
+
+    if sale.status == Sale.Status.IPTAL:
+        raise StockError("İptal edilmiş satışın satıcısı değiştirilemez.")
+    if not reason:
+        raise StockError("Değişikliğin gerekçesini yazın.")
+    if to_user is None or not in_panel(to_user):
+        raise StockError("Yeni satıcı ekipte aktif bir kullanıcı olmalıdır.")
+    if to_user.pk == sale.cashier_id:
+        raise StockError(f"Satış zaten {display_name(to_user)} adına.")
+    pending = SellerChange.objects.filter(sale=sale, status=SellerChange.Status.BEKLIYOR)
+    if not patron and pending.exists():
+        raise StockError("Bu satış için onay bekleyen bir satıcı değişikliği talebi var.")
+
+    now = timezone.now()
+    change = SellerChange(sale=sale, from_user=sale.cashier, to_user=to_user,
+                          reason=reason, requested_by=user, requested_at=now)
+    if patron:
+        change.status = SellerChange.Status.ONAYLANDI
+        change.decided_by = user
+        change.decided_at = now
+        change.save()
+        _apply_seller_change(change, actor=user, approved=False)
+        return change
+
+    change.save()
+    notify(active_patrons(),
+           f"{display_name(user)}, {_sale_label(sale)} satışının satıcısını "
+           f"{display_name(sale.cashier)} → {display_name(to_user)} yapmak istiyor. "
+           f"Gerekçe: {reason}",
+           _sale_url(sale), exclude=user)
+    return change
+
+
+@transaction.atomic
+def decide_seller_change(change: SellerChange, *, user, approve: bool,
+                         note: str = "") -> SellerChange:
+    """Patronun onayı/reddi. Talep bu arada anlamını yitirdiyse (fiş iptal,
+    satıcı başka yoldan değişti) GEÇERSİZ olarak kapanır; durum dönen kayıttan
+    okunur — hata fırlatmak geçersiz işaretini de geri alırdı."""
+    from apps.staff.notify import notify
+
+    from .permissions import is_patron
+
+    if not is_patron(user):
+        raise StockError("Satıcı değişikliğini yalnızca patron onaylayabilir.")
+    change = (SellerChange.objects.select_for_update()
+              .select_related("sale", "from_user", "to_user", "requested_by")
+              .get(pk=change.pk))
+    if change.status != SellerChange.Status.BEKLIYOR:
+        raise StockError("Bu talep zaten sonuçlanmış.")
+
+    sale = change.sale
+    change.decided_by = user
+    change.decided_at = timezone.now()
+    change.decision_note = (note or "").strip()[:200]
+    if sale.status == Sale.Status.IPTAL or sale.cashier_id != change.from_user_id:
+        change.status = SellerChange.Status.GECERSIZ
+        change.save()
+        return change
+
+    if approve:
+        change.status = SellerChange.Status.ONAYLANDI
+        change.save()
+        _apply_seller_change(change, actor=user, approved=True)
+    else:
+        change.status = SellerChange.Status.REDDEDILDI
+        change.save()
+        message = f"{_sale_label(sale)}: satıcı değişikliği talebiniz reddedildi."
+        if change.decision_note:
+            message += f" Not: {change.decision_note}"
+        notify([change.requested_by], message, _sale_url(sale), exclude=user)
+    return change
 
 
 # ===========================================================================

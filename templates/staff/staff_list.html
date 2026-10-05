@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load stock_extras %}
 {% block page_title %}Personel{% endblock %}
 
 {% block content %}
@@ -42,8 +43,18 @@
         {% endfor %}
         {% endif %}
       </div>
+      {% with month=row.month %}
+      <div class="text-xs mt-2" style="color:var(--muted)">
+        Bu ay:
+        {% if month %}
+        <span style="color:var(--ink)">{{ month.receipts }} fiş · {{ month.device_qty }} cihaz · {{ month.accessory_qty }} aksesuar</span>
+        · <strong class="gradient-text">{{ month.revenue|tl0 }}</strong>
+        {% else %}satış yok{% endif %}
+      </div>
+      {% endwith %}
     </div>
-    <div class="flex items-center gap-2 shrink-0">
+    <div class="flex flex-wrap items-center gap-2 shrink-0">
+      <a href="{% url 'stock:staff_report' pk=user.pk %}?donem=ay" class="btn btn-ghost btn-sm">Satış Raporu</a>
       <a href="{% url 'staff:logs' %}?kullanici={{ user.pk }}" class="btn btn-ghost btn-sm">Hareketler</a>
       <a href="{% url 'staff:edit' pk=user.pk %}" class="btn btn-ghost btn-sm">Düzenle</a>
     </div>

@@ -1,0 +1,144 @@
+{% extends "stock/base_stock.html" %}
+{% load stock_extras %}
+{% block page_title %}Personel Raporu{% endblock %}
+
+{% block content %}
+{% with name=person.get_full_name|default:person.username %}
+<div class="flex items-center gap-2 text-sm mb-5" style="color:var(--muted)">
+  <a href="{% url 'stock:reports' %}?donem={{ period }}" class="hover:text-white">Raporlar</a>
+  <span>/</span><span style="color:var(--ink)">{{ name }}</span>
+</div>
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div>
+    <h2 class="font-display font-extrabold text-xl">{{ name }} · Satış Raporu</h2>
+    <p class="text-sm" style="color:var(--muted)">{{ start|date:"d.m.Y" }} — {{ end|date:"d.m.Y" }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    {% include "stock/partials/staff_picker.html" with selected=person.pk %}
+    {% for key, item in periods.items %}
+    <a href="?donem={{ key }}" class="filter-chip {% if period == key %}active{% endif %}">{{ item.0 }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+  {% include "stock/partials/kpi_card.html" with label="Toplam Ciro" value=summary.revenue|tl0 icon="💰" tone="brand" hint=summary.receipts|stringformat:"s"|add:" fiş" %}
+  {% include "stock/partials/kpi_card.html" with label="Cihaz" value=summary.device_qty icon="📱" hint=summary.device_revenue|tl0 %}
+  {% include "stock/partials/kpi_card.html" with label="Aksesuar" value=summary.accessory_qty icon="🎧" hint=summary.accessory_revenue|tl0 %}
+  {% include "stock/partials/kpi_card.html" with label="Brüt Kâr" value=summary.profit|tl0 icon="📊" hint=summary.share|pct|add:" mağaza cirosundan pay" %}
+</div>
+
+<div class="card p-5 mb-6">
+  <h2 class="font-display font-bold mb-4">Ciro ve Kâr (12 Ay)</h2>
+  <div style="height:300px"><canvas id="revenue-chart"></canvas></div>
+</div>
+
+<div class="grid gap-5 lg:grid-cols-2 mb-6">
+  <!-- Cihaz kırılımı -->
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-3">Cihaz Satışları</h2>
+    <table class="w-full text-sm">
+      <thead>
+        <tr style="color:var(--muted)">
+          <th class="text-left py-2 font-medium">Tür · Durum</th>
+          <th class="text-right py-2 font-medium">Adet</th>
+          <th class="text-right py-2 font-medium">Ciro</th>
+          <th class="text-right py-2 font-medium">Kâr</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in breakdown.devices %}
+        <tr style="border-top:1px solid var(--line)">
+          <td class="py-2">{{ row.label }}</td>
+          <td class="py-2 text-right">{{ row.qty }}</td>
+          <td class="py-2 text-right">{{ row.revenue|tl0 }}</td>
+          <td class="py-2 text-right" style="color:{% if row.profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ row.profit|tl0 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="py-6 text-center" style="color:var(--muted)">Bu dönemde cihaz satışı yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Aksesuar kırılımı -->
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-3">Aksesuar Satışları</h2>
+    <table class="w-full text-sm">
+      <thead>
+        <tr style="color:var(--muted)">
+          <th class="text-left py-2 font-medium">Kategori</th>
+          <th class="text-right py-2 font-medium">Adet</th>
+          <th class="text-right py-2 font-medium">Ciro</th>
+          <th class="text-right py-2 font-medium">Kâr</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in breakdown.accessories %}
+        <tr style="border-top:1px solid var(--line)">
+          <td class="py-2">{{ row.label }}</td>
+          <td class="py-2 text-right">{{ row.qty }}</td>
+          <td class="py-2 text-right">{{ row.revenue|tl0 }}</td>
+          <td class="py-2 text-right" style="color:{% if row.profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ row.profit|tl0 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="py-6 text-center" style="color:var(--muted)">Bu dönemde aksesuar satışı yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid gap-5 lg:grid-cols-3 mb-6">
+  <!-- En çok satılan modeller -->
+  <div class="card p-5 lg:col-span-2">
+    <h2 class="font-display font-bold mb-3">En Çok Sattığı Modeller</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm" style="min-width:420px">
+        <thead>
+          <tr style="color:var(--muted)">
+            <th class="text-left py-2 font-medium">Model</th>
+            <th class="text-right py-2 font-medium">Adet</th>
+            <th class="text-right py-2 font-medium">Ciro</th>
+            <th class="text-right py-2 font-medium">Kâr</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in top_models %}
+          <tr style="border-top:1px solid var(--line)">
+            <td class="py-2">{{ row.brand }} {{ row.model }}</td>
+            <td class="py-2 text-right">{{ row.count }}</td>
+            <td class="py-2 text-right">{{ row.revenue|tl0 }}</td>
+            <td class="py-2 text-right" style="color:{% if row.profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ row.profit|tl0 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="py-6 text-center" style="color:var(--muted)">Bu dönemde cihaz satışı yok.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- İadeler -->
+  <div class="card p-5">
+    <h2 class="font-display font-bold mb-1">İade ve İptal</h2>
+    <p class="text-xs mb-3" style="color:var(--muted)">Bu kişinin satışlarından dönemde geri alınanlar (yukarıdaki rakamlardan düşülmüştür).</p>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span style="color:var(--muted)">İade edilen kalem</span><span>{{ breakdown.returns.lines }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">İade tutarı</span><span>{{ breakdown.returns.total|tl0 }}</span></div>
+      <div class="flex justify-between"><span style="color:var(--muted)">İptal edilen fiş</span><span>{{ breakdown.returns.voided }}</span></div>
+    </div>
+    <a href="{% url 'stock:sale_list' %}?personel={{ person.pk }}" class="btn btn-ghost btn-sm btn-block mt-4">Satışlarını gör →</a>
+    {% if access.patron %}
+    <a href="{% url 'staff:logs' %}?kullanici={{ person.pk }}" class="btn btn-ghost btn-sm btn-block mt-2">Hareket kayıtları →</a>
+    {% endif %}
+  </div>
+</div>
+{% endwith %}
+{% endblock %}
+
+{% block stock_scripts %}
+{{ chart|json_script:"stock-chart-data" }}
+{% include "stock/partials/chart_js.html" %}
+{% endblock %}

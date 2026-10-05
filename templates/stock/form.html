@@ -14,6 +14,9 @@
     <span style="color:var(--ink)">{% if is_edit %}Düzenle{% else %}Yeni {{ singular }}{% endif %}</span>
   </div>
 
+  {% comment %} data-enter-next: barkod okuyucu okuttuğu koddan sonra Enter'a basar;
+     IMEI/barkod alanında bu Enter formu kaydetmesin, sonraki alana geçsin
+     (static/js/fields.js). Kayıt yalnızca Kaydet düğmesiyle olur. {% endcomment %}
   {% if duplicate %}
   <div class="card p-4 mb-4" style="border-color:rgba(245,180,60,.4)">
     <p class="text-sm" style="color:#ffd48a">
@@ -24,7 +27,7 @@
   </div>
   {% endif %}
 
-  <form method="post" enctype="multipart/form-data" class="card p-6" novalidate{% if guard %} data-guard="{% if form.is_bound %}dirty{% endif %}"{% endif %}>
+  <form method="post" enctype="multipart/form-data" class="card p-6" novalidate data-enter-next{% if guard %} data-guard="{% if form.is_bound %}dirty{% endif %}"{% endif %}>
     {% csrf_token %}
     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
     {% if form.non_field_errors %}

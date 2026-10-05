@@ -1,0 +1,12 @@
+{% comment %} Personel seçimi (Raporlar → Personel Satışları ve kişi raporu).
+   Seçilen kişinin raporu aynı dönemle açılır. Kişi URL yolunda olduğu için
+   GET formu yetmez: seçeneğin değeri doğrudan rapor adresidir.
+   Parametreler: people, period, selected (ops., seçili kişinin pk'si). {% endcomment %}
+<select class="select" style="min-width:13rem;width:auto" aria-label="Personel seç"
+        onchange="if (this.value) window.location.href = this.value">
+  {% if not selected %}<option value="">Personel seçin…</option>{% endif %}
+  {% for person in people %}
+  {% url 'stock:staff_report' pk=person.pk as href %}
+  <option value="{{ href }}?donem={{ period }}" {% if person.pk == selected %}selected{% endif %}>{{ person.get_full_name|default:person.username }}{% if not person.is_active %} (pasif){% endif %}</option>
+  {% endfor %}
+</select>

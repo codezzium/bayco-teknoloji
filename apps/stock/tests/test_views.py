@@ -93,7 +93,11 @@ class ScreenTestCase(TestCase):
             reverse("stock:sale_list"),
             reverse("stock:sale_list") + "?filtre=acik",
             reverse("stock:sale_list") + "?filtre=vadesi&q=BYC",
+            reverse("stock:sale_list") + f"?personel={self.patron.pk}",
             reverse("stock:sale_detail", kwargs={"pk": self.sale.pk}),
+            # Satıcı değiştirme pop-up'ı herkese açık (personelin talebi onaya düşer).
+            reverse("stock:sale_seller_change", kwargs={"pk": self.sale.pk}),
+            reverse("staff:notifications"),
             reverse("stock:receipt", kwargs={"pk": self.sale.pk}),
             reverse("stock:receipt_png", kwargs={"pk": self.sale.pk}),
             reverse("stock:receipt_logo"),
@@ -118,6 +122,8 @@ class ScreenTestCase(TestCase):
             reverse("stock:reports") + "?donem=bugun",
             reverse("stock:reports") + "?donem=ay",
             reverse("stock:reports") + "?donem=yil",
+            reverse("stock:staff_report", kwargs={"pk": self.patron.pk}),
+            reverse("stock:staff_report", kwargs={"pk": self.personel.pk}) + "?donem=yil",
         ]
 
     def expense_urls(self):

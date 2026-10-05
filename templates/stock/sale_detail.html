@@ -8,6 +8,31 @@
   <span>/</span><span style="color:var(--ink)">{{ sale.receipt_no }}</span>
 </div>
 
+{% for change in seller_changes %}{% if change.is_pending %}
+<div class="rounded-xl px-4 py-3 mb-5 text-sm flex flex-wrap items-center justify-between gap-3"
+     style="background:rgba(245,180,60,.12);color:#ffd48a;border:1px solid rgba(245,180,60,.3)">
+  <div class="min-w-0">
+    ⏳ Satıcı değişikliği onay bekliyor:
+    <strong>{{ change.from_user.get_full_name|default:change.from_user.username|default:"Kayıtsız" }}</strong> →
+    <strong>{{ change.to_user.get_full_name|default:change.to_user.username }}</strong>
+    <span class="text-xs">({{ change.requested_by.username|default:"—" }}, {{ change.requested_at|date:"d.m.Y H:i" }})</span>
+    <div class="text-xs mt-0.5">Gerekçe: {{ change.reason }}</div>
+  </div>
+  {% if access.patron %}
+  <div class="flex gap-2 shrink-0">
+    <form method="post" action="{% url 'stock:seller_change_decide' pk=change.pk %}">
+      {% csrf_token %}<input type="hidden" name="decision" value="onayla">
+      <button class="btn btn-gradient btn-sm">Onayla</button>
+    </form>
+    <form method="post" action="{% url 'stock:seller_change_decide' pk=change.pk %}">
+      {% csrf_token %}<input type="hidden" name="decision" value="reddet">
+      <button class="btn btn-ghost btn-sm">Reddet</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endif %}{% endfor %}
+
 {% if sale.status == 'iptal' %}
 <div class="rounded-xl px-4 py-3 mb-5 text-sm"
      style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
@@ -22,9 +47,15 @@
       <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <h2 class="font-display font-extrabold text-2xl">{{ sale.receipt_no }}</h2>
-          <p class="text-sm mt-1" style="color:var(--muted)">
-            {{ sale.sold_at|date:"d.m.Y H:i" }}
-            {% if sale.cashier %}· {{ sale.cashier.username }}{% endif %}
+          <p class="text-sm mt-1 flex flex-wrap items-center gap-1.5" style="color:var(--muted)">
+            <span>{{ sale.sold_at|date:"d.m.Y H:i" }} · Satışı yapan:</span>
+            <span style="color:var(--ink)">{% if sale.cashier %}{{ sale.cashier.get_full_name|default:sale.cashier.username }}{% else %}Kayıtsız{% endif %}</span>
+            {% if sale.status != 'iptal' %}
+            <button type="button" class="rounded-md px-1.5 leading-5 hover:text-white"
+                    style="background:var(--brand-soft)" title="Satıcıyı değiştir" aria-label="Satıcıyı değiştir"
+                    hx-get="{% url 'stock:sale_seller_change' pk=sale.pk %}"
+                    hx-target="#seller-body" @click="$dispatch('seller-open')">⇄ Değiştir</button>
+            {% endif %}
           </p>
         </div>
         <a href="{% url 'stock:receipt' pk=sale.pk %}?auto=1" target="_blank"
@@ -165,6 +196,31 @@
     </div>
     {% endif %}
 
+    {% if seller_changes %}
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Satıcı Geçmişi</h3>
+      <div class="space-y-3 text-sm">
+        {% for change in seller_changes %}
+        <div class="pb-3" style="border-bottom:1px solid var(--line)">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold">
+              {{ change.from_user.get_full_name|default:change.from_user.username|default:"Kayıtsız" }} →
+              {{ change.to_user.get_full_name|default:change.to_user.username }}
+            </span>
+            <span class="chip shrink-0" style="font-size:11px;{% if change.status == 'onaylandi' %}color:#7ff0ab{% elif change.status == 'bekliyor' %}color:#ffd48a{% else %}color:#ff8b95{% endif %}">{{ change.get_status_display }}</span>
+          </div>
+          <div class="text-xs mt-1" style="color:var(--muted)">
+            {{ change.requested_at|date:"d.m.Y H:i" }} · {{ change.requested_by.username|default:"—" }}
+            {% if change.decided_by and change.decided_by_id != change.requested_by_id %} · karar: {{ change.decided_by.username }}{% endif %}
+          </div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">Gerekçe: {{ change.reason }}</div>
+          {% if change.decision_note %}<div class="text-xs mt-0.5" style="color:var(--muted)">Not: {{ change.decision_note }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {% if sale.status != 'iptal' and access.delete %}
     <form method="post" action="{% url 'stock:sale_void' pk=sale.pk %}" class="card p-5"
           onsubmit="return confirm('Fiş iptal edilecek: tüm kalemler iade olacak, cihazlar stoğa dönecek, tahsilat geri ödenecek. Emin misiniz?')">
@@ -182,4 +238,5 @@
     {% endif %}
   </div>
 </div>
+{% include "stock/partials/seller_modal.html" %}
 {% endblock %}

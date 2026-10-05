@@ -64,3 +64,27 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.at:%d.%m.%Y %H:%M} · {self.username} · {self.action}"
+
+
+class Notification(models.Model):
+    """Panel bildirimi (topbar'daki zil). Yazımlar apps/staff/notify.py'den.
+
+    Metin kayıt anında kurulur: satış ya da kişi sonradan değişse de bildirim
+    o anki durumu anlatır.
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name="notifications", verbose_name="Alıcı")
+    message = models.CharField("Bildirim", max_length=240)
+    url = models.CharField(max_length=300, blank=True, default="")
+    created_at = models.DateTimeField("Zaman", default=timezone.now)
+    read_at = models.DateTimeField("Okunma", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Bildirim"
+        verbose_name_plural = "Bildirimler"
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["user", "read_at"])]
+
+    def __str__(self):
+        return f"{self.user} · {self.message}"

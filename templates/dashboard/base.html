@@ -160,6 +160,16 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span class="hidden sm:inline" x-text="busy ? 'Yükleniyor…' : 'Uygulama Olarak Yükle'">Uygulama Olarak Yükle</span>
         </button>
+        {% with unread=notices.unread %}
+        <a href="{% url 'staff:notifications' %}" class="relative glass w-10 h-10 rounded-xl grid place-items-center shrink-0 hover:text-white"
+           style="color:var(--muted)" title="Bildirimler" aria-label="Bildirimler{% if unread %} ({{ unread }} yeni){% endif %}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          {% if unread %}
+          <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full grid place-items-center text-[11px] font-bold text-white"
+                style="background:#e23a48">{% if unread > 99 %}99+{% else %}{{ unread }}{% endif %}</span>
+          {% endif %}
+        </a>
+        {% endwith %}
         <a href="{% url 'staff:password' %}" class="hidden sm:block hover:text-white"
            style="color:var(--muted)" title="Şifremi değiştir">👤 {{ request.user.username }}</a>
       </div>

@@ -1,4 +1,28 @@
+{% load stock_extras %}
 <div id="log-results" class="space-y-2">
+  {% comment %} Kullanıcı seçiliyse yalnızca SATIŞ özeti (ayrıntı kişi raporunda).
+     Bu parçada: filtre (kişi/tarih) değişince htmx onu da yeniler. {% endcomment %}
+  {% if sales %}
+  {% with t=sales.totals %}
+  <div class="card p-4 mb-3">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div>
+        <div class="font-display font-bold">{{ sales.person.get_full_name|default:sales.person.username }} · Satışlar</div>
+        <div class="text-xs" style="color:var(--muted)">
+          {{ sales.start|date:"d.m.Y" }} — {{ sales.end|date:"d.m.Y" }}{% if sales.default %} (son 30 gün; tarih seçerek değiştirin){% endif %}
+        </div>
+      </div>
+      <a href="{% url 'stock:staff_report' pk=sales.person.pk %}" class="btn btn-ghost btn-sm">Detaylı rapor →</a>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+      <div><div class="text-xs" style="color:var(--muted)">Fiş</div><div class="font-semibold">{{ t.receipts }}</div></div>
+      <div><div class="text-xs" style="color:var(--muted)">Cihaz</div><div class="font-semibold">{{ t.device_qty }} <span class="text-xs font-normal" style="color:var(--muted)">· {{ t.device_revenue|tl0 }}</span></div></div>
+      <div><div class="text-xs" style="color:var(--muted)">Aksesuar</div><div class="font-semibold">{{ t.accessory_qty }} <span class="text-xs font-normal" style="color:var(--muted)">· {{ t.accessory_revenue|tl0 }}</span></div></div>
+      <div><div class="text-xs" style="color:var(--muted)">Toplam ciro</div><div class="font-display font-extrabold gradient-text">{{ t.revenue|tl0 }}</div></div>
+    </div>
+  </div>
+  {% endwith %}
+  {% endif %}
   {# CSV bağlantısı bu parçada: filtre değişince htmx onu da yeniler. #}
   <div class="flex items-center justify-between gap-3">
     <p class="text-xs" style="color:var(--muted)">{{ total }} kayıt</p>

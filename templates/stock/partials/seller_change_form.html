@@ -1,0 +1,77 @@
+{% comment %} Satıcı değiştirme pop-up'ının gövdesi (stock/partials/seller_modal.html'e
+   htmx ile gelir). Form #seller-body'ye post edilir; başarıda sunucu 204 +
+   HX-Refresh döner. {% endcomment %}
+<h2 class="font-display font-bold text-lg pr-8">Satıcıyı Değiştir</h2>
+<p class="text-sm mt-1 mb-4" style="color:var(--muted)">
+  {{ sale.receipt_no }} · şu anki satıcı:
+  <strong style="color:var(--ink)">{% if sale.cashier %}{{ sale.cashier.get_full_name|default:sale.cashier.username }}{% else %}Kayıtsız{% endif %}</strong>
+</p>
+
+{% if sale.status == 'iptal' %}
+<p class="text-sm" style="color:#ff8b95">İptal edilmiş satışın satıcısı değiştirilemez.</p>
+<button type="button" class="btn btn-ghost btn-sm btn-block mt-4" @click="open = false">Kapat</button>
+
+{% else %}
+{% if pending %}
+<div class="rounded-xl px-4 py-3 mb-4 text-sm"
+     style="background:rgba(245,180,60,.12);color:#ffd48a;border:1px solid rgba(245,180,60,.3)">
+  <div>
+    ⏳ <strong>{{ pending.requested_by.get_full_name|default:pending.requested_by.username|default:"—" }}</strong>
+    satıcıyı <strong>{{ pending.to_user.get_full_name|default:pending.to_user.username }}</strong>
+    yapmak istiyor ({{ pending.requested_at|date:"d.m.Y H:i" }}).
+  </div>
+  <div class="text-xs mt-1">Gerekçe: {{ pending.reason }}</div>
+  {% if patron %}
+  <div class="flex gap-2 mt-3">
+    <form method="post" action="{% url 'stock:seller_change_decide' pk=pending.pk %}" class="flex-1">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <input type="hidden" name="decision" value="onayla">
+      <button class="btn btn-gradient btn-sm btn-block">Onayla</button>
+    </form>
+    <form method="post" action="{% url 'stock:seller_change_decide' pk=pending.pk %}" class="flex-1">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <input type="hidden" name="decision" value="reddet">
+      <button class="btn btn-ghost btn-sm btn-block">Reddet</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if pending and not patron %}
+<p class="text-sm" style="color:var(--muted)">Talep patron onayını bekliyor. Sonuç panel bildirimi olarak gelecek.</p>
+<button type="button" class="btn btn-ghost btn-sm btn-block mt-4" @click="open = false">Kapat</button>
+{% else %}
+<form hx-post="{% url 'stock:sale_seller_change' pk=sale.pk %}" hx-target="#seller-body" hx-swap="innerHTML">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="rounded-xl px-4 py-3 mb-4 text-sm"
+       style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+    {{ form.non_field_errors|striptags }}
+  </div>
+  {% endif %}
+  {% for field in form %}
+  <div class="field">
+    <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.errors %}<p class="text-xs mt-1" style="color:#ff8b95">{{ field.errors|striptags }}</p>{% endif %}
+  </div>
+  {% endfor %}
+  <p class="text-xs mb-4" style="color:var(--muted)">
+    {% if patron %}
+      {% if pending %}Buradan değiştirirseniz bekleyen talep geçersiz sayılır.{% else %}Değişiklik hemen uygulanır.{% endif %}
+      Eski ve yeni satıcıya bildirim gider; raporlar yeni satıcıya göre hesaplanır.
+    {% else %}
+      Talep patron onayına gönderilir; satıcı onaydan sonra değişir.
+    {% endif %}
+    İade ve yeniden satış gerekmez.
+  </p>
+  <div class="flex gap-2">
+    <button class="btn btn-gradient flex-1">{% if patron %}Değiştir{% else %}Onaya Gönder{% endif %}</button>
+    <button type="button" class="btn btn-ghost" @click="open = false">Vazgeç</button>
+  </div>
+</form>
+{% endif %}
+{% endif %}

@@ -9,6 +9,8 @@
  * form[data-guard]: bir alan değiştikten sonra sayfadan çıkılırsa (menü
  *   bağlantısı, geri tuşu, yenileme) tarayıcı onay ister; gönderimde kalkar.
  *   data-guard="dirty": form hatayla geri döndü, girilenler zaten ekranda.
+ * form[data-enter-next]: bir alanda Enter formu GÖNDERMEZ, sonraki alana geçer.
+ *   Barkod okuyucu kodu yazıp Enter'a basar; IMEI okutunca kayıt oluşmasın.
  *
  * Alpine'a bağlı değildir; htmx ile sonradan gelen içerikte de çalışır.
  * window.BaycoNum.parse / format Alpine ifadelerinde kullanılır (kasa ödemesi).
@@ -205,6 +207,35 @@
   document.addEventListener("DOMContentLoaded", function () { enhance(document); });
   // htmx ile yerleştirilen her yeni içerik (sepet, sayım listesi…)
   document.addEventListener("htmx:load", function (e) { enhance(e.detail && e.detail.elt); });
+
+  /* ------------------------------------------------------------------ */
+  /* Enter ile sonraki alana geç                                         */
+  /* ------------------------------------------------------------------ */
+  // scan.js bir alana yazılırken bilinçli olarak karışmaz; okuyucunun Enter'ı
+  // buraya düşer. Bubble aşamasında: combobox kendi Enter'ını zaten
+  // preventDefault eder (seçim yapar), ona dokunulmaz.
+  var NOT_A_FIELD = /^(submit|button|reset|image|hidden)$/;
+
+  function nextField(input) {
+    var fields = Array.prototype.filter.call(input.form.elements, function (el) {
+      return (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA") &&
+             !NOT_A_FIELD.test(el.type) && !el.disabled && el.tabIndex >= 0 &&
+             el.offsetParent !== null;
+    });
+    return fields[fields.indexOf(input) + 1] || null;
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || e.defaultPrevented || e.isComposing) return;
+    var input = e.target;
+    if (!(input instanceof HTMLInputElement) || NOT_A_FIELD.test(input.type)) return;
+    if (!input.form || !input.form.hasAttribute("data-enter-next")) return;
+    e.preventDefault();
+    var next = nextField(input);
+    if (!next) return;  // son alan: kayıt yalnızca Kaydet düğmesiyle
+    next.focus();
+    if (next.tagName === "INPUT" && next.select) next.select();
+  });
 
   /* ------------------------------------------------------------------ */
   /* Kaydedilmemiş değişiklik uyarısı                                    */

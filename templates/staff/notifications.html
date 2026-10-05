@@ -1,0 +1,82 @@
+{% extends "dashboard/base.html" %}
+{% block page_title %}Bildirimler{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  {% if pending %}
+  <div class="card p-5 mb-6">
+    <h2 class="font-display font-bold mb-1">Onay Bekleyen Satıcı Değişiklikleri</h2>
+    <p class="text-xs mb-4" style="color:var(--muted)">
+      Onaylanınca satış yeni satıcıya yazılır, raporlar ona göre hesaplanır ve ilgili kişilere bildirim gider.
+    </p>
+    <div class="space-y-3">
+      {% for change in pending %}
+      <div class="glass rounded-xl p-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0 text-sm">
+            <a href="{% url 'stock:sale_detail' pk=change.sale.pk %}" class="font-mono text-xs px-2 py-0.5 rounded-md hover:underline"
+               style="background:var(--brand-soft)">{{ change.sale.receipt_no|default:"—" }}</a>
+            <div class="mt-2">
+              <strong>{{ change.from_user.get_full_name|default:change.from_user.username|default:"Kayıtsız" }}</strong>
+              → <strong>{{ change.to_user.get_full_name|default:change.to_user.username }}</strong>
+            </div>
+            <div class="text-xs mt-1" style="color:var(--muted)">
+              Talep eden: {{ change.requested_by.get_full_name|default:change.requested_by.username|default:"—" }}
+              · {{ change.requested_at|date:"d.m.Y H:i" }}
+            </div>
+            <div class="text-xs mt-1">Gerekçe: {{ change.reason }}</div>
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <form method="post" action="{% url 'stock:seller_change_decide' pk=change.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ next_url }}">
+              <input type="hidden" name="decision" value="onayla">
+              <button class="btn btn-gradient btn-sm">Onayla</button>
+            </form>
+            <form method="post" action="{% url 'stock:seller_change_decide' pk=change.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ next_url }}">
+              <input type="hidden" name="decision" value="reddet">
+              <button class="btn btn-ghost btn-sm">Reddet</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <h2 class="font-display font-extrabold text-xl mb-4">Bildirimler</h2>
+  <div class="space-y-2">
+    {% for item in page %}
+    <div class="card p-4 flex items-start gap-3">
+      <span class="mt-1.5 w-2 h-2 rounded-full shrink-0"
+            style="background:{% if item.read_at %}transparent{% else %}#e23a48{% endif %}"
+            {% if not item.read_at %}title="Yeni"{% endif %}></span>
+      <div class="min-w-0 flex-1">
+        {% if item.url %}
+        <a href="{{ item.url }}" class="text-sm hover:underline {% if not item.read_at %}font-semibold{% endif %}">{{ item.message }}</a>
+        {% else %}
+        <p class="text-sm {% if not item.read_at %}font-semibold{% endif %}">{{ item.message }}</p>
+        {% endif %}
+        <div class="text-xs mt-1" style="color:var(--muted)">{{ item.created_at|date:"d.m.Y H:i" }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="card p-12 text-center">
+      <div class="text-4xl mb-3">🔔</div>
+      <p class="font-semibold">Bildirim yok</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if page.has_other_pages %}
+  <div class="flex items-center justify-between gap-3 mt-4 text-sm">
+    {% if page.has_previous %}<a href="?sayfa={{ page.previous_page_number }}" class="btn btn-ghost btn-sm">← Yeni</a>{% else %}<span></span>{% endif %}
+    <span style="color:var(--muted)">{{ page.number }}/{{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?sayfa={{ page.next_page_number }}" class="btn btn-ghost btn-sm">Eski →</a>{% else %}<span></span>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

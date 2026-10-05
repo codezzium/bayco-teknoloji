@@ -1,7 +1,9 @@
 """Kasa (POS), satış listesi, fiş ve tahsilat ekranları."""
 
 from django.contrib import messages
-from django.db.models import F, Q
+from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.db.models import Exists, F, OuterRef, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -9,10 +11,12 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
+from apps.staff.notify import display_name, panel_users
+
 from .. import cart as cart_utils
 from .. import pos58, services
-from ..forms import PaymentForm
-from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem
+from ..forms import PaymentForm, SellerChangeForm
+from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem, SellerChange
 from ..niimbot import to_png
 from ..receipt_logo import current_logo
 from ..templatetags.stock_extras import tl
@@ -21,10 +25,14 @@ from .base import (
     access_required,
     can_see_money,
     has_access,
+    is_htmx,
+    is_patron,
     paginate,
     panel_required,
+    patron_required,
     pick_template,
     querystring,
+    safe_next,
 )
 
 
@@ -47,6 +55,9 @@ def cart_context(request, cart=None) -> dict:
         "device_models": (DeviceModel.objects.filter(is_active=True)
                           .select_related("brand")
                           if summary["has_device"] or summary["trade_ins"] else []),
+        # "Satışı yapan" seçimi (tembel: yalnızca ödeme formu çizilirse sorgulanır).
+        "sellers": panel_users(),
+        "selected_seller": request.user.pk,
     }
 
 
@@ -225,6 +236,15 @@ def _payments_from_post(post, payable) -> list[dict] | None:
     return [{"amount": amount, "method": method} for method, amount in totals.items()]
 
 
+def _chosen_seller(request):
+    """Kasada "Satışı yapan" seçimi; boş ya da ekipte olmayan değer giriş
+    yapan kullanıcı demektir."""
+    raw = request.POST.get("seller", "")
+    if raw.isdigit() and int(raw) != request.user.pk:
+        return panel_users().filter(pk=int(raw)).first() or request.user
+    return request.user
+
+
 @panel_required
 @require_POST
 def checkout(request):
@@ -242,14 +262,30 @@ def checkout(request):
         due_date = None
     if due_raw and due_date is None:
         return _render_cart(request, cart, "Geçersiz vade tarihi.")
+
+    # Başkası adına satış: Patron doğrudan yazar. Personel kendi adına yazar ve
+    # aynı işlemde satıcı değişikliği talebi açılır (patron onayına düşer);
+    # aksi halde Satışlar'daki onay akışı kasadan atlanabilirdi.
+    seller = _chosen_seller(request)
+    direct = seller.pk == request.user.pk or is_patron(request.user)
+    change = None
     try:
-        sale = services.create_sale_from_cart(
-            cart, user=request.user, payments=payments, due_date=due_date,
-            note=cart.get("note", ""),
-            confirm_prices=bool(request.POST.get("confirm_prices")),
-        )
+        with transaction.atomic():
+            sale = services.create_sale_from_cart(
+                cart, user=request.user, payments=payments, due_date=due_date,
+                note=cart.get("note", ""),
+                confirm_prices=bool(request.POST.get("confirm_prices")),
+                seller=seller if direct else None,
+            )
+            if not direct:
+                change = services.request_seller_change(
+                    sale, to_user=seller, user=request.user,
+                    reason=f"Kasada satışı yapan olarak {display_name(seller)} seçildi.")
         methods = dict(Payment.Method.choices)
-        detail = {"Ödenecek": str(sale.payable_total)}
+        detail = {"Ödenecek": str(sale.payable_total),
+                  "Satışı yapan": display_name(seller)}
+        if change is not None:
+            detail["Satıcı"] = "Patron onayına gönderildi"
         if payments:
             detail["Ödeme"] = " + ".join(f"{methods[p['method']]} {tl(p['amount'])}"
                                          for p in payments)
@@ -259,12 +295,17 @@ def checkout(request):
     except services.PriceChanged as exc:
         context = cart_context(request, cart)
         context["price_changes"] = exc.changes
+        context["selected_seller"] = seller.pk
         return render(request, "stock/partials/cart.html", context)
     except services.StockError as exc:
         return _render_cart(request, cart, str(exc))
 
     cart_utils.clear_cart(request)
-    messages.success(request, f"{sale.receipt_no} oluşturuldu.")
+    message = f"{sale.receipt_no} oluşturuldu."
+    if change is not None:
+        message += (f" Satıcı olarak {display_name(seller)} seçildi; "
+                    "değişiklik patron onayına gönderildi.")
+    messages.success(request, message)
     return render(request, "stock/partials/cart.html", {
         **cart_context(request),
         "completed_sale": sale,
@@ -280,8 +321,13 @@ def checkout(request):
 def sale_list(request):
     query = request.GET.get("q", "").strip()
     only = request.GET.get("filtre", "")
+    person = request.GET.get("personel", "")
 
-    sales = Sale.objects.select_related("customer", "cashier").prefetch_related("items")
+    sales = (Sale.objects.select_related("customer", "cashier").prefetch_related("items")
+             .annotate(seller_pending=Exists(SellerChange.objects.filter(
+                 sale=OuterRef("pk"), status=SellerChange.Status.BEKLIYOR))))
+    if person.isdigit():
+        sales = sales.filter(cashier_id=int(person))
     if only == "acik":
         sales = sales.filter(status=Sale.Status.TAMAMLANDI,
                              payable_total__gt=F("paid_total"))
@@ -306,6 +352,9 @@ def sale_list(request):
                                          "stock/sale_list.html"), {
         "active": "satislar", "title": "Satışlar", "page": page,
         "total": page.paginator.count, "q": query, "filtre": only,
+        "personel": person,
+        "sellers": (get_user_model().objects.filter(sales__isnull=False)
+                    .distinct().order_by("first_name", "username")),
         "qs": querystring(request),
         "filter_options": [
             ("", "Tümü"), ("acik", "Açık bakiye"),
@@ -327,6 +376,8 @@ def sale_detail(request, pk):
         "payments": sale.payments.select_related("created_by"),
         "payment_form": PaymentForm(user=request.user),
         "show_money": can_see_money(request.user),
+        "seller_changes": list(sale.seller_changes.select_related(
+            "from_user", "to_user", "requested_by", "decided_by")),
     })
 
 
@@ -405,6 +456,88 @@ def sale_void(request, pk):
     except services.StockError as exc:
         messages.error(request, str(exc))
     return redirect("stock:sale_detail", pk=pk)
+
+
+# ===========================================================================
+# Satıcı değişikliği
+# ===========================================================================
+
+@panel_required
+def sale_seller_change(request, pk):
+    """Satıcı değiştirme pop-up'ının gövdesi (GET) ve gönderimi (POST).
+
+    Patron için anında uygulanır, personelin talebi patron onayına düşer
+    (services.request_seller_change). Başarıda 204 + HX-Refresh: sayfa
+    yenilenir, satıcı ve mesaj görünür (deny()'daki kalıp). Hata pop-up'ın
+    içinde formu yeniden çizer.
+    """
+    sale = get_object_or_404(Sale.objects.select_related("cashier"), pk=pk)
+    sale_url = reverse("stock:sale_detail", kwargs={"pk": sale.pk})
+    form = SellerChangeForm(request.POST or None, sale=sale)
+
+    if request.method == "POST":
+        request.audit = {"target": sale.receipt_no, "target_url": sale_url,
+                         "invalid": True}
+        if form.is_valid():
+            to_user = form.cleaned_data["to_user"]
+            try:
+                change = services.request_seller_change(
+                    sale, to_user=to_user, reason=form.cleaned_data["reason"],
+                    user=request.user)
+            except services.StockError as exc:
+                form.add_error(None, str(exc))
+            else:
+                request.audit.update(invalid=False, detail={
+                    "Eski satıcı": display_name(change.from_user),
+                    "Yeni satıcı": display_name(to_user),
+                    "Sonuç": change.get_status_display(),
+                })
+                if change.status == SellerChange.Status.ONAYLANDI:
+                    messages.success(request, f"{sale.receipt_no} satıcısı "
+                                              f"{display_name(to_user)} olarak değiştirildi.")
+                else:
+                    messages.success(request, f"{sale.receipt_no}: satıcı değişikliği "
+                                              "patron onayına gönderildi.")
+                if is_htmx(request):
+                    return HttpResponse(status=204, headers={"HX-Refresh": "true"})
+                return redirect(sale_url)
+
+    return render(request, "stock/partials/seller_change_form.html", {
+        "sale": sale,
+        "form": form,
+        "pending": (sale.seller_changes.filter(status=SellerChange.Status.BEKLIYOR)
+                    .select_related("to_user", "requested_by").first()),
+        "patron": is_patron(request.user),
+        "next_url": safe_next(request) or sale_url,
+    })
+
+
+@patron_required
+@require_POST
+def seller_change_decide(request, pk):
+    change = get_object_or_404(SellerChange.objects.select_related("sale", "to_user"),
+                               pk=pk)
+    sale = change.sale
+    approve = request.POST.get("decision") == "onayla"
+    request.audit = {"target": sale.receipt_no,
+                     "target_url": reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
+                     "detail": {"Yeni satıcı": display_name(change.to_user)}}
+    try:
+        change = services.decide_seller_change(change, user=request.user, approve=approve,
+                                               note=request.POST.get("note", ""))
+    except services.StockError as exc:
+        messages.error(request, str(exc))
+    else:
+        if change.status == SellerChange.Status.GECERSIZ:
+            messages.warning(request, f"{sale.receipt_no}: talep geçersiz — satış iptal "
+                                      "edilmiş ya da satıcısı bu arada değişmiş.")
+        elif change.status == SellerChange.Status.ONAYLANDI:
+            messages.success(request, f"{sale.receipt_no} satıcısı "
+                                      f"{display_name(change.to_user)} olarak değiştirildi.")
+        else:
+            messages.success(request, f"{sale.receipt_no}: satıcı değişikliği reddedildi.")
+    return redirect(safe_next(request)
+                    or reverse("stock:sale_detail", kwargs={"pk": sale.pk}))
 
 
 @panel_required

@@ -1,7 +1,7 @@
 """Personel yönetimi, şifre değiştirme ve hareket kayıtları."""
 
 import csv
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
@@ -12,9 +12,10 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
+from apps.stock import reports as rpt
+from apps.stock.models import SellerChange
 from apps.stock.permissions import (
     ACCESS,
-    PANEL_GROUPS,
     is_patron,
     panel_required,
     patron_required,
@@ -23,7 +24,8 @@ from apps.stock.views.base import paginate, pick_template, querystring
 
 from .actions import field_label
 from .forms import StaffForm, StyledPasswordChangeForm, granted_keys
-from .models import ActivityLog
+from .models import ActivityLog, Notification
+from .notify import panel_members
 
 User = get_user_model()
 
@@ -32,12 +34,13 @@ User = get_user_model()
 
 @patron_required
 def staff_list(request):
-    users = (User.objects
-             .filter(Q(is_superuser=True) | Q(is_staff=True)
-                     | Q(groups__name__in=PANEL_GROUPS))
-             .distinct()
+    users = (panel_members()
              .prefetch_related("groups")
              .order_by("-is_active", "username"))
+    # Bu ayın satış özeti: tek sorgu, kullanıcıya göre sözlük.
+    today = timezone.localdate()
+    month = {row["user"].pk: row for row in rpt.sales_by_staff(today.replace(day=1), today)
+             if row["user"] is not None}
     rows = []
     for user in users:
         patron = is_patron(user)
@@ -47,6 +50,7 @@ def staff_list(request):
             "patron": patron,
             "labels": [] if patron else [item.label for key, item in ACCESS.items()
                                          if key in keys],
+            "month": month.get(user.pk),
         })
     return render(request, "staff/staff_list.html", {
         "active": "personel", "title": "Personel", "singular": "Personel",
@@ -121,6 +125,25 @@ def _filtered_logs(request):
     return logs
 
 
+def _sales_summary(request):
+    """Kullanıcı seçiliyken log ekranının üstündeki satış özeti.
+
+    Yalnızca satış rakamları (fiş, cihaz, aksesuar, ciro); ayrıntı kişi
+    raporundadır. Tarih seçilmemişse son 30 gün.
+    """
+    user_id = request.GET.get("kullanici", "")
+    person = User.objects.filter(pk=user_id).first() if user_id.isdigit() else None
+    if person is None:
+        return None
+    start = parse_date(request.GET.get("baslangic") or "")
+    end = parse_date(request.GET.get("bitis") or "")
+    default = start is None and end is None
+    end = end or timezone.localdate()
+    start = start or end - timedelta(days=29)
+    return {"person": person, "start": start, "end": end, "default": default,
+            "totals": rpt.staff_sales_summary(start, end, person)}
+
+
 @patron_required
 def log_list(request):
     logs = _filtered_logs(request)
@@ -145,6 +168,32 @@ def log_list(request):
         "kinds": ActivityLog.Kind.choices,
         "users": User.objects.filter(activity_logs__isnull=False).distinct()
                              .order_by("username"),
+        "sales": _sales_summary(request),
+    })
+
+
+# ---------- Bildirimler ----------
+
+@panel_required
+def notifications(request):
+    """Kullanıcının bildirimleri. Açılan sayfadaki okunmamışlar okundu sayılır.
+
+    Patron için en üstte onay bekleyen satıcı değişiklikleri — ayrı bir onay
+    sayfası yoktur, zildeki bildirim buraya getirir.
+    """
+    page = paginate(Notification.objects.filter(user=request.user), request, per_page=30)
+    unread = [item.pk for item in page if item.read_at is None]
+    # Sayfa çizilirken "yeni" rozeti görünsün diye nesnelere dokunulmaz;
+    # yalnızca veritabanında okundu işaretlenir.
+    Notification.objects.filter(pk__in=unread).update(read_at=timezone.now())
+    pending = []
+    if is_patron(request.user):
+        pending = (SellerChange.objects.filter(status=SellerChange.Status.BEKLIYOR)
+                   .select_related("sale", "from_user", "to_user", "requested_by")
+                   .order_by("requested_at"))
+    return render(request, "staff/notifications.html", {
+        "active": "", "page": page, "pending": pending,
+        "next_url": reverse("staff:notifications"),
     })
 
 

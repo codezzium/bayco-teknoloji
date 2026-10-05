@@ -12,4 +12,5 @@ urlpatterns = [
     path("<int:pk>/duzenle/", views.staff_form, name="edit"),
     path("sifre/", views.password_change, name="password"),
     path("loglar/", views.log_list, name="logs"),
+    path("bildirimler/", views.notifications, name="notifications"),
 ]

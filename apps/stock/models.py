@@ -624,6 +624,7 @@ class Sale(models.Model):
             models.Index(fields=["status", "sold_at"]),
             models.Index(fields=["due_date"]),
             models.Index(fields=["customer", "status"]),
+            models.Index(fields=["cashier", "sold_at"]),  # personel raporu
         ]
         permissions = [
             ("view_money", "Maliyet, kâr ve ciro bilgilerini görebilir"),
@@ -688,6 +689,64 @@ class Sale(models.Model):
             cost=Coalesce(Sum("line_cost"), ZERO),
         )
         return money(active["revenue"]) - money(active["cost"])
+
+
+class SellerChange(models.Model):
+    """Satışın satıcısını (Sale.cashier) değiştirme talebi — ve geçmişi.
+
+    Yanlış kişinin adına düşen satış iade + yeniden satışla düzeltilirse stok,
+    kasa ve iade kayıtları sahte hareketlerle dolar. Burada yalnızca satıcı
+    değişir; eski satıcı, gerekçe ve onaylayan bu tabloda kalır.
+
+    Patronun talebi anında uygulanır (onaylandi); personelinki patron
+    onayını bekler. Yazımlar yalnızca services.py'deki satıcı değişikliği
+    fonksiyonlarından yapılır.
+    """
+
+    class Status(models.TextChoices):
+        BEKLIYOR = "bekliyor", "Onay bekliyor"
+        ONAYLANDI = "onaylandi", "Onaylandı"
+        REDDEDILDI = "reddedildi", "Reddedildi"
+        #: Satış iptal edildi ya da satıcı bu arada başka yoldan değişti.
+        GECERSIZ = "gecersiz", "Geçersiz"
+
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE,
+                             related_name="seller_changes", verbose_name="Satış")
+    from_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                  null=True, blank=True, related_name="+",
+                                  verbose_name="Eski satıcı")
+    to_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                related_name="+", verbose_name="Yeni satıcı")
+    reason = models.CharField("Gerekçe", max_length=200)
+    status = models.CharField("Durum", max_length=10, choices=Status.choices,
+                              default=Status.BEKLIYOR)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                     null=True, blank=True, related_name="+",
+                                     verbose_name="Talep eden")
+    requested_at = models.DateTimeField("Talep zamanı", default=timezone.now)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                   null=True, blank=True, related_name="+",
+                                   verbose_name="Karar veren")
+    decided_at = models.DateTimeField("Karar zamanı", null=True, blank=True)
+    decision_note = models.CharField("Karar notu", max_length=200, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Satıcı Değişikliği"
+        verbose_name_plural = "Satıcı Değişiklikleri"
+        ordering = ["-requested_at", "-id"]
+        constraints = [
+            # Bir satış için aynı anda en fazla BİR bekleyen talep.
+            models.UniqueConstraint(fields=["sale"], condition=Q(status="bekliyor"),
+                                    name="uniq_pending_seller_change"),
+        ]
+        indexes = [models.Index(fields=["status", "requested_at"])]
+
+    def __str__(self):
+        return f"{self.sale} satıcı: {self.from_user} → {self.to_user} ({self.status})"
+
+    @property
+    def is_pending(self):
+        return self.status == self.Status.BEKLIYOR
 
 
 class SaleItem(models.Model):

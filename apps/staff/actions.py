@@ -26,6 +26,8 @@ LABELS = {
     "stock:sale_payment": "Ödeme kaydetti",
     "stock:sale_void": "Satışı iptal etti",
     "stock:sale_item_return": "Ürün iadesi aldı",
+    "stock:sale_seller_change": "Satıcı değişikliği yaptı/istedi",
+    "stock:seller_change_decide": "Satıcı değişikliğine karar verdi",
     # --- Cihazlar ---
     "stock:device_create": "Cihaz ekledi",
     "stock:device_edit": "Cihazı düzenledi",
@@ -83,6 +85,10 @@ BY_PARAM = {
         "sayim": "Aksesuar sayım düzeltmesi yaptı",
         "fire": "Aksesuar fire kaydetti",
     }),
+    "stock:seller_change_decide": ("decision", {
+        "onayla": "Satıcı değişikliğini onayladı",
+        "reddet": "Satıcı değişikliğini reddetti",
+    }),
 }
 
 #: Yalnızca okuma yapan (ya da loglanmaması bilinçli) rotalar. Yetkisiz
@@ -119,8 +125,10 @@ READ_ONLY = {
     "stock:label_print": "Etiket",
     "stock:niimbot_png": "Etiket görseli",
     "stock:reports": "Raporlar",
+    "stock:staff_report": "Personel raporu",
     "staff:list": "Personel",
     "staff:logs": "Hareket Kayıtları",
+    "staff:notifications": "Bildirimler",
 }
 
 #: POST'u olan ama ekrana karşılık gelen GET'i de olan form view'ları: GET'te
@@ -134,6 +142,7 @@ FORM_PAGES = {
     "stock:contact_create": "Cari ekleme", "stock:contact_edit": "Cari düzenleme",
     "stock:contact_quick": "Cari ekleme",
     "stock:expense_create": "Gider ekleme", "stock:expense_edit": "Gider düzenleme",
+    "stock:sale_seller_change": "Satıcı değiştirme",
     "dashboard:crud_create": "{title}", "dashboard:crud_edit": "{title}",
     "dashboard:settings": "Site Ayarları",
     "staff:create": "Personel ekleme", "staff:edit": "Personel düzenleme",
@@ -269,6 +278,7 @@ FIELD_LABELS = {
     "unit_cost": "Birim alış", "list_price": "Satış fiyatı",
     "purchase_price": "Alış fiyatı", "cost": "Alış fiyatı",
     "imei1": "IMEI 1", "imei2": "IMEI 2", "storage": "Hafıza", "color": "Renk",
+    "seller": "Satışı yapan", "to_user": "Yeni satıcı", "decision": "Karar",
 }
 
 

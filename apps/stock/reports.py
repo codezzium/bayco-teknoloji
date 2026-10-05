@@ -19,7 +19,7 @@ from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
 from .models import Accessory, Device, Expense, Payment, Sale, SaleItem
-from .utils import money
+from .utils import add_months, money
 
 DEC = DecimalField(max_digits=14, decimal_places=2)
 ZERO = Value(Decimal("0.00"), output_field=DEC)
@@ -29,17 +29,22 @@ IST = ZoneInfo("Europe/Istanbul")
 HELD_STATUSES = [Device.Status.STOKTA, Device.Status.REZERVE, Device.Status.SERVISTE]
 
 
-def sold_lines(start=None, end=None):
+def sold_lines(start=None, end=None, cashier=None):
     """Ciro/kâr hesabının TEK kaynağı.
 
     Sale.grand_total OKUNMAZ: o, basılan fişin üzerindeki rakamdır ve takas
     içeren fişlerde tahsil edilen tutardan farklıdır. Ciro her zaman satır
     kalemlerinden toplanır.
+
+    `cashier`: yalnızca bu personelin (Sale.cashier, kullanıcı ya da id)
+    satışları. Satıcı değişikliği onaylanınca rakamlar yeni satıcıya geçer.
     """
     lines = SaleItem.objects.filter(sale__status=Sale.Status.TAMAMLANDI,
                                     returned_at__isnull=True)
     if start and end:
         lines = lines.filter(sale__sold_at__date__range=(start, end))
+    if cashier is not None:
+        lines = lines.filter(sale__cashier=cashier)
     return lines
 
 
@@ -47,8 +52,8 @@ def sold_lines(start=None, end=None):
 # Ciro / kâr
 # ---------------------------------------------------------------------------
 
-def revenue_and_profit(start=None, end=None) -> dict:
-    totals = sold_lines(start, end).aggregate(
+def revenue_and_profit(start=None, end=None, cashier=None) -> dict:
+    totals = sold_lines(start, end, cashier).aggregate(
         revenue=Coalesce(Sum("line_total", output_field=DEC), ZERO),
         cost=Coalesce(Sum("line_cost", output_field=DEC), ZERO),
         lines=Count("id"),
@@ -183,13 +188,13 @@ def aging_buckets() -> list[dict]:
 # Satış kırılımları
 # ---------------------------------------------------------------------------
 
-def top_models(start=None, end=None, limit=10) -> list[dict]:
+def top_models(start=None, end=None, limit=10, cashier=None) -> list[dict]:
     """DeviceModel tablosunun asıl gerekçesi olan sorgu.
 
     Model adı serbest metin olsaydı "iphone 13", "İphone13" ve "IPHONE 13 "
     üç ayrı ürün olarak dönerdi.
     """
-    rows = (sold_lines(start, end)
+    rows = (sold_lines(start, end, cashier)
             .filter(kind=SaleItem.Kind.CIHAZ)
             .values("device__device_model__brand__name",
                     "device__device_model__name")
@@ -208,13 +213,15 @@ def top_models(start=None, end=None, limit=10) -> list[dict]:
     } for r in rows]
 
 
-def revenue_series(months=12) -> dict:
-    """Aylık ciro/kâr serisi (Chart.js için)."""
+def revenue_series(months=12, cashier=None) -> dict:
+    """Aylık ciro/kâr serisi (Chart.js için); son ay içinde bulunulan aydır."""
     today = timezone.localdate()
-    first = (today.replace(day=1)
-             - timedelta(days=31 * (months - 1))).replace(day=1)
+    # Ay aritmetiği: timedelta(days=31 * 11) her zaman geçen yılın AYNI ayına
+    # düşüyordu ve 12 aylık eksen bu ayı dışarıda bırakıyordu.
+    this_month = today.replace(day=1)
+    first = add_months(this_month, -(months - 1)) or this_month
 
-    rows = (sold_lines()
+    rows = (sold_lines(cashier=cashier)
             .filter(sale__sold_at__date__gte=first)
             # tzinfo AÇIKÇA verilir: sistem tz veritabanı yoksa Django sessizce
             # UTC'ye düşer ve 21:00 sonrası satışlar yanlış aya yazılır.
@@ -264,6 +271,115 @@ def cash_by_method(start, end) -> list[dict]:
     labels = dict(Payment.Method.choices)
     return [{"method": labels.get(r["method"], r["method"]),
              "total": money(r["total"])} for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Personel kırılımı
+# ---------------------------------------------------------------------------
+# Satıcı Sale.cashier'dır (fiş başına bir kişi). Kalemler kimin sattığını
+# taşımaz; bir fişteki cihaz ve aksesuar aynı kişiye yazılır.
+
+def _staff_row(user=None) -> dict:
+    zero = Decimal("0.00")
+    return {"user": user, "receipts": 0,
+            "device_qty": 0, "device_revenue": zero, "device_profit": zero,
+            "accessory_qty": 0, "accessory_revenue": zero, "accessory_profit": zero,
+            "revenue": zero, "profit": zero, "share": Decimal("0")}
+
+
+def sales_by_staff(start, end, cashier=None) -> list[dict]:
+    """Personel başına fiş, cihaz/aksesuar adedi, ciro ve brüt kâr.
+
+    Satıcısı boş satışlar (Excel içe aktarımı) `user=None` satırında toplanır.
+    `share`: dönem cirosundaki payı (%). Ciroya göre azalan sıralı.
+    """
+    from django.contrib.auth import get_user_model
+
+    lines = sold_lines(start, end, cashier)
+    by_kind = (lines.values("sale__cashier", "kind")
+               .annotate(qty=Coalesce(Sum("quantity"), Value(0)),
+                         revenue=Coalesce(Sum("line_total", output_field=DEC), ZERO),
+                         profit=Coalesce(
+                             Sum(F("line_total") - F("line_cost"), output_field=DEC),
+                             ZERO))
+               .order_by())
+    # Fiş sayısı ayrı sorgu: (kişi, tür) gruplarındaki distinct sayılar
+    # toplanırsa hem cihaz hem aksesuar içeren fiş iki kez sayılırdı.
+    receipts = dict(lines.values_list("sale__cashier")
+                    .annotate(n=Count("sale", distinct=True))
+                    .order_by())
+
+    rows = {}
+    for r in by_kind:
+        row = rows.setdefault(r["sale__cashier"], _staff_row())
+        prefix = "device" if r["kind"] == SaleItem.Kind.CIHAZ else "accessory"
+        row[f"{prefix}_qty"] += r["qty"]
+        row[f"{prefix}_revenue"] += money(r["revenue"])
+        row[f"{prefix}_profit"] += money(r["profit"])
+
+    users = get_user_model().objects.in_bulk([pk for pk in rows if pk is not None])
+    # Pay her zaman MAĞAZA cirosuna göredir; tek kişi süzülmüşse satırların
+    # toplamı yalnızca onun cirosu olur ve pay hep %100 çıkardı.
+    if cashier is None:
+        total = sum((row["device_revenue"] + row["accessory_revenue"]
+                     for row in rows.values()), Decimal("0.00"))
+    else:
+        total = revenue_and_profit(start, end)["revenue"]
+    for pk, row in rows.items():
+        row["user"] = users.get(pk)
+        row["receipts"] = receipts.get(pk, 0)
+        row["revenue"] = row["device_revenue"] + row["accessory_revenue"]
+        row["profit"] = row["device_profit"] + row["accessory_profit"]
+        row["share"] = (row["revenue"] / total * 100) if total else Decimal("0")
+    return sorted(rows.values(), key=lambda row: row["revenue"], reverse=True)
+
+
+def staff_sales_summary(start, end, cashier) -> dict:
+    """Tek personelin dönem özeti (satışı yoksa sıfırlar)."""
+    rows = sales_by_staff(start, end, cashier)
+    return rows[0] if rows else _staff_row()
+
+
+def staff_breakdown(start, end, cashier) -> dict:
+    """Kişi raporu için kırılımlar: cihaz türü + durumu, aksesuar kategorisi,
+    ve bu personelin satışlarından dönemde yapılan iadeler."""
+    from .models import DeviceModel
+
+    lines = sold_lines(start, end, cashier)
+    money_cols = {
+        "revenue": Coalesce(Sum("line_total", output_field=DEC), ZERO),
+        "profit": Coalesce(Sum(F("line_total") - F("line_cost"), output_field=DEC), ZERO),
+    }
+
+    kinds = dict(DeviceModel.Kind.choices)
+    conditions = dict(Device.Condition.choices)
+    devices = [{
+        "label": f"{kinds.get(r['device__device_model__kind'], '—')} · "
+                 f"{conditions.get(r['device__condition'], '—')}",
+        "qty": r["qty"], "revenue": money(r["revenue"]), "profit": money(r["profit"]),
+    } for r in (lines.filter(kind=SaleItem.Kind.CIHAZ)
+                .values("device__device_model__kind", "device__condition")
+                .annotate(qty=Count("id"), **money_cols)
+                .order_by("-revenue"))]
+
+    accessories = [{
+        "label": r["accessory__category__name"] or "Kategorisiz",
+        "qty": r["qty"], "revenue": money(r["revenue"]), "profit": money(r["profit"]),
+    } for r in (lines.filter(kind=SaleItem.Kind.AKSESUAR)
+                .values("accessory__category__name")
+                .annotate(qty=Coalesce(Sum("quantity"), Value(0)), **money_cols)
+                .order_by("-revenue"))]
+
+    returned = SaleItem.objects.filter(sale__cashier=cashier,
+                                       returned_at__date__range=(start, end))
+    returns = returned.aggregate(
+        lines=Count("id"),
+        total=Coalesce(Sum("line_total", output_field=DEC), ZERO))
+    voided = Sale.objects.filter(cashier=cashier, status=Sale.Status.IPTAL,
+                                 voided_at__date__range=(start, end)).count()
+    return {"devices": devices, "accessories": accessories,
+            "returns": {"lines": returns["lines"], "total": money(returns["total"]),
+                        "voided": voided}}
 
 
 # ---------------------------------------------------------------------------

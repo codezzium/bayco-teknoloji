@@ -1,0 +1,18 @@
+{% comment %} "Satıcıyı değiştir" pop-up'ı (Satışlar listesi ve fiş sayfası).
+   Düğme (⇄) gövdeyi htmx ile #seller-body'ye çeker ve seller-open olayıyla
+   pop-up'ı açar. Kayıt başarılıysa sunucu 204 + HX-Refresh döner: sayfa
+   yenilenir, yeni satıcı ve mesaj görünür. Hata formu pop-up'ın içinde
+   yeniden çizer. stock/form.html'deki "+ Kişi Ekle" pop-up'ıyla aynı kalıp:
+   koyu/opak (dialog-backdrop + dialog-card), @click.outside yok — yanlışlıkla
+   dışarı tıklamak yazılan gerekçeyi silerdi. {% endcomment %}
+<div x-data="{ open: false }" x-show="open" x-cloak
+     @seller-open.window="open = true; $refs.body.textContent = 'Yükleniyor…'"
+     @keydown.escape.window="open = false"
+     class="dialog-backdrop fixed inset-0 z-[60] overflow-y-auto p-4"
+     role="dialog" aria-modal="true" aria-label="Satıcıyı değiştir">
+  <div class="card dialog-card p-5 sm:p-6 w-full mx-auto my-4 sm:my-12" style="max-width:32rem">
+    <button type="button" @click="open = false" class="absolute top-4 right-5 text-2xl leading-none"
+            style="color:var(--muted)" aria-label="Kapat">&times;</button>
+    <div id="seller-body" x-ref="body"></div>
+  </div>
+</div>

@@ -314,6 +314,22 @@
       <label class="label">Vade Tarihi</label>
       <input type="date" name="due_date" class="input">
     </div>
+    {% comment %} Satış kimin adına yazılsın: ortak kasa bilgisayarında başkasının
+       oturumu açıkken satış yapılırsa sonradan düzeltme gerekmez. Personel
+       başkasını seçerse satış onaya düşer (pos.checkout). {% endcomment %}
+    {% if sellers|length > 1 %}
+    <div class="field" style="margin:0">
+      <label class="label" for="cart-seller">Satışı Yapan</label>
+      <select name="seller" id="cart-seller" class="select">
+        {% for person in sellers %}
+        <option value="{{ person.pk }}" {% if person.pk == selected_seller %}selected{% endif %}>{{ person.get_full_name|default:person.username }}{% if person.pk == request.user.pk %} (siz){% endif %}</option>
+        {% endfor %}
+      </select>
+      {% if not access.patron %}
+      <p class="text-xs mt-1" style="color:var(--muted)">Başkası seçilirse satış patron onayına düşer.</p>
+      {% endif %}
+    </div>
+    {% endif %}
     {% if price_changes %}<input type="hidden" name="confirm_prices" value="1">{% endif %}
     <button class="btn btn-gradient btn-block">
       {% if price_changes %}Onayla ve Sat{% else %}Satışı Tamamla{% endif %}

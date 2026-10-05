@@ -27,6 +27,60 @@
   <div style="height:320px"><canvas id="revenue-chart"></canvas></div>
 </div>
 
+<!-- Personel satışları -->
+<div class="card p-5 mb-6">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+    <h2 class="font-display font-bold">Personel Satışları</h2>
+    {% include "stock/partials/staff_picker.html" %}
+  </div>
+  <p class="text-xs mb-3" style="color:var(--muted)">
+    Personel seçin ya da tablodaki ada tıklayın: kişinin ayrıntılı raporu bu dönemle açılır.
+    Satış, fişteki "Satışı yapan" kişiye yazılır. İade ve iptaller düşülmüştür;
+    onaylanan satıcı değişiklikleri rakamları yeni satıcıya taşır.
+  </p>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm" style="min-width:720px">
+      <thead>
+        <tr style="color:var(--muted)">
+          <th class="text-left py-2 font-medium">Personel</th>
+          <th class="text-right py-2 font-medium">Fiş</th>
+          <th class="text-right py-2 font-medium">Cihaz</th>
+          <th class="text-right py-2 font-medium">Aksesuar</th>
+          <th class="text-right py-2 font-medium">Toplam Ciro</th>
+          <th class="text-right py-2 font-medium">Brüt Kâr</th>
+          <th class="text-right py-2 font-medium" style="width:9rem">Pay</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in staff_sales %}
+        <tr style="border-top:1px solid var(--line)">
+          <td class="py-2">
+            {% if row.user %}
+            <a href="{% url 'stock:staff_report' pk=row.user.pk %}?donem={{ period }}" class="font-semibold hover:underline">{{ row.user.get_full_name|default:row.user.username }}</a>
+            {% else %}<span style="color:var(--muted)">Kayıtsız (içe aktarım)</span>{% endif %}
+          </td>
+          <td class="py-2 text-right">{{ row.receipts }}</td>
+          <td class="py-2 text-right">{{ row.device_qty }} <span class="text-xs" style="color:var(--muted)">· {{ row.device_revenue|tl0 }}</span></td>
+          <td class="py-2 text-right">{{ row.accessory_qty }} <span class="text-xs" style="color:var(--muted)">· {{ row.accessory_revenue|tl0 }}</span></td>
+          <td class="py-2 text-right font-semibold">{{ row.revenue|tl0 }}</td>
+          <td class="py-2 text-right" style="color:{% if row.profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">{{ row.profit|tl0 }}</td>
+          <td class="py-2">
+            <div class="flex items-center justify-end gap-2">
+              <div class="h-1.5 rounded-full flex-1" style="background:var(--line);max-width:5rem">
+                <div class="h-1.5 rounded-full" style="width:{{ row.share|floatformat:'0' }}%;background:var(--brand)"></div>
+              </div>
+              <span class="text-xs w-10 text-right">{{ row.share|pct }}</span>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="py-6 text-center" style="color:var(--muted)">Bu dönemde satış yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <div class="grid gap-5 lg:grid-cols-2 mb-6">
   <!-- Kâr dökümü -->
   <div class="card p-5">

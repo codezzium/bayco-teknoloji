@@ -78,6 +78,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "apps.sitecore.context_processors.site_globals",
                 "apps.staff.context_processors.access",
+                "apps.staff.context_processors.notifications",
             ],
         },
     },

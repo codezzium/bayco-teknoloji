@@ -17,6 +17,7 @@ from apps.stock.permissions import (  # noqa: F401  (view modÃ¼lleri buradan alÄ
     can_see_money,
     deny,
     has_access,
+    is_patron,
     money_required,
     panel_required,
     patron_required,

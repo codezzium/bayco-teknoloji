@@ -64,6 +64,9 @@ urlpatterns = [
     path("satislar/<int:pk>/iptal/", pos.sale_void, name="sale_void"),
     path("satislar/<int:pk>/kalem/<int:item_id>/iade/", pos.sale_item_return,
          name="sale_item_return"),
+    path("satislar/<int:pk>/satici/", pos.sale_seller_change, name="sale_seller_change"),
+    path("satislar/satici-talebi/<int:pk>/karar/", pos.seller_change_decide,
+         name="seller_change_decide"),
 
     # --- Cariler ---
     path("cariler/", contacts.contact_list, name="contact_list"),
@@ -93,4 +96,5 @@ urlpatterns = [
 
     # --- Rapor ---
     path("rapor/", reports.reports, name="reports"),
+    path("rapor/personel/<int:pk>/", reports.staff_report, name="staff_report"),
 ]

@@ -280,6 +280,36 @@ class PaymentForm(MoneyAwareModelForm):
             ]
 
 
+class PersonChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, user):
+        return user.get_full_name() or user.get_username()
+
+
+class SellerChangeForm(forms.Form):
+    """Satıcı değiştirme pop-up'ı (Satışlar listesi ve fiş sayfası).
+
+    Ekip: panele girebilen aktif kullanıcılar, mevcut satıcı hariç. Kimin
+    doğrudan değiştirip kimin onaya düşeceği services.request_seller_change'te.
+    """
+
+    to_user = PersonChoiceField(label="Yeni satıcı", queryset=None,
+                                empty_label="Ekipten seçin…")
+    reason = forms.CharField(
+        label="Gerekçe", max_length=200,
+        widget=forms.Textarea(attrs={
+            "rows": 3,
+            "placeholder": "Örn: Satışı Ayşe yaptı, kasada Mehmet'in oturumu açıktı.",
+        }))
+
+    def __init__(self, *args, sale, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.dashboard.forms import _style
+        from apps.staff.notify import panel_users
+
+        self.fields["to_user"].queryset = panel_users().exclude(pk=sale.cashier_id)
+        _style(self.fields)
+
+
 class StockIntakeForm(forms.Form):
     """Aksesuar mal girişi — doğrudan adet düzenlemek yerine hareket yazar."""
 
