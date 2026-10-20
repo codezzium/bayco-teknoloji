@@ -334,6 +334,12 @@ class Device(models.Model):
             clash = (Device.objects
                      .filter(Q(imei1=value) | Q(imei2=value))
                      .exclude(pk=self.pk).first())
+            if clash and clash.status == Device.Status.SATILDI:
+                raise ValidationError({
+                    field: f"Bu IMEI satılmış {clash.stock_code} kaydında. Müşteri "
+                           "iade ettiyse fişten İade edin; cihazı geri satın "
+                           "aldıysanız Kasa'da Takas / Geri Alım ekleyin.",
+                })
             if clash:
                 raise ValidationError({
                     field: f"Bu IMEI zaten {clash.stock_code} kaydında kayıtlı.",

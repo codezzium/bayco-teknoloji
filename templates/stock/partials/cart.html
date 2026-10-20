@@ -9,6 +9,7 @@
     <h3 class="font-display font-extrabold text-xl">{{ completed_sale.receipt_no }}</h3>
     <p class="text-sm mt-1" style="color:var(--muted)">
       Toplam {{ completed_sale.grand_total|tl }}
+      {% if completed_sale.trade_in_total %} · Takas / geri alım {{ completed_sale.trade_in_total|tl }}{% endif %}
       {% if completed_sale.balance > 0 %} · Kalan borç
         <strong style="color:#ffd48a">{{ completed_sale.balance|tl }}</strong>{% endif %}
     </p>
@@ -58,6 +59,11 @@
       <div class="text-4xl mb-2">🛒</div>
       <p class="font-semibold">Sepet boş</p>
       <p class="text-sm mt-1" style="color:var(--muted)">Barkod okutarak ürün ekleyin.</p>
+      {% if can_price %}
+      <p class="text-xs mt-2" style="color:var(--muted)">
+        Satılmış bir cihazı geri alıyorsanız aşağıdan Takas / Geri Alım ekleyin.
+      </p>
+      {% endif %}
     </div>
     {% else %}
 
@@ -151,8 +157,8 @@
       {% endif %}
       <div class="flex justify-between text-lg font-display font-extrabold pt-2"
            style="border-top:1px solid var(--line)">
-        <span>Tahsil Edilecek</span>
-        <span class="gradient-text">{{ cart.payable|tl }}</span>
+        <span>{% if cart.payout %}Müşteriye Ödenecek{% else %}Tahsil Edilecek{% endif %}</span>
+        <span class="gradient-text">{{ cart.due|tl }}</span>
       </div>
       {% if show_money %}
       <div class="flex justify-between text-xs" style="color:var(--muted)">
@@ -195,12 +201,13 @@
        class="btn btn-ghost btn-sm btn-block mt-2">+ Yeni Müşteri</a>
     {% endif %}
   </div>
+  {% endif %}
 
   <!-- Takas: bedeli ödenecek tutarı düşürdüğü için fiyat tikine bağlı. -->
-  {% if can_price %}
+  {% if can_price %}{% if cart.has_device or cart.trade_ins or not cart.lines %}
   <div class="card p-4" x-data="{ open: false }">
     <button class="flex items-center justify-between w-full" @click="open = !open" type="button">
-      <h3 class="font-display font-bold text-sm">↩️ Takas Ekle</h3>
+      <h3 class="font-display font-bold text-sm">↩️ Takas / Geri Alım Ekle</h3>
       <span x-text="open ? '−' : '+'"></span>
     </button>
     <form x-show="open" x-cloak class="space-y-2 mt-3"
@@ -234,10 +241,15 @@
         Ciro düşmez — takas bir indirim değil, ayni ödemedir. Alınan cihaz
         satış anında maliyetiyle stoğa girer.
       </p>
+      {% if not cart.lines %}
+      <p class="text-xs" style="color:var(--muted)">
+        Sepette ürün yoksa cihaz müşteriden geri alınır; bedeli kasadan ödenir.
+        Satılmış cihazın IMEI'si yazılırsa eski kayıttan taşınır.
+      </p>
+      {% endif %}
     </form>
   </div>
-  {% endif %}
-  {% endif %}
+  {% endif %}{% endif %}
 
   <!-- Ödeme ve tamamla. Birden çok satır = bölünmüş ödeme (500 nakit + 500 kart);
        her satır sunucuda ayrı bir tahsilat olur. Tutarlar kuruş (tam sayı) olarak
@@ -246,10 +258,10 @@
   {% if cart.lines or cart.trade_ins %}
   <form class="card p-4 space-y-3"
         hx-post="{% url 'stock:checkout' %}" hx-target="#cart" hx-swap="outerHTML"
-        x-data="{ payable: Math.round({{ cart.payable|unlocalize }} * 100),
+        x-data="{ payable: Math.round({{ cart.due|unlocalize }} * 100),
                   methods: [{% for value, label in payment_methods %}'{{ value }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
                   seq: 1,
-                  rows: [{ id: 1, method: '{{ payment_methods.0.0 }}', text: '{{ cart.payable|money_input }}' }],
+                  rows: [{ id: 1, method: '{{ payment_methods.0.0 }}', text: '{{ cart.due|money_input }}' }],
                   cents(text) { return Math.round(BaycoNum.parse(text) * 100); },
                   get paid() { return this.rows.reduce((sum, row) => sum + this.cents(row.text), 0); },
                   tl(cents) { return (cents / 100).toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺'; },
@@ -262,11 +274,12 @@
                                      text: rest > 0 ? BaycoNum.format(rest / 100) : '' });
                   } }">
     {% csrf_token %}
+    <input type="hidden" name="payable" value="{{ cart.payable|unlocalize }}">
     <h3 class="font-display font-bold text-sm">Ödeme</h3>
     <template x-for="(row, i) in rows" :key="row.id">
       <div class="grid grid-cols-2 gap-2">
         <div class="field" style="margin:0">
-          <label class="label" x-show="i === 0">Tahsil Edilen (₺)</label>
+          <label class="label" x-show="i === 0">{% if cart.payout %}Müşteriye Ödenen (₺){% else %}Tahsil Edilen (₺){% endif %}</label>
           {# Metin: "18.500,90" biçimi. x-model.number parseFloat'la 18,5 okurdu. #}
           <input type="text" name="paid_amount" data-money="2" inputmode="decimal" autocomplete="off"
                  class="input" :required="i === 0" x-model="row.text">
@@ -294,10 +307,23 @@
     </button>
     <div class="flex justify-between text-sm pt-2" x-show="rows.length > 1" x-cloak
          style="border-top:1px solid var(--line)">
-      <span style="color:var(--muted)">Toplam tahsilat</span>
+      <span style="color:var(--muted)">{% if cart.payout %}Toplam ödeme{% else %}Toplam tahsilat{% endif %}</span>
       <strong x-text="tl(paid)"></strong>
     </div>
 
+    {% if cart.payout %}
+    <div class="rounded-xl px-3 py-2 text-sm" x-show="paid < payable" x-cloak
+         style="background:rgba(245,180,60,.12);color:#ffd48a;border:1px solid rgba(245,180,60,.3)">
+      Kalan <strong x-text="tl(payable - paid)"></strong>
+      müşteriye borç olarak kalır.
+    </div>
+    <div class="rounded-xl px-3 py-2 text-sm" x-show="paid > payable" x-cloak
+         style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+      Ödenen tutar fazla — müşteri
+      <strong x-text="tl(paid - payable)"></strong>
+      borçlu kalır.
+    </div>
+    {% else %}
     <div class="rounded-xl px-3 py-2 text-sm" x-show="paid < payable" x-cloak
          style="background:rgba(245,180,60,.12);color:#ffd48a;border:1px solid rgba(245,180,60,.3)">
       Kalan <strong x-text="tl(payable - paid)"></strong>
@@ -314,6 +340,7 @@
       <label class="label">Vade Tarihi</label>
       <input type="date" name="due_date" class="input">
     </div>
+    {% endif %}
     {% comment %} Satış kimin adına yazılsın: ortak kasa bilgisayarında başkasının
        oturumu açıkken satış yapılırsa sonradan düzeltme gerekmez. Personel
        başkasını seçerse satış onaya düşer (pos.checkout). {% endcomment %}
@@ -332,10 +359,10 @@
     {% endif %}
     {% if price_changes %}<input type="hidden" name="confirm_prices" value="1">{% endif %}
     <button class="btn btn-gradient btn-block">
-      {% if price_changes %}Onayla ve Sat{% else %}Satışı Tamamla{% endif %}
+      {% if price_changes %}Onayla ve Sat{% elif not cart.lines %}Geri Alımı Tamamla{% else %}Satışı Tamamla{% endif %}
     </button>
     <p class="text-xs text-center" style="color:var(--muted)">
-      Tahsil edilen tutar toplamdan azsa kalan borç veresiye olarak takip edilir.
+      {% if cart.payout %}Müşteriye ödenen tutar kasadan çıkış olarak kaydedilir.{% else %}Tahsil edilen tutar toplamdan azsa kalan borç veresiye olarak takip edilir.{% endif %}
     </p>
   </form>
   {% endif %}

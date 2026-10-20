@@ -54,7 +54,8 @@ def cart_context(request, cart=None) -> dict:
         # yeniden çizildiği için model listesi de bu bağlamda olmalıdır.
         "device_models": (DeviceModel.objects.filter(is_active=True)
                           .select_related("brand")
-                          if summary["has_device"] or summary["trade_ins"] else []),
+                          if summary["has_device"] or summary["trade_ins"]
+                          or not summary["lines"] else []),
         # "Satışı yapan" seçimi (tembel: yalnızca ödeme formu çizilirse sorgulanır).
         "sellers": panel_users(),
         "selected_seller": request.user.pk,
@@ -249,11 +250,17 @@ def _chosen_seller(request):
 @require_POST
 def checkout(request):
     cart = cart_utils.get_cart(request)
-    payable = cart_utils.summarize(cart, with_money=False)["payable"]
+    summary = cart_utils.summarize(cart, with_money=False)
+    if request.POST.get("payable") not in (None, str(summary["payable"])):
+        return _render_cart(request, cart,
+                            "Sepet değişti; tutarı kontrol edip tekrar deneyin.")
 
-    payments = _payments_from_post(request.POST, payable)
+    payments = _payments_from_post(request.POST, summary["due"])
     if payments is None:
         return _render_cart(request, cart, "Geçersiz tahsilat tutarı.")
+    if summary["payout"]:
+        for payment in payments:
+            payment.update(kind=Payment.Kind.IADE, note="Müşteriye ödeme")
 
     due_raw = (request.POST.get("due_date") or "").strip()
     try:

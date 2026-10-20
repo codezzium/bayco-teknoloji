@@ -169,6 +169,7 @@ def summarize(cart: dict, *, with_money=True) -> dict:
 
     trade_in_total = sum((money(t["amount"]) for t in cart["trade_ins"]),
                          Decimal("0.00"))
+    payable = subtotal - trade_in_total
     return {
         "lines": lines,
         "trade_ins": cart["trade_ins"],
@@ -178,7 +179,9 @@ def summarize(cart: dict, *, with_money=True) -> dict:
         "count": len(cart["lines"]),
         "subtotal": subtotal,                       # = ciro
         "trade_in_total": trade_in_total,
-        "payable": subtotal - trade_in_total,       # = tahsil edilecek
+        "payable": payable,                         # = tahsil edilecek
+        "payout": payable < 0,
+        "due": abs(payable),
         "cost_total": cost_total if with_money else None,
         "profit": (subtotal - cost_total) if with_money else None,
     }

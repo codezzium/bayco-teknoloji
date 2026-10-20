@@ -431,6 +431,7 @@ def create_sale_from_cart(cart: dict, *, user, payments=None, due_date=None,
     sale.recalculate()
     for payment in (payments or []):
         record_payment(sale, payment["amount"], method=payment.get("method", "nakit"),
+                       kind=payment.get("kind", Payment.Kind.TAHSILAT),
                        user=user, note=payment.get("note", ""))
     sale.refresh_from_db()
     return sale
@@ -665,6 +666,12 @@ def void_sale(sale: Sale, *, user=None, reason: str = "") -> Sale:
             amount=_q(sale.paid_total), paid_at=timezone.now(),
             note="Fiş iptali", created_by=user,
         )
+    elif sale.paid_total and sale.paid_total < 0:
+        Payment.objects.create(
+            sale=sale, kind=Payment.Kind.TAHSILAT, method=Payment.Method.NAKIT,
+            amount=_q(-sale.paid_total), paid_at=timezone.now(),
+            note="Fiş iptali", created_by=user,
+        )
 
     for trade_in in sale.trade_ins.select_related("device"):
         device = trade_in.device
@@ -754,7 +761,8 @@ def request_seller_change(sale: Sale, *, to_user, reason: str, user) -> SellerCh
 
     from .permissions import in_panel, is_patron
 
-    sale = Sale.objects.select_for_update().select_related("cashier").get(pk=sale.pk)
+    sale = (Sale.objects.select_for_update(of=("self",))
+            .select_related("cashier").get(pk=sale.pk))
     reason = (reason or "").strip()[:200]
     patron = is_patron(user)
 
@@ -802,7 +810,7 @@ def decide_seller_change(change: SellerChange, *, user, approve: bool,
 
     if not is_patron(user):
         raise StockError("Satıcı değişikliğini yalnızca patron onaylayabilir.")
-    change = (SellerChange.objects.select_for_update()
+    change = (SellerChange.objects.select_for_update(of=("self",))
               .select_related("sale", "from_user", "to_user", "requested_by")
               .get(pk=change.pk))
     if change.status != SellerChange.Status.BEKLIYOR:

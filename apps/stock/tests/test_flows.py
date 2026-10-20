@@ -1,3 +1,4 @@
+import re
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -436,6 +437,70 @@ class SaleFlowTests(PanelFlowTestCase):
         self.assertEqual(self.device.imei1, "351234567890123")
         self.assertFalse(Device.objects.filter(acquisition=Device.Acquisition.TAKAS).exists())
         self.assertEqual(Device.objects.get(imei1="351234567890123"), self.device)
+
+    def test_sold_device_can_be_bought_back_without_a_sale(self):
+        first_sale = self.sell_first()
+        response = self.client.get(reverse("stock:pos"))
+        self.assertContains(response, "Takas / Geri Alım Ekle")
+        self.assertContains(response, f'<option value="{self.model.pk}">')
+        self.client.post(reverse("stock:cart_trade_in"), {
+            "device_model": self.model.pk, "amount": "9000",
+            "imei1": self.device.imei1, "color": "", "storage": "", "note": "",
+        })
+        response = self.client.post(reverse("stock:cart_customer"),
+                                    {"customer": self.customer.pk})
+        self.assertContains(response, "Müşteriye Ödenecek")
+        self.assertContains(response, "Geri Alımı Tamamla")
+        payable = re.search(r'name="payable" value="([^"]+)"',
+                            response.content.decode())[1]
+        response = self.client.post(reverse("stock:checkout"), {
+            "paid_amount": "", "payment_method": "nakit", "payable": payable,
+        })
+        self.assertEqual(response.status_code, 200)
+
+        sale = Sale.objects.latest("id")
+        self.assertNotEqual(sale, first_sale)
+        self.assertFalse(sale.items.exists())
+        self.assertEqual((sale.grand_total, sale.payable_total, sale.balance),
+                         (TL("0.00"), TL("-9000.00"), TL("0.00")))
+        payment = sale.payments.get()
+        self.assertEqual((payment.kind, payment.method, payment.amount),
+                         (Payment.Kind.IADE, Payment.Method.NAKIT, TL("9000.00")))
+
+        returned = Device.objects.get(imei1="351234567890123")
+        self.assertNotEqual(returned.pk, self.device.pk)
+        self.assertEqual((returned.status, returned.purchase_price),
+                         (Device.Status.STOKTA, TL("9000.00")))
+        self.device.refresh_from_db()
+        self.assertEqual((self.device.status, self.device.imei1),
+                         (Device.Status.SATILDI, ""))
+
+        self.client.post(reverse("stock:sale_void", kwargs={"pk": sale.pk}),
+                         {"reason": "Yanlış işlem"})
+        sale.refresh_from_db()
+        self.assertEqual((sale.status, sale.paid_total, sale.balance),
+                         (Sale.Status.IPTAL, TL("0.00"), TL("0.00")))
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.imei1, "351234567890123")
+
+    def test_stale_checkout_form_is_refused(self):
+        self.fill_cart()
+        self.client.post(reverse("stock:cart_trade_in"), {
+            "device_model": self.model.pk, "amount": "20000", "imei1": "",
+            "color": "", "storage": "", "note": "",
+        })
+        response = self.client.post(reverse("stock:checkout"), {
+            "paid_amount": "18.740", "payment_method": "nakit", "payable": "18740.00",
+        })
+        self.assertContains(response, "Sepet değişti")
+        self.assertFalse(Sale.objects.exists())
+
+    def test_sold_imei_in_device_form_points_to_buy_back(self):
+        self.sell_first()
+        response = self.client.post(reverse("stock:device_create"),
+                                    self.device_payload())
+        self.assertContains(response, "Takas / Geri Alım")
+        self.assertEqual(Device.objects.count(), 1)
 
     def test_sold_device_keeps_history(self):
         self.fill_cart()
