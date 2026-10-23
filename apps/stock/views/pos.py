@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from apps.staff.notify import display_name, panel_users
@@ -415,7 +416,8 @@ def receipt(request, pk):
     return render(request, "stock/receipt.html", {
         "sale": sale,
         "doc_title": f"Fiş {sale.receipt_no}",
-        "png_url": reverse("stock:receipt_png", kwargs={"pk": sale.pk}),
+        "png_url": f'{reverse("stock:receipt_png", kwargs={"pk": sale.pk})}'
+                   f"?v={timezone.now().timestamp():.0f}",
         "back_url": reverse("stock:sale_detail", kwargs={"pk": sale.pk}),
         # @page yüksekliği: tarayıcıyla basarken kâğıt fiş boyu kadar ilerlesin.
         # Nokta ile biçimlenir; şablon yerelleştirmesi virgül koyardı.
@@ -424,12 +426,14 @@ def receipt(request, pk):
     })
 
 
+@never_cache
 @panel_required
 def receipt_png(request, pk):
     sale = get_object_or_404(Sale.objects.select_related("customer"), pk=pk)
     return HttpResponse(to_png(pos58.receipt_image(sale)), content_type="image/png")
 
 
+@never_cache
 @panel_required
 def receipt_logo(request):
     """Fişin üstündeki siyah-beyaz logo (Panel → Site Ayarları → Fiş Logosu)."""

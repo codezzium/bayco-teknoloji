@@ -11,6 +11,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from apps.sitecore.models import SiteSettings
@@ -339,13 +340,15 @@ def ticket_slip(request, pk):
     ticket = get_object_or_404(ServiceTicket.objects.select_related("customer"), pk=pk)
     return render(request, "stock/receipt.html", {
         "doc_title": f"Servis Fişi {ticket.ticket_no}",
-        "png_url": reverse("service:ticket_slip_png", kwargs={"pk": ticket.pk}),
+        "png_url": f'{reverse("service:ticket_slip_png", kwargs={"pk": ticket.pk})}'
+                   f"?v={timezone.now().timestamp():.0f}",
         "back_url": reverse("service:ticket_detail", kwargs={"pk": ticket.pk}),
         "height_mm": f"{height_mm(slip_image(ticket)):.1f}",
         "auto": request.GET.get("auto") == "1",
     })
 
 
+@never_cache
 @access_required("service")
 def ticket_slip_png(request, pk):
     ticket = get_object_or_404(ServiceTicket.objects.select_related("customer"), pk=pk)
