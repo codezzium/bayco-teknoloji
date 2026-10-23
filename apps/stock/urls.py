@@ -19,6 +19,8 @@ urlpatterns = [
     path("cihazlar/", catalog.device_list, name="device_list"),
     path("cihazlar/ekle/", catalog.device_form, name="device_create"),
     path("cihaz/kod/<str:stock_code>/", catalog.device_by_code, name="device_by_code"),
+    path("cihaz/yeniden-giris/", catalog.device_reentry_lookup,
+         name="device_reentry_lookup"),
     path("cihaz/<int:pk>/", catalog.device_detail, name="device_detail"),
     path("cihaz/<int:pk>/duzenle/", catalog.device_form, name="device_edit"),
     path("cihaz/<int:pk>/durum/", catalog.device_status, name="device_status"),

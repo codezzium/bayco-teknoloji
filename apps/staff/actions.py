@@ -123,6 +123,7 @@ READ_ONLY = {
     "stock:device_list": "Cihazlar",
     "stock:device_by_code": "Cihaz",
     "stock:device_detail": "Cihaz",
+    "stock:device_reentry_lookup": "Cihaz formunda IMEI sorgusu",
     "stock:accessory_list": "Aksesuarlar",
     "stock:accessory_detail": "Aksesuar",
     "stock:accessory_barcode": "Barkod önerisi",

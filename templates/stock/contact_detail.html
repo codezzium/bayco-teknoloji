@@ -65,7 +65,7 @@
       </div>
     </div>
 
-    {% if supplied %}
+    {% if supplied or supplied_cycles %}
     <div class="card p-5">
       <h3 class="font-display font-bold mb-3">Bu Kişiden Alınan Cihazlar</h3>
       <div class="space-y-2 text-sm">
@@ -81,6 +81,17 @@
             {% include "stock/partials/status_badge.html" %}
             <div class="text-xs mt-1" style="color:var(--muted)">{{ device.purchase_date|date:"d.m.Y" }}</div>
           </div>
+        </a>
+        {% endfor %}
+        {% for cycle in supplied_cycles %}
+        <a href="{% url 'stock:device_detail' pk=cycle.device_id %}"
+           class="flex items-center justify-between gap-3 py-2 block"
+           style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <div class="font-semibold truncate">{{ cycle.device.label }}</div>
+            <div class="text-xs font-mono" style="color:var(--muted)">{{ cycle.device.stock_code }} · {{ cycle.cycle_no }}. dönem</div>
+          </div>
+          <div class="text-xs shrink-0" style="color:var(--muted)">{{ cycle.purchase_date|date:"d.m.Y" }}</div>
         </a>
         {% endfor %}
       </div>

@@ -83,6 +83,8 @@ def contact_detail(request, pk):
         "supplied": contact.supplied_devices.select_related(
             "device_model__brand")[:30],
         "bought": contact.bought_devices.select_related("device_model__brand")[:30],
+        "supplied_cycles": contact.supplied_cycles.select_related(
+            "device__device_model__brand")[:30],
         "open_sales": open_sales,
         "balance": balance,
         "service_tickets": (contact.service_tickets.select_related("device_model__brand")[:30]
@@ -179,7 +181,8 @@ def contact_quick(request):
 def contact_delete(request, pk):
     contact = get_object_or_404(Contact, pk=pk)
     if (contact.sales.exists() or contact.supplied_devices.exists()
-            or contact.bought_devices.exists() or contact.service_tickets.exists()):
+            or contact.bought_devices.exists() or contact.service_tickets.exists()
+            or contact.supplied_cycles.exists() or contact.bought_cycles.exists()):
         messages.error(
             request,
             "Bu cariye bağlı satış/cihaz/servis kaydı var; silinemez. "

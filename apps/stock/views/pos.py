@@ -20,7 +20,7 @@ from ..models import Contact, Device, DeviceModel, Payment, Sale, SaleItem, Sell
 from ..niimbot import to_png
 from ..receipt_logo import current_logo
 from ..templatetags.stock_extras import tl
-from ..utils import MONEY_MAX, parse_money, trfold
+from ..utils import MONEY_MAX, digits_only, parse_money, trfold
 from .base import (
     access_required,
     can_see_money,
@@ -54,8 +54,7 @@ def cart_context(request, cart=None) -> dict:
         # yeniden çizildiği için model listesi de bu bağlamda olmalıdır.
         "device_models": (DeviceModel.objects.filter(is_active=True)
                           .select_related("brand")
-                          if summary["has_device"] or summary["trade_ins"]
-                          or not summary["lines"] else []),
+                          if summary["has_device"] or summary["trade_ins"] else []),
         # "Satışı yapan" seçimi (tembel: yalnızca ödeme formu çizilirse sorgulanır).
         "sellers": panel_users(),
         "selected_seller": request.user.pk,
@@ -120,6 +119,19 @@ def sell_device(request, pk):
     cart_utils.save_cart(request, cart)
     messages.success(request, message)
     return redirect("stock:pos")
+
+
+def _reentry_entry(device, amount, **fields) -> dict:
+    return {
+        "device_id": device.pk,
+        "device_model_id": device.device_model_id,
+        "label": f"{device.stock_code} · {device.label}",
+        "amount": amount,
+        "imei1": device.imei1,
+        "color": fields.get("color", ""),
+        "storage": fields.get("storage", ""),
+        "note": fields.get("note", ""),
+    }
 
 
 @panel_required
@@ -189,14 +201,21 @@ def cart_trade_in(request):
     if amount <= 0:
         return _render_cart(request, cart, "Takas bedeli pozitif olmalıdır.")
 
+    fields = {name: request.POST.get(name, "") for name in ("color", "storage", "note")}
+    imei = digits_only(request.POST.get("imei1", ""))
+    sold = services.find_sold_device(imei1=imei)
+    if sold is not None:
+        if any(t.get("device_id") == sold.pk for t in cart["trade_ins"]):
+            return _render_cart(request, cart, f"{sold.stock_code} zaten sepette.")
+        cart = cart_utils.add_trade_in(cart, _reentry_entry(sold, amount, **fields))
+        return _render_cart(request, cart,
+                            f"{sold.stock_code} geri alınacak — {amount} ₺")
     cart = cart_utils.add_trade_in(cart, {
         "device_model_id": model.pk,
         "label": str(model),
         "amount": amount,
-        "imei1": request.POST.get("imei1", ""),
-        "color": request.POST.get("color", ""),
-        "storage": request.POST.get("storage", ""),
-        "note": request.POST.get("note", ""),
+        "imei1": imei,
+        **fields,
     })
     return _render_cart(request, cart, f"Takas eklendi: {model} — {amount} ₺")
 

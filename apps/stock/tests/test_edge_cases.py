@@ -245,7 +245,7 @@ class PosInputTests(EdgeCaseTestCase):
         self.assertFalse(Sale.objects.exists())
         self.assertEqual(Device.objects.count(), 1)
 
-    def test_trade_in_matching_the_second_imei_moves_both(self):
+    def test_trade_in_matching_the_second_imei_reopens_the_device(self):
         device = services.create_device(
             user=self.patron, device_model=self.model, imei1="351111111111111",
             imei2="352222222222222", purchase_price=TL("1000"), list_price=TL("1500"))
@@ -259,11 +259,12 @@ class PosInputTests(EdgeCaseTestCase):
              "trade_ins": [{"device_model_id": self.model.pk, "amount": "800",
                             "imei1": "352222222222222"}]},
             user=self.patron)
-        returned = Device.objects.get(acquisition=Device.Acquisition.TAKAS)
-        self.assertEqual((returned.imei1, returned.imei2),
-                         ("351111111111111", "352222222222222"))
         device.refresh_from_db()
-        self.assertEqual((device.imei1, device.imei2), ("", ""))
+        self.assertEqual((device.status, device.cycle_no, device.acquisition),
+                         (Device.Status.STOKTA, 2, Device.Acquisition.TAKAS))
+        self.assertEqual((device.imei1, device.imei2),
+                         ("351111111111111", "352222222222222"))
+        self.assertEqual(Device.objects.filter(imei1="351111111111111").count(), 1)
 
     def test_trade_in_long_note_is_trimmed(self):
         self.client.post(reverse("stock:cart_customer"), {"customer": self.customer.pk})

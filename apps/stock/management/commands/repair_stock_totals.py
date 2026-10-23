@@ -42,7 +42,8 @@ class Command(BaseCommand):
                                                  "updated_at"])
 
             for device in Device.objects.filter(status=Device.Status.SATILDI):
-                item = device.sale_items.filter(returned_at__isnull=True).first()
+                item = device.sale_items.filter(returned_at__isnull=True,
+                                                cycle_no=device.cycle_no).first()
                 if item is None:
                     self.stdout.write(
                         f"CİHAZ {device.stock_code}: satıldı görünüyor ama aktif "

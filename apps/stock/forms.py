@@ -74,8 +74,13 @@ class DeviceForm(MoneyAwareModelForm):
                                                         "list": "garanti-onerileri"}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, reentry=False, **kwargs):
         super().__init__(*args, **kwargs)
+        if reentry:
+            for name in self.PRICE_FIELDS:
+                if name in self.fields:
+                    self.fields[name].disabled = False
+                    self.fields[name].help_text = Device._meta.get_field(name).help_text
         self.fields["device_model"].queryset = (
             DeviceModel.objects.filter(is_active=True).select_related("brand")
         )

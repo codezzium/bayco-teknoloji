@@ -14,11 +14,20 @@ from datetime import timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from django.db.models import Avg, Count, DecimalField, F, Q, Subquery, Sum, Value
+from django.db.models import (
+    Count,
+    DecimalField,
+    Exists,
+    F,
+    OuterRef,
+    Q,
+    Sum,
+    Value,
+)
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
-from .models import Accessory, Device, Expense, Payment, Sale, SaleItem
+from .models import Accessory, Device, DeviceCycle, Expense, Payment, Sale, SaleItem
 from .utils import add_months, money
 
 DEC = DecimalField(max_digits=14, decimal_places=2)
@@ -80,12 +89,13 @@ def expenses_for_period(start, end) -> dict:
 
     Burayı "düzelten" biri net kâr rakamını sessizce bozar.
     """
-    sold_device_ids = sold_lines(start, end).filter(
-        kind=SaleItem.Kind.CIHAZ).values("device_id")
+    sold_in_period = sold_lines(start, end).filter(
+        kind=SaleItem.Kind.CIHAZ, device_id=OuterRef("device_id"),
+        cycle_no=OuterRef("cycle_no"))
     device_expense = Expense.objects.filter(
         # Subquery kullanılır: literal IN listesi yoğun bir aydan sonra
         # SQLITE_MAX_VARIABLE_NUMBER (999) sınırına çarpar.
-        device_id__in=Subquery(sold_device_ids)
+        Exists(sold_in_period), device__isnull=False,
     ).aggregate(t=Coalesce(Sum("amount", output_field=DEC), ZERO))["t"]
 
     overhead = Expense.objects.filter(
@@ -125,7 +135,7 @@ def stock_capital() -> dict:
     devices = Device.objects.filter(status__in=HELD_STATUSES).aggregate(
         t=Coalesce(Sum("purchase_price", output_field=DEC), ZERO))["t"]
     device_expenses = Expense.objects.filter(
-        device__status__in=HELD_STATUSES
+        device__status__in=HELD_STATUSES, cycle_no=F("device__cycle_no")
     ).aggregate(t=Coalesce(Sum("amount", output_field=DEC), ZERO))["t"]
     accessories = Accessory.objects.filter(stock_qty__gt=0).aggregate(
         t=Coalesce(Sum(F("stock_qty") * F("cost"), output_field=DEC), ZERO))["t"]
@@ -144,11 +154,16 @@ def turnover(start, end) -> dict:
     days_in_stock satış anında dondurulduğu için basit bir Avg yeterlidir.
     Join ile hesaplamak SQLite'ta DateField/DateTimeField karışımı üretirdi.
     """
-    avg_days = Device.objects.filter(
-        sold_at__range=(start, end), days_in_stock__isnull=False
-    ).aggregate(a=Avg("days_in_stock"))["a"]
+    days = [
+        model.objects.filter(sold_at__range=(start, end), days_in_stock__isnull=False)
+        .aggregate(n=Count("id"), t=Coalesce(Sum("days_in_stock"), Value(0)))
+        for model in (Device, DeviceCycle)
+    ]
+    counted = sum(row["n"] for row in days)
+    avg_days = sum(row["t"] for row in days) / counted if counted else None
 
-    sold_count = Device.objects.filter(sold_at__range=(start, end)).count()
+    sold_count = sum(model.objects.filter(sold_at__range=(start, end)).count()
+                     for model in (Device, DeviceCycle))
     on_hand = (_units_on_hand(start) + _units_on_hand(end)) / 2 or 1
     return {
         "avg_days": round(avg_days) if avg_days is not None else None,

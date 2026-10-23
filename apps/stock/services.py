@@ -25,6 +25,7 @@ from .models import (
     ALLOWED_TRANSITIONS,
     Accessory,
     Device,
+    DeviceCycle,
     DeviceStatusLog,
     Expense,
     Payment,
@@ -399,7 +400,7 @@ def create_sale_from_cart(cart: dict, *, user, payments=None, due_date=None,
             item = SaleItem.objects.create(
                 sale=sale, kind=SaleItem.Kind.CIHAZ, device=device,
                 item_name=device.label[:200], item_code=device.stock_code,
-                item_imei=device.imei1, quantity=1,
+                item_imei=device.imei1, quantity=1, cycle_no=device.cycle_no,
                 unit_price=_q(line["unit"]),
                 # Maliyet kasada güncel değerden okunur; sepet snapshot'ı
                 # yalnızca sepet ekranında kâr göstermek içindir.
@@ -463,30 +464,104 @@ def _sell_device(device: Device, *, sale: Sale, item: SaleItem, user) -> None:
     unpublish_device(device)
 
 
-IDENTIFIERS = ["imei1", "imei2", "serial_no"]
+def find_sold_device(*, imei1="", imei2="", serial_no="") -> Device | None:
+    sold = Device.objects.filter(status=Device.Status.SATILDI)
+    for value in (digits_only(imei1), digits_only(imei2)):
+        if value:
+            device = sold.filter(Q(imei1=value) | Q(imei2=value)).first()
+            if device:
+                return device
+    serial = (serial_no or "").strip()
+    return sold.filter(serial_no=serial).first() if serial else None
 
 
-def _sold_device_with_imei(imei: str) -> Device | None:
-    if not imei:
-        return None
-    return (Device.objects.select_for_update()
-            .filter(Q(imei1=imei) | Q(imei2=imei), status=Device.Status.SATILDI)
-            .first())
+def _sold_device(entry: dict) -> Device | None:
+    if entry.get("device_id"):
+        device = Device.objects.filter(pk=entry["device_id"]).first()
+        if device is None or device.status != Device.Status.SATILDI:
+            raise StockError("Geri alınacak cihaz artık satılmış durumda değil.")
+        return device
+    return find_sold_device(imei1=entry.get("imei1", ""))
 
 
-def _previous_record(device: Device, sale: Sale) -> Device | None:
-    if not device.imei1:
-        return None
-    return (Device.objects
-            .filter(status=Device.Status.SATILDI, imei1="", status_logs__sale=sale,
-                    sale_items__item_imei=device.imei1)
-            .order_by("-pk").first())
+REENTRY_RESET = {
+    "condition": Device.Condition.IKINCI_EL, "battery_health": None,
+    "has_box": False, "has_invoice": False, "shelf": "", "defect_note": "",
+    "supplier": None, "purchase_price": Decimal("0.00"), "list_price": None,
+    "sold_to": None, "sold_at": None, "sold_price": None, "days_in_stock": None,
+    "warranty_months": 0, "warranty_start": None,
+}
 
 
-def _move_identifiers(source: Device, target: Device) -> None:
-    for name in IDENTIFIERS:
-        setattr(target, name, getattr(source, name))
-        setattr(source, name, "")
+@transaction.atomic
+def reenter_device(device: Device, *, user, acquisition, fields, sale=None,
+                   note="") -> Device:
+    device = Device.objects.select_for_update().get(pk=device.pk)
+    if device.status != Device.Status.SATILDI:
+        raise StockError(f"{device.stock_code} satılmış durumda değil; "
+                         "yeniden stoğa girilemez.")
+    item = device.sale_items.filter(cycle_no=device.cycle_no,
+                                    returned_at__isnull=True).first()
+    DeviceCycle.objects.create(
+        device=device, cycle_no=device.cycle_no, sale_item=item, closed_by=user,
+        **{name: getattr(device, name) for name in DeviceCycle.SNAPSHOT_FIELDS},
+    )
+    device.cycle_no += 1
+    device.status = Device.Status.STOKTA
+    device.acquisition = acquisition
+    device.purchase_date = timezone.localdate()
+    for name, value in {**REENTRY_RESET, **fields}.items():
+        setattr(device, name, value)
+    device.updated_by = user
+    try:
+        device.full_clean(exclude=["stock_code", "warranty_end", "search_blob"])
+    except ValidationError as exc:
+        raise StockError(f"Cihaz yeniden stoğa girilemedi: {' '.join(exc.messages)}")
+    device.save()
+    DeviceStatusLog.objects.create(
+        device=device, from_status=Device.Status.SATILDI,
+        to_status=Device.Status.STOKTA, sale=sale,
+        note=(note or f"Yeniden stok girişi, {device.cycle_no}. dönem")[:200],
+        created_by=user,
+    )
+    return device
+
+
+def _reopen_device(device: Device, sale: Sale, entry: dict, *, amount, user,
+                   customer) -> TradeIn:
+    fields = {"supplier": customer, "purchase_price": amount,
+              "condition": entry.get("condition", Device.Condition.IKINCI_EL),
+              "defect_note": entry.get("note", "")}
+    for name in ("color", "storage"):
+        if entry.get(name):
+            fields[name] = entry[name]
+    device = reenter_device(
+        device, user=user, sale=sale, fields=fields,
+        acquisition=Device.Acquisition.TAKAS,
+        note=f"Takasla geri alındı — fiş {sale.receipt_no}",
+    )
+    return TradeIn.objects.create(sale=sale, device=device, amount=amount,
+                                  cycle_no=device.cycle_no,
+                                  note=entry.get("note", "")[:200])
+
+
+def _restore_cycle(trade_in: TradeIn, *, user) -> None:
+    device = trade_in.device
+    cycle = device.cycles.get(cycle_no=trade_in.cycle_no - 1)
+    for name in DeviceCycle.SNAPSHOT_FIELDS:
+        setattr(device, name, getattr(cycle, name))
+    device.cycle_no = cycle.cycle_no
+    device.status = Device.Status.SATILDI
+    device.updated_by = user
+    sale = trade_in.sale
+    trade_in.delete()
+    cycle.delete()
+    device.save()
+    DeviceStatusLog.objects.create(
+        device=device, from_status=Device.Status.STOKTA,
+        to_status=Device.Status.SATILDI, sale=sale,
+        note="Geri alım fişi iptal edildi", created_by=user,
+    )
 
 
 def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
@@ -499,13 +574,15 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
     from .models import DeviceModel
 
     amount = _q(entry["amount"])
-    imei = digits_only(entry.get("imei1", ""))
-    previous = _sold_device_with_imei(imei)
+    previous = _sold_device(entry)
+    if previous:
+        return _reopen_device(previous, sale, entry, amount=amount, user=user,
+                              customer=customer)
     device = Device(
         device_model=DeviceModel.objects.get(pk=entry["device_model_id"]),
         condition=entry.get("condition", Device.Condition.IKINCI_EL),
         status=Device.Status.STOKTA,
-        imei1=imei,
+        imei1=digits_only(entry.get("imei1", "")),
         color=entry.get("color", ""),
         storage=entry.get("storage", ""),
         defect_note=entry.get("note", ""),
@@ -517,14 +594,6 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
         updated_by=user,
     )
     note = f"Takas girişi — fiş {sale.receipt_no}"
-    if previous:
-        _move_identifiers(previous, device)
-        previous.updated_by = user
-        previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_by",
-                                     "updated_at"])
-        device.color = device.color or previous.color
-        device.storage = device.storage or previous.storage
-        note = f"{note} · önceki kayıt {previous.stock_code}"
     try:
         device.full_clean(exclude=["stock_code", "warranty_end", "search_blob"])
     except ValidationError as exc:
@@ -534,11 +603,6 @@ def _create_trade_in(sale: Sale, entry: dict, *, user, customer) -> TradeIn:
         device=device, from_status="", to_status=Device.Status.STOKTA,
         sale=sale, note=note, created_by=user,
     )
-    if previous:
-        DeviceStatusLog.objects.create(
-            device=previous, from_status=previous.status, to_status=previous.status,
-            sale=sale, note=f"Takasla geri alındı: {device.stock_code}", created_by=user,
-        )
     return TradeIn.objects.create(sale=sale, device=device, amount=amount,
                                   note=entry.get("note", "")[:200])
 
@@ -559,7 +623,7 @@ def record_historical_sale(device: Device, *, customer, sold_on, price, user=Non
     item = SaleItem.objects.create(
         sale=sale, kind=SaleItem.Kind.CIHAZ, device=device,
         item_name=device.label[:200], item_code=device.stock_code,
-        item_imei=device.imei1, quantity=1,
+        item_imei=device.imei1, quantity=1, cycle_no=device.cycle_no,
         unit_price=price, unit_cost=_q(device.purchase_price),
     )
     item.refresh_from_db(fields=["line_total", "line_cost"])
@@ -602,13 +666,19 @@ def return_sale_item(item: SaleItem, *, user=None, reason="", refund=True) -> Sa
     if locked.returned_at:
         raise StockError("Bu kalem zaten iade edilmiş.")
 
+    device = None
+    if item.kind == SaleItem.Kind.CIHAZ and item.device_id:
+        device = Device.objects.select_for_update().get(pk=item.device_id)
+        if locked.cycle_no != device.cycle_no:
+            raise StockError(f"{device.stock_code} bu satıştan sonra geri alındı; "
+                             "eski satış iade edilemez.")
+
     refund_amount = item.line_total
     item.returned_at = timezone.now()
     item.return_reason = reason[:200]
     item.save(update_fields=["returned_at", "return_reason"])
 
-    if item.kind == SaleItem.Kind.CIHAZ and item.device_id:
-        device = Device.objects.select_for_update().get(pk=item.device_id)
+    if device is not None:
         device.status = Device.Status.STOKTA
         device.sold_to = None
         device.sold_at = None
@@ -649,7 +719,9 @@ def void_sale(sale: Sale, *, user=None, reason: str = "") -> Sale:
     # kayıtları bozmadan geri alınamaz — kullanıcı elle çözmelidir.
     for trade_in in sale.trade_ins.select_related("device"):
         device = trade_in.device
-        if device.expenses.exists() or device.sale_items.exists():
+        if (device.cycle_no != trade_in.cycle_no
+                or device.expenses.filter(cycle_no=trade_in.cycle_no).exists()
+                or device.sale_items.filter(cycle_no=trade_in.cycle_no).exists()):
             raise TradeInNotReversible(
                 f"{device.stock_code} takasla girmiş ve üzerinde gider/satış "
                 f"kaydı var. Fişi iptal etmeden önce bu kaydı elle çözün."
@@ -674,21 +746,13 @@ def void_sale(sale: Sale, *, user=None, reason: str = "") -> Sale:
         )
 
     for trade_in in sale.trade_ins.select_related("device"):
+        if trade_in.cycle_no > 1:
+            _restore_cycle(trade_in, user=user)
+            continue
         device = trade_in.device
-        previous = _previous_record(device, sale)
         trade_in.delete()
         device.status_logs.all().delete()
         device.delete()
-        if previous:
-            _move_identifiers(device, previous)
-            previous.updated_by = user
-            previous.save(update_fields=[*IDENTIFIERS, "search_blob", "updated_by",
-                                         "updated_at"])
-            DeviceStatusLog.objects.create(
-                device=previous, from_status=previous.status, to_status=previous.status,
-                sale=sale, note="Takas fişi iptal edildi, IMEI geri alındı",
-                created_by=user,
-            )
 
     _close_pending_seller_changes(sale)
     sale.status = Sale.Status.IPTAL

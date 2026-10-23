@@ -18,6 +18,7 @@ from apps.stock.models import (
     Device,
     DeviceModel,
     DeviceStatusLog,
+    Expense,
     Payment,
     Sale,
     SaleItem,
@@ -390,98 +391,184 @@ class SaleFlowTests(PanelFlowTestCase):
         return self.client.post(reverse("stock:checkout"),
                                 {"paid_amount": "", "payment_method": "nakit"})
 
-    def test_sold_device_can_come_back_as_a_trade_in(self):
+    def sell_to(self, customer, price):
+        self.client.post(reverse("stock:scan_resolve"),
+                         {"mode": "sale", "code": self.device.stock_code})
+        self.client.post(reverse("stock:cart_customer"), {"customer": customer.pk})
+        self.client.post(
+            reverse("stock:cart_price", kwargs={"lid": f"d-{self.device.pk}"}),
+            {"price": price, "discount": "0"})
+        self.client.post(reverse("stock:checkout"), {
+            "paid_amount": "", "payment_method": "nakit", "confirm_prices": "1",
+        })
+        self.device.refresh_from_db()
+        return Sale.objects.latest("id")
+
+    def reenter(self, price, supplier, **overrides):
+        response = self.client.post(reverse("stock:device_create"), self.device_payload(
+            purchase_price=price, supplier=supplier.pk, list_price="", **overrides))
+        self.assertRedirects(response, reverse("stock:device_detail",
+                                               kwargs={"pk": self.device.pk}))
+        self.device.refresh_from_db()
+
+    def test_sold_device_comes_back_on_the_same_record(self):
         first_sale = self.sell_first()
         response = self.trade_back(self.device.imei1)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Sale.objects.count(), 2)
-
-        returned = Device.objects.get(imei1="351234567890123")
-        self.assertNotEqual(returned.pk, self.device.pk)
-        self.assertEqual(returned.status, Device.Status.STOKTA)
-        self.assertEqual(returned.acquisition, Device.Acquisition.TAKAS)
-        self.assertEqual(returned.purchase_price, TL("9000.00"))
-        self.assertEqual((returned.storage, returned.color), ("128GB", "Mavi"))
-        self.assertIn(self.device.stock_code, returned.status_logs.get().note)
+        self.assertEqual(Device.objects.count(), 1)
 
         self.device.refresh_from_db()
-        self.assertEqual((self.device.status, self.device.imei1),
-                         (Device.Status.SATILDI, ""))
-        self.assertEqual(self.device.sold_to, self.customer)
-        self.assertTrue(self.device.status_logs.filter(
-            note__contains=returned.stock_code).exists())
-        self.assertEqual(first_sale.items.get(kind=SaleItem.Kind.CIHAZ).item_imei,
-                         "351234567890123")
+        self.assertEqual((self.device.status, self.device.cycle_no,
+                          self.device.acquisition, self.device.stock_code),
+                         (Device.Status.STOKTA, 2, Device.Acquisition.TAKAS,
+                          "BYC-000001"))
+        self.assertEqual((self.device.purchase_price, self.device.supplier,
+                          self.device.sold_to, self.device.sold_price),
+                         (TL("9000.00"), self.customer, None, None))
+        self.assertEqual((self.device.storage, self.device.color), ("128GB", "Mavi"))
 
-        self.client.post(reverse("stock:scan_resolve"),
-                         {"mode": "sale", "code": returned.stock_code})
-        self.client.post(reverse("stock:cart_customer"), {"customer": self.customer.pk})
-        self.client.post(reverse("stock:checkout"),
-                         {"paid_amount": "0", "payment_method": "nakit"})
-        returned.refresh_from_db()
-        self.assertEqual(returned.status, Device.Status.SATILDI)
-        self.assertEqual(Sale.objects.count(), 3)
+        cycle = self.device.cycles.get()
+        first_item = first_sale.items.get(kind=SaleItem.Kind.CIHAZ)
+        self.assertEqual((cycle.cycle_no, cycle.purchase_price, cycle.sold_to,
+                          cycle.sold_price, cycle.sale_item),
+                         (1, TL("16000.00"), self.customer, TL("18500.00"), first_item))
+        self.assertEqual(first_item.line_cost, TL("16000.00"))
 
-    def test_voiding_the_trade_in_sale_gives_the_imei_back(self):
-        self.sell_first()
+        sale = self.sell_to(self.customer, "12000")
+        item = sale.items.get()
+        self.assertEqual((self.device.status, item.cycle_no, item.line_cost),
+                         (Device.Status.SATILDI, 2, TL("9000.00")))
+
+    def test_device_sold_three_times_keeps_every_cycle(self):
+        from apps.stock import reports
+
+        second = Contact.objects.create(full_name="Mehmet Demir", phone="0533 222 33 44")
+        third = Contact.objects.create(full_name="Zeynep Ak", phone="0534 333 44 55")
+        Expense.objects.create(device=self.device, kind="parca", title="Ekran",
+                               amount=TL("500"))
+        sale_a = self.sell_to(self.customer, "18500")
+        self.reenter("9000", self.customer)
+        self.assertEqual((self.device.supplier, self.device.acquisition),
+                         (self.customer, Device.Acquisition.ALIM))
+        Expense.objects.create(device=self.device, kind="iscilik", title="Pil",
+                               amount=TL("300"))
+        sale_b = self.sell_to(second, "12000")
+        self.reenter("7000", second)
+        self.assertEqual(self.device.supplier, second)
+        self.assertEqual(self.device.total_expense, TL("0.00"))
+        capital = reports.stock_capital()
+        self.assertEqual((capital["devices"], capital["device_expenses"]),
+                         (TL("7000.00"), TL("0.00")))
+        sale_c = self.sell_to(third, "10000")
+
+        self.assertEqual(Device.objects.count(), 1)
+        self.assertEqual((self.device.stock_code, self.device.imei1, self.device.cycle_no),
+                         ("BYC-000001", "351234567890123", 3))
+        self.assertEqual(self.device.sold_to, third)
+        self.assertEqual(
+            list(self.device.cycles.order_by("cycle_no").values_list(
+                "cycle_no", "purchase_price", "sold_to", "sold_price")),
+            [(1, TL("16000.00"), self.customer.pk, TL("18500.00")),
+             (2, TL("9000.00"), second.pk, TL("12000.00"))])
+        self.assertEqual(
+            [sale.items.get().line_cost for sale in (sale_a, sale_b, sale_c)],
+            [TL("16000.00"), TL("9000.00"), TL("7000.00")])
+        self.assertEqual(
+            sorted(self.device.expenses.values_list("cycle_no", "amount")),
+            [(1, TL("500.00")), (2, TL("300.00"))])
+        today = timezone.localdate()
+        self.assertEqual(reports.revenue_and_profit(today, today)["revenue"],
+                         TL("40500.00"))
+        self.assertEqual(reports.expenses_for_period(today, today)["device"],
+                         TL("800.00"))
+
+        old_item = sale_a.items.get()
+        self.client.post(reverse("stock:sale_item_return",
+                                 kwargs={"pk": sale_a.pk, "item_id": old_item.pk}),
+                         {"reason": "x", "refund": "1"})
+        old_item.refresh_from_db()
+        self.assertIsNone(old_item.returned_at)
+        self.client.post(reverse("stock:sale_void", kwargs={"pk": sale_b.pk}),
+                         {"reason": "x"})
+        sale_b.refresh_from_db()
+        self.assertEqual(sale_b.status, Sale.Status.TAMAMLANDI)
+        self.device.refresh_from_db()
+        self.assertEqual((self.device.status, self.device.cycle_no),
+                         (Device.Status.SATILDI, 3))
+
+        response = self.client.get(reverse("stock:device_detail",
+                                           kwargs={"pk": self.device.pk}))
+        for text in ("Alış / Satış Dönemleri", "1. dönem", "2. dönem",
+                     "3. dönem", "Mehmet Demir", sale_a.receipt_no):
+            self.assertContains(response, text)
+        response = self.client.get(reverse("stock:contact_detail",
+                                           kwargs={"pk": self.customer.pk}))
+        self.assertContains(response, "2. dönem")
+
+    def test_voiding_the_buy_back_restores_the_previous_cycle(self):
+        first_sale = self.sell_first()
         self.trade_back(self.device.imei1)
-        self.assertEqual(Sale.objects.count(), 2)
-        self.assertTrue(Device.objects.filter(acquisition=Device.Acquisition.TAKAS).exists())
         second = Sale.objects.latest("id")
         response = self.client.post(reverse("stock:sale_void", kwargs={"pk": second.pk}),
                                     {"reason": "Yanlış işlem"})
         self.assertEqual(response.status_code, 302)
         second.refresh_from_db()
-        self.assertEqual(second.status, Sale.Status.IPTAL)
+        self.assertEqual((second.status, second.balance), (Sale.Status.IPTAL, TL("0.00")))
         self.device.refresh_from_db()
-        self.assertEqual(self.device.imei1, "351234567890123")
-        self.assertFalse(Device.objects.filter(acquisition=Device.Acquisition.TAKAS).exists())
-        self.assertEqual(Device.objects.get(imei1="351234567890123"), self.device)
+        self.assertEqual((self.device.status, self.device.cycle_no, self.device.sold_to,
+                          self.device.purchase_price),
+                         (Device.Status.SATILDI, 1, self.customer, TL("16000.00")))
+        self.assertFalse(self.device.cycles.exists())
+        self.assertIsNone(first_sale.items.get(kind=SaleItem.Kind.CIHAZ).returned_at)
+        self.assertEqual(Device.objects.count(), 1)
 
-    def test_sold_device_can_be_bought_back_without_a_sale(self):
+    def test_device_form_offers_the_sold_record(self):
+        self.sell_first()
+        response = self.client.get(reverse("stock:device_create"),
+                                   {"imei": self.device.imei1})
+        self.assertContains(response, "daha önce BYC-000001 olarak satıldı")
+        self.assertEqual(response.context["form"].initial["supplier"], self.customer.pk)
+        self.assertEqual(response.context["form"].initial["storage"], "128GB")
+
+        response = self.client.post(reverse("stock:device_reentry_lookup"),
+                                    {"imei1": self.device.imei1})
+        data = response.json()
+        self.assertTrue(data["found"])
+        self.assertEqual(data["values"]["color"], "Mavi")
+        self.assertEqual(data["selects"]["device_model"]["value"], self.model.pk)
+        self.assertEqual(data["selects"]["supplier"]["value"], self.customer.pk)
+        response = self.client.post(reverse("stock:device_reentry_lookup"),
+                                    {"imei1": "359999999999999"})
+        self.assertFalse(response.json()["found"])
+
+    def test_device_form_puts_the_sold_device_back_in_stock(self):
         first_sale = self.sell_first()
-        response = self.client.get(reverse("stock:pos"))
-        self.assertContains(response, "Takas / Geri Alım Ekle")
-        self.assertContains(response, f'<option value="{self.model.pk}">')
-        self.client.post(reverse("stock:cart_trade_in"), {
-            "device_model": self.model.pk, "amount": "9000",
-            "imei1": self.device.imei1, "color": "", "storage": "", "note": "",
-        })
-        response = self.client.post(reverse("stock:cart_customer"),
-                                    {"customer": self.customer.pk})
-        self.assertContains(response, "Müşteriye Ödenecek")
-        self.assertContains(response, "Geri Alımı Tamamla")
-        payable = re.search(r'name="payable" value="([^"]+)"',
-                            response.content.decode())[1]
-        response = self.client.post(reverse("stock:checkout"), {
-            "paid_amount": "", "payment_method": "nakit", "payable": payable,
-        })
+        self.reenter("9000", self.customer, battery_health="85", shelf="B3")
+        self.assertEqual(Device.objects.count(), 1)
+        self.assertEqual((self.device.status, self.device.cycle_no,
+                          self.device.purchase_price, self.device.battery_health,
+                          self.device.shelf, self.device.list_price),
+                         (Device.Status.STOKTA, 2, TL("9000.00"), 85, "B3", None))
+        self.assertEqual(self.device.cycles.get().sale_item,
+                         first_sale.items.get(kind=SaleItem.Kind.CIHAZ))
+        self.assertFalse(Payment.objects.filter(kind=Payment.Kind.IADE).exists())
+
+        response = self.client.post(reverse("stock:device_create"),
+                                    self.device_payload())
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(Device.objects.count(), 1)
 
-        sale = Sale.objects.latest("id")
-        self.assertNotEqual(sale, first_sale)
-        self.assertFalse(sale.items.exists())
-        self.assertEqual((sale.grand_total, sale.payable_total, sale.balance),
-                         (TL("0.00"), TL("-9000.00"), TL("0.00")))
-        payment = sale.payments.get()
-        self.assertEqual((payment.kind, payment.method, payment.amount),
-                         (Payment.Kind.IADE, Payment.Method.NAKIT, TL("9000.00")))
-
-        returned = Device.objects.get(imei1="351234567890123")
-        self.assertNotEqual(returned.pk, self.device.pk)
-        self.assertEqual((returned.status, returned.purchase_price),
-                         (Device.Status.STOKTA, TL("9000.00")))
+    def test_customer_return_stays_on_the_same_cycle(self):
+        sale = self.sell_first()
+        item = sale.items.get(kind=SaleItem.Kind.CIHAZ)
+        self.client.post(reverse("stock:sale_item_return",
+                                 kwargs={"pk": sale.pk, "item_id": item.pk}),
+                         {"reason": "Beğenmedi", "refund": "1"})
         self.device.refresh_from_db()
-        self.assertEqual((self.device.status, self.device.imei1),
-                         (Device.Status.SATILDI, ""))
-
-        self.client.post(reverse("stock:sale_void", kwargs={"pk": sale.pk}),
-                         {"reason": "Yanlış işlem"})
-        sale.refresh_from_db()
-        self.assertEqual((sale.status, sale.paid_total, sale.balance),
-                         (Sale.Status.IPTAL, TL("0.00"), TL("0.00")))
-        self.device.refresh_from_db()
-        self.assertEqual(self.device.imei1, "351234567890123")
+        self.assertEqual((self.device.status, self.device.cycle_no),
+                         (Device.Status.STOKTA, 1))
+        self.assertFalse(self.device.cycles.exists())
 
     def test_stale_checkout_form_is_refused(self):
         self.fill_cart()
@@ -494,13 +581,6 @@ class SaleFlowTests(PanelFlowTestCase):
         })
         self.assertContains(response, "Sepet değişti")
         self.assertFalse(Sale.objects.exists())
-
-    def test_sold_imei_in_device_form_points_to_buy_back(self):
-        self.sell_first()
-        response = self.client.post(reverse("stock:device_create"),
-                                    self.device_payload())
-        self.assertContains(response, "Takas / Geri Alım")
-        self.assertEqual(Device.objects.count(), 1)
 
     def test_sold_device_keeps_history(self):
         self.fill_cart()

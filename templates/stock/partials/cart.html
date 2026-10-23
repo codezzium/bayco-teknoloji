@@ -59,11 +59,6 @@
       <div class="text-4xl mb-2">🛒</div>
       <p class="font-semibold">Sepet boş</p>
       <p class="text-sm mt-1" style="color:var(--muted)">Barkod okutarak ürün ekleyin.</p>
-      {% if can_price %}
-      <p class="text-xs mt-2" style="color:var(--muted)">
-        Satılmış bir cihazı geri alıyorsanız aşağıdan Takas / Geri Alım ekleyin.
-      </p>
-      {% endif %}
     </div>
     {% else %}
 
@@ -129,7 +124,7 @@
         <div class="min-w-0 flex-1">
           <div class="font-semibold text-sm">↩️ Takas: {{ trade.label }}</div>
           <div class="text-xs" style="color:var(--muted)">
-            {% if trade.imei1 %}IMEI {{ trade.imei1 }} · {% endif %}Stoğa maliyetle girecek
+            {% if trade.imei1 %}IMEI {{ trade.imei1 }} · {% endif %}{% if trade.device_id %}Aynı kayıt yeni dönemle stoğa dönecek{% else %}Stoğa maliyetle girecek{% endif %}
           </div>
         </div>
         <span class="font-semibold text-sm" style="color:#ffd48a">− {{ trade.amount|tl }}</span>
@@ -201,13 +196,12 @@
        class="btn btn-ghost btn-sm btn-block mt-2">+ Yeni Müşteri</a>
     {% endif %}
   </div>
-  {% endif %}
 
   <!-- Takas: bedeli ödenecek tutarı düşürdüğü için fiyat tikine bağlı. -->
-  {% if can_price %}{% if cart.has_device or cart.trade_ins or not cart.lines %}
+  {% if can_price %}
   <div class="card p-4" x-data="{ open: false }">
     <button class="flex items-center justify-between w-full" @click="open = !open" type="button">
-      <h3 class="font-display font-bold text-sm">↩️ Takas / Geri Alım Ekle</h3>
+      <h3 class="font-display font-bold text-sm">↩️ Takas Ekle</h3>
       <span x-text="open ? '−' : '+'"></span>
     </button>
     <form x-show="open" x-cloak class="space-y-2 mt-3"
@@ -241,15 +235,13 @@
         Ciro düşmez — takas bir indirim değil, ayni ödemedir. Alınan cihaz
         satış anında maliyetiyle stoğa girer.
       </p>
-      {% if not cart.lines %}
       <p class="text-xs" style="color:var(--muted)">
-        Sepette ürün yoksa cihaz müşteriden geri alınır; bedeli kasadan ödenir.
-        Satılmış cihazın IMEI'si yazılırsa eski kayıttan taşınır.
+        Satılmış bir cihazın IMEI'si yazılırsa aynı kayıt yeni dönemle stoğa döner.
       </p>
-      {% endif %}
     </form>
   </div>
-  {% endif %}{% endif %}
+  {% endif %}
+  {% endif %}
 
   <!-- Ödeme ve tamamla. Birden çok satır = bölünmüş ödeme (500 nakit + 500 kart);
        her satır sunucuda ayrı bir tahsilat olur. Tutarlar kuruş (tam sayı) olarak
@@ -359,7 +351,7 @@
     {% endif %}
     {% if price_changes %}<input type="hidden" name="confirm_prices" value="1">{% endif %}
     <button class="btn btn-gradient btn-block">
-      {% if price_changes %}Onayla ve Sat{% elif not cart.lines %}Geri Alımı Tamamla{% else %}Satışı Tamamla{% endif %}
+      {% if price_changes %}Onayla ve Sat{% else %}Satışı Tamamla{% endif %}
     </button>
     <p class="text-xs text-center" style="color:var(--muted)">
       {% if cart.payout %}Müşteriye ödenen tutar kasadan çıkış olarak kaydedilir.{% else %}Tahsil edilen tutar toplamdan azsa kalan borç veresiye olarak takip edilir.{% endif %}

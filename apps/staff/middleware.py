@@ -19,7 +19,7 @@ from . import audit
 from .actions import FORM_PAGES, describe
 from .models import ActivityLog
 
-SKIP_VIEWS = {"dashboard:login", "dashboard:logout"}
+SKIP_VIEWS = {"dashboard:login", "dashboard:logout", "stock:device_reentry_lookup"}
 
 
 class ActivityLogMiddleware:

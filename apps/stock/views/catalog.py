@@ -3,9 +3,10 @@
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import F, ProtectedError, Q
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import dateformat
 from django.views.decorators.http import require_POST
 
 from apps.catalog.models import Brand
@@ -119,6 +120,10 @@ def device_detail(request, pk):
         "logs": device.status_logs.select_related("created_by")[:20],
         "expenses": device.expenses.all() if can_see_money(request.user) else [],
         "sale_items": device.sale_items.select_related("sale__customer"),
+        "current_item": (device.sale_items.select_related("sale")
+                         .filter(cycle_no=device.cycle_no, returned_at__isnull=True)
+                         .first()),
+        "cycles": device.cycles.select_related("supplier", "sold_to", "sale_item__sale"),
         "formats": LABEL_FORMATS,
         # Satıldı/İade elle atanamaz (fiş, stok hareketi ve tahsilat oluşmaz),
         # bu yüzden seçeneklerden çıkarılır.
@@ -137,41 +142,93 @@ def device_by_code(request, stock_code):
     return redirect("stock:device_detail", pk=device.pk)
 
 
+def _reentry_message(device) -> str:
+    sold = []
+    if device.sold_at:
+        sold.append(dateformat.format(device.sold_at, "d.m.Y"))
+    if device.sold_to:
+        sold.append(device.sold_to.full_name)
+    detail = f" ({' · '.join(sold)})" if sold else ""
+    return (f"Bu cihaz daha önce {device.stock_code} olarak satıldı{detail}. "
+            f"Kaydedince aynı kayıt {device.cycle_no + 1}. dönemle yeniden stoğa "
+            "girer; önceki alış ve satış bilgileri geçmişte kalır.")
+
+
+def _reentry_initial(device) -> dict:
+    initial = {name: getattr(device, name)
+               for name in ("device_model", "imei1", "imei2", "serial_no",
+                            "storage", "color")}
+    initial["condition"] = Device.Condition.IKINCI_EL
+    if device.sold_to_id:
+        initial["supplier"] = device.sold_to_id
+    return initial
+
+
+def _sold_from(data):
+    return services.find_sold_device(imei1=data.get("imei1", ""),
+                                     imei2=data.get("imei2", ""),
+                                     serial_no=data.get("serial_no", ""))
+
+
 @panel_required
 def device_form(request, pk=None):
     instance = get_object_or_404(Device, pk=pk) if pk else None
+    sold = None
     if request.method == "POST":
-        form = DeviceForm(request.POST, instance=instance, user=request.user)
-        if form.is_valid():
-            device = form.save(commit=False)
-            if instance is None:
-                device.created_by = request.user
-            device.updated_by = request.user
-            try:
-                device.full_clean(exclude=["stock_code", "warranty_end",
-                                           "search_blob", "created_by"])
-            except Exception as exc:  # ValidationError -> forma taşı
-                form.add_error(None, exc)
-            else:
-                device.save()
-                # Listede tüm cariler var; bize cihaz satan müşteri artık
-                # tedarikçimizdir de ("Tedarikçi" filtresinde görünsün).
-                Contact.objects.filter(pk=device.supplier_id,
-                                       is_supplier=False).update(is_supplier=True)
-                messages.success(
-                    request,
-                    f"{device.stock_code} kaydedildi." if instance is None
-                    else f"{device.stock_code} güncellendi.",
-                )
-                return redirect("stock:device_detail", pk=device.pk)
+        sold = None if instance else _sold_from(request.POST)
+        if sold is not None:
+            target = Device(pk=sold.pk)
+            target._state.adding = False
+            form = DeviceForm(request.POST, instance=target, user=request.user,
+                              reentry=True)
+            if form.is_valid():
+                try:
+                    device = services.reenter_device(
+                        sold, user=request.user, fields=dict(form.cleaned_data),
+                        acquisition=Device.Acquisition.ALIM)
+                except services.StockError as exc:
+                    form.add_error(None, str(exc))
+                else:
+                    Contact.objects.filter(pk=device.supplier_id,
+                                           is_supplier=False).update(is_supplier=True)
+                    messages.success(request, f"{device.stock_code} yeniden stoğa girdi "
+                                              f"({device.cycle_no}. dönem).")
+                    return redirect("stock:device_detail", pk=device.pk)
+        else:
+            form = DeviceForm(request.POST, instance=instance, user=request.user)
+            if form.is_valid():
+                device = form.save(commit=False)
+                if instance is None:
+                    device.created_by = request.user
+                device.updated_by = request.user
+                try:
+                    device.full_clean(exclude=["stock_code", "warranty_end",
+                                               "search_blob", "created_by"])
+                except Exception as exc:  # ValidationError -> forma taşı
+                    form.add_error(None, exc)
+                else:
+                    device.save()
+                    # Listede tüm cariler var; bize cihaz satan müşteri artık
+                    # tedarikçimizdir de ("Tedarikçi" filtresinde görünsün).
+                    Contact.objects.filter(pk=device.supplier_id,
+                                           is_supplier=False).update(is_supplier=True)
+                    messages.success(
+                        request,
+                        f"{device.stock_code} kaydedildi." if instance is None
+                        else f"{device.stock_code} güncellendi.",
+                    )
+                    return redirect("stock:device_detail", pk=device.pk)
     else:
         initial = {}
         scanned = request.GET.get("imei", "").strip()
         if scanned and instance is None:
             initial["imei1"] = "".join(ch for ch in scanned if ch.isdigit())
+            sold = _sold_from(initial)
         if instance is None:
             # `?device_model=<pk>` ile gelen bağlantılarda model seçili gelir.
             initial.update(preselected(request, "device_model"))
+        if sold is not None:
+            initial.update(_reentry_initial(sold))
         form = DeviceForm(instance=instance, user=request.user, initial=initial)
 
     return render(request, "stock/form.html", {
@@ -181,6 +238,29 @@ def device_form(request, pk=None):
         "guard": True,
         "back_url": (reverse("stock:device_detail", kwargs={"pk": instance.pk})
                      if instance else reverse("stock:device_list")),
+        "reentry_message": _reentry_message(sold) if sold else "",
+        "reentry_url": "" if instance else reverse("stock:device_reentry_lookup"),
+    })
+
+
+@panel_required
+@require_POST
+def device_reentry_lookup(request):
+    sold = _sold_from(request.POST)
+    if sold is None:
+        return JsonResponse({"found": False})
+    selects = {"device_model": {"value": sold.device_model_id,
+                                "label": str(sold.device_model)}}
+    if sold.sold_to_id:
+        selects["supplier"] = {"value": sold.sold_to_id,
+                               "label": str(sold.sold_to)}
+    return JsonResponse({
+        "found": True,
+        "message": _reentry_message(sold),
+        "values": {name: getattr(sold, name)
+                   for name in ("imei1", "imei2", "serial_no", "storage", "color")},
+        "selects": selects,
+        "condition": Device.Condition.IKINCI_EL,
     })
 
 

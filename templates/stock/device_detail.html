@@ -117,6 +117,51 @@
     </div>
     {% endif %}
 
+    {% if cycles %}
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-3">Alış / Satış Dönemleri</h3>
+      <div class="space-y-2 text-sm">
+        <div class="flex items-start justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <div class="font-semibold">{{ device.cycle_no }}. dönem · şu an</div>
+            <div class="text-xs" style="color:var(--muted)">
+              Alış {{ device.purchase_date|date:"d.m.Y" }} · {{ device.get_acquisition_display }}{% if device.supplier %} · {{ device.supplier.full_name }}{% endif %}
+              {% if device.sold_at %}<br>Satış {{ device.sold_at|date:"d.m.Y" }}{% if device.sold_to %} · {{ device.sold_to.full_name }}{% endif %}{% endif %}
+            </div>
+          </div>
+          {% if access.money %}
+          <div class="text-right text-xs shrink-0" style="color:var(--muted)">
+            <div>alış {{ device.purchase_price|tl0 }}</div>
+            {% if device.sold_price is not None %}<div>satış {{ device.sold_price|tl0 }}</div>{% endif %}
+          </div>
+          {% endif %}
+        </div>
+        {% for cycle in cycles %}
+        <div class="flex items-start justify-between gap-3 py-2" style="border-bottom:1px solid var(--line)">
+          <div class="min-w-0">
+            <div class="font-semibold">{{ cycle.cycle_no }}. dönem</div>
+            <div class="text-xs" style="color:var(--muted)">
+              Alış {{ cycle.purchase_date|date:"d.m.Y" }} · {{ cycle.get_acquisition_display }}{% if cycle.supplier %} · {{ cycle.supplier.full_name }}{% endif %}
+              {% if cycle.sold_at %}<br>Satış {{ cycle.sold_at|date:"d.m.Y" }}{% if cycle.sold_to %} · {{ cycle.sold_to.full_name }}{% endif %}{% endif %}
+              {% if cycle.sale_item %}· <a href="{% url 'stock:sale_detail' pk=cycle.sale_item.sale_id %}" class="hover:underline">{{ cycle.sale_item.sale.receipt_no }}</a>{% endif %}
+              <br>Geri alındı {{ cycle.closed_at|date:"d.m.Y" }}
+            </div>
+          </div>
+          {% if access.money %}
+          <div class="text-right text-xs shrink-0" style="color:var(--muted)">
+            <div>alış {{ cycle.purchase_price|tl0 }}</div>
+            {% if cycle.sold_price is not None %}
+            <div>satış {{ cycle.sold_price|tl0 }}</div>
+            <div style="color:{% if cycle.net_profit > 0 %}#7ff0ab{% else %}#ff8b95{% endif %}">kâr {{ cycle.net_profit|tl0 }}</div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Durum geçmişi -->
     <div class="card p-5">
       <h3 class="font-display font-bold mb-3">Hareket Geçmişi</h3>
@@ -169,12 +214,10 @@
         {{ device.sold_at|date:"d.m.Y" }}
         {% if device.sold_to %}· {{ device.sold_to.full_name }}{% endif %}
       </p>
-      {% with item=sale_items.first %}
-      {% if item %}
-      <a href="{% url 'stock:sale_detail' pk=item.sale_id %}"
-         class="btn btn-ghost btn-sm btn-block mt-3">Fişi Aç ({{ item.sale.receipt_no }})</a>
+      {% if current_item %}
+      <a href="{% url 'stock:sale_detail' pk=current_item.sale_id %}"
+         class="btn btn-ghost btn-sm btn-block mt-3">Fişi Aç ({{ current_item.sale.receipt_no }})</a>
       {% endif %}
-      {% endwith %}
     </div>
     {% endif %}
 

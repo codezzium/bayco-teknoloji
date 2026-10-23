@@ -27,7 +27,13 @@
   </div>
   {% endif %}
 
-  <form method="post" enctype="multipart/form-data" class="card p-6" novalidate data-enter-next{% if guard %} data-guard="{% if form.is_bound %}dirty{% endif %}"{% endif %}>
+  {% if reentry_url %}
+  <div id="reentry-info" class="card p-4 mb-4" style="border-color:rgba(245,180,60,.4){% if not reentry_message %};display:none{% endif %}">
+    <p class="text-sm" style="color:#ffd48a" data-reentry-text>{{ reentry_message }}</p>
+  </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="card p-6" novalidate data-enter-next{% if guard %} data-guard="{% if form.is_bound %}dirty{% endif %}"{% endif %}{% if reentry_url %} data-reentry-url="{{ reentry_url }}"{% endif %}>
     {% csrf_token %}
     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
     {% if form.non_field_errors %}
@@ -53,6 +59,42 @@
         if (months) months.value = start.getAttribute("data-warranty-months");
       });
     </script>
+    {% if reentry_url %}
+    <script>
+      (function () {
+        var form = document.currentScript.closest("form");
+        var info = document.getElementById("reentry-info");
+        var keys = ["imei1", "imei2", "serial_no"];
+        form.addEventListener("change", function (e) {
+          if (keys.indexOf(e.target.name) === -1) return;
+          var data = new FormData();
+          data.append("csrfmiddlewaretoken", form.elements.csrfmiddlewaretoken.value);
+          keys.forEach(function (key) {
+            if (form.elements[key]) data.append(key, form.elements[key].value);
+          });
+          fetch(form.getAttribute("data-reentry-url"), {method: "POST", body: data})
+            .then(function (response) { return response.json(); })
+            .then(function (result) {
+              info.style.display = result.found ? "" : "none";
+              if (!result.found) return;
+              info.querySelector("[data-reentry-text]").textContent = result.message;
+              Object.keys(result.values).forEach(function (key) {
+                var input = form.elements[key];
+                if (input && !input.value && result.values[key]) input.value = result.values[key];
+              });
+              Object.keys(result.selects).forEach(function (key) {
+                var select = form.elements[key];
+                if (!select || select.value) return;
+                document.dispatchEvent(new CustomEvent("bayco:created", {detail: {
+                  field: select.id, value: result.selects[key].value,
+                  label: result.selects[key].label}}));
+              });
+              if (form.elements.condition) form.elements.condition.value = result.condition;
+            });
+        });
+      })();
+    </script>
+    {% endif %}
 
     <div class="flex items-center gap-3 mt-5 pt-5" style="border-top:1px solid var(--line)">
       <button class="btn btn-gradient">Kaydet</button>

@@ -193,6 +193,7 @@ class Device(models.Model):
                                  default=Condition.IKINCI_EL)
     status = models.CharField("Stok Durumu", max_length=10, choices=Status.choices,
                               default=Status.STOKTA, db_index=True)
+    cycle_no = models.PositiveSmallIntegerField("Dönem", default=1, editable=False)
 
     imei1 = models.CharField("IMEI 1", max_length=20, blank=True, default="")
     imei2 = models.CharField("IMEI 2", max_length=20, blank=True, default="")
@@ -336,9 +337,9 @@ class Device(models.Model):
                      .exclude(pk=self.pk).first())
             if clash and clash.status == Device.Status.SATILDI:
                 raise ValidationError({
-                    field: f"Bu IMEI satılmış {clash.stock_code} kaydında. Müşteri "
-                           "iade ettiyse fişten İade edin; cihazı geri satın "
-                           "aldıysanız Kasa'da Takas / Geri Alım ekleyin.",
+                    field: f"Bu IMEI satılmış {clash.stock_code} kaydında. Cihaz "
+                           "geri geldiyse Yeni Cihaz formuna bu IMEI ile girin; "
+                           "müşteri iade ettiyse fişten İade edin.",
                 })
             if clash:
                 raise ValidationError({
@@ -355,7 +356,8 @@ class Device(models.Model):
 
     @property
     def total_expense(self):
-        return money(self.expenses.aggregate(t=Coalesce(Sum("amount"), ZERO))["t"])
+        return money(self.expenses.filter(cycle_no=self.cycle_no)
+                     .aggregate(t=Coalesce(Sum("amount"), ZERO))["t"])
 
     @property
     def cost_basis(self):
@@ -785,6 +787,7 @@ class SaleItem(models.Model):
                                related_name="sale_items")
     accessory = models.ForeignKey(Accessory, on_delete=models.PROTECT, null=True,
                                   blank=True, related_name="sale_items")
+    cycle_no = models.PositiveSmallIntegerField("Dönem", default=1)
 
     # --- anlık görüntüler: ürün sonradan düzenlense de fiş değişmez ---
     item_name = models.CharField("Ürün", max_length=200)
@@ -834,7 +837,7 @@ class SaleItem(models.Model):
             # İade edilen satır returned_at aldığı için cihaz otomatik olarak
             # yeniden satılabilir hale gelir.
             models.UniqueConstraint(
-                fields=["device"],
+                fields=["device", "cycle_no"],
                 condition=Q(device__isnull=False, returned_at__isnull=True),
                 name="uniq_active_device_line",
             ),
@@ -868,8 +871,9 @@ class TradeIn(models.Model):
     """
 
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="trade_ins")
-    device = models.OneToOneField(Device, on_delete=models.PROTECT,
-                                  related_name="trade_in", verbose_name="Alınan Cihaz")
+    device = models.ForeignKey(Device, on_delete=models.PROTECT,
+                               related_name="trade_ins", verbose_name="Alınan Cihaz")
+    cycle_no = models.PositiveSmallIntegerField("Dönem", default=1)
     amount = models.DecimalField("Takas Bedeli (₺)", **MONEY)
     note = models.CharField("Not", max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -885,6 +889,66 @@ class TradeIn(models.Model):
 
     def __str__(self):
         return f"{self.device.stock_code} takas {self.amount} ₺"
+
+
+class DeviceCycle(models.Model):
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="cycles")
+    cycle_no = models.PositiveSmallIntegerField("Dönem")
+    acquisition = models.CharField("Giriş Şekli", max_length=8,
+                                   choices=Device.Acquisition.choices)
+    supplier = models.ForeignKey(Contact, on_delete=models.PROTECT, null=True, blank=True,
+                                 related_name="supplied_cycles",
+                                 verbose_name="Alındığı Kişi / Firma")
+    purchase_date = models.DateField("Alış Tarihi")
+    purchase_price = models.DecimalField("Alış Fiyatı (₺)", **MONEY)
+    condition = models.CharField("Durum", max_length=10,
+                                 choices=Device.Condition.choices)
+    battery_health = models.PositiveSmallIntegerField("Pil Sağlığı (%)", null=True,
+                                                      blank=True)
+    defect_note = models.TextField("Hasar / Arıza Notu", blank=True, default="")
+    list_price = models.DecimalField("Etiket Satış Fiyatı (₺)", null=True, blank=True,
+                                     **MONEY)
+    sale_item = models.ForeignKey(SaleItem, on_delete=models.PROTECT, null=True,
+                                  blank=True, related_name="+")
+    sold_to = models.ForeignKey(Contact, on_delete=models.PROTECT, null=True, blank=True,
+                                related_name="bought_cycles", verbose_name="Satılan Kişi")
+    sold_at = models.DateField("Satış Tarihi", null=True, blank=True)
+    sold_price = models.DecimalField("Satış Bedeli (₺)", null=True, blank=True, **MONEY)
+    days_in_stock = models.PositiveIntegerField("Stokta Kalan Gün", null=True, blank=True)
+    warranty_months = models.PositiveSmallIntegerField("Garanti Süresi (ay)", default=0)
+    warranty_start = models.DateField("Garanti Başlangıcı", null=True, blank=True)
+    warranty_end = models.DateField("Garanti Bitişi", null=True, blank=True)
+    closed_at = models.DateTimeField("Geri Alınma Zamanı", default=timezone.now)
+    closed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                  null=True, blank=True, related_name="+")
+
+    SNAPSHOT_FIELDS = ["acquisition", "supplier", "purchase_date", "purchase_price",
+                       "condition", "battery_health", "defect_note", "list_price",
+                       "sold_to", "sold_at", "sold_price", "days_in_stock",
+                       "warranty_months", "warranty_start", "warranty_end"]
+
+    class Meta:
+        verbose_name = "Cihaz Dönemi"
+        verbose_name_plural = "Cihaz Dönemleri"
+        ordering = ["device", "-cycle_no"]
+        constraints = [
+            models.UniqueConstraint(fields=["device", "cycle_no"],
+                                    name="uniq_device_cycle"),
+        ]
+
+    def __str__(self):
+        return f"{self.device.stock_code} · {self.cycle_no}. dönem"
+
+    @property
+    def total_expense(self):
+        return money(self.device.expenses.filter(cycle_no=self.cycle_no)
+                     .aggregate(t=Coalesce(Sum("amount"), ZERO))["t"])
+
+    @property
+    def net_profit(self):
+        if self.sold_price is None:
+            return None
+        return self.sold_price - self.purchase_price - self.total_expense
 
 
 class Payment(models.Model):
@@ -960,6 +1024,8 @@ class Expense(models.Model):
 
     device = models.ForeignKey(Device, on_delete=models.PROTECT, null=True, blank=True,
                                related_name="expenses", verbose_name="İlgili Cihaz")
+    cycle_no = models.PositiveSmallIntegerField("Dönem", null=True, blank=True,
+                                                editable=False)
     kind = models.CharField("Gider Türü", max_length=10, choices=Kind.choices)
     title = models.CharField("Açıklama", max_length=160)
     amount = models.DecimalField("Tutar (₺)", **MONEY)
@@ -992,3 +1058,13 @@ class Expense(models.Model):
 
     def __str__(self):
         return f"{self.title} — {self.amount} ₺"
+
+    def save(self, *args, **kwargs):
+        if not self.device_id:
+            self.cycle_no = None
+        elif self.cycle_no is None or (
+                self.pk and not Expense.objects.filter(
+                    pk=self.pk, device_id=self.device_id).exists()):
+            self.cycle_no = Device.objects.values_list(
+                "cycle_no", flat=True).get(pk=self.device_id)
+        super().save(*args, **kwargs)

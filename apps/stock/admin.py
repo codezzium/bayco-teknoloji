@@ -6,6 +6,7 @@ from .models import (
     Contact,
     Counter,
     Device,
+    DeviceCycle,
     DeviceModel,
     DeviceStatusLog,
     Expense,
@@ -147,6 +148,12 @@ class ExpenseAdmin(MoneyGatedAdmin):
 @admin.register(TradeIn)
 class TradeInAdmin(MoneyGatedAdmin):
     list_display = ("sale", "device", "amount")
+
+
+@admin.register(DeviceCycle)
+class DeviceCycleAdmin(MoneyGatedAdmin):
+    list_display = ("device", "cycle_no", "purchase_date", "sold_at", "closed_at")
+    raw_id_fields = ("device", "supplier", "sold_to", "sale_item")
 
 
 @admin.register(DeviceStatusLog)
