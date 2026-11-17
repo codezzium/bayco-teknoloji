@@ -67,6 +67,11 @@
                hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
                hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true"> Pasif
       </label>
+      <label class="filter-chip cursor-pointer" :class="filtre === 'silinen' ? 'active' : ''" @click="filtre='silinen'">
+        <input type="radio" name="filtre" value="silinen" class="sr-only" {% if filtre == 'silinen' %}checked{% endif %}
+               hx-get="{% url 'stock:accessory_list' %}" hx-include="#accessory-filters"
+               hx-target="#accessory-results" hx-swap="outerHTML" hx-push-url="true"> 🗑️ Silinenler
+      </label>
     </div>
   </div>
 

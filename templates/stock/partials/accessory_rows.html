@@ -7,7 +7,7 @@
     <div class="text-4xl mb-3">📦</div>
     <p class="font-semibold">Sonuç yok</p>
     <p class="text-sm mt-1" style="color:var(--muted)">
-      {% if q %}"{{ q }}" için kayıt bulunamadı.{% else %}"Yeni Aksesuar" ile ilk kaydı ekleyin.{% endif %}
+      {% if q %}"{{ q }}" için kayıt bulunamadı.{% elif filtre == 'silinen' %}Silinmiş aksesuar yok.{% else %}"Yeni Aksesuar" ile ilk kaydı ekleyin.{% endif %}
     </p>
   </div>
   {% endfor %}

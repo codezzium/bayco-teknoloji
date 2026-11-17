@@ -8,6 +8,27 @@
   <span>/</span><span style="color:var(--ink)">{{ accessory }}</span>
 </div>
 
+{% if accessory.is_deleted %}
+<div class="rounded-2xl px-5 py-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+     style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+  <div class="min-w-0 text-sm">
+    <div class="font-semibold">🗑️ Bu aksesuar silindi</div>
+    <div class="mt-1">
+      {{ accessory.deleted_at|date:"d.m.Y H:i" }}
+      · {% if accessory.deleted_by %}{{ accessory.deleted_by.get_full_name|default:accessory.deleted_by.username }}{% else %}bilinmiyor{% endif %}
+    </div>
+    <div class="mt-1" style="color:var(--ink)">Gerekçe: {{ accessory.delete_reason|default:"—" }}</div>
+  </div>
+  {% if access.delete %}
+  <form method="post" action="{% url 'stock:accessory_restore' pk=accessory.pk %}" class="shrink-0"
+        onsubmit="return confirm('{{ accessory|escapejs }} tekrar aktif edilsin mi?')">
+    {% csrf_token %}
+    <button class="btn btn-gradient btn-sm">↩️ Tekrar Aktif Et</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="grid lg:grid-cols-3 gap-5">
   <div class="lg:col-span-2 space-y-5">
     <div class="card p-5">
@@ -16,7 +37,8 @@
           <div class="flex items-center gap-2 flex-wrap mb-2">
             <span class="font-mono text-xs px-2 py-1 rounded-md" style="background:var(--brand-soft)">{{ accessory.sku }}</span>
             {% if accessory.barcode %}<span class="chip font-mono" style="font-size:11px">{{ accessory.barcode }}</span>{% endif %}
-            {% if not accessory.is_active %}<span class="chip" style="font-size:11px;color:#ff8b95">Pasif</span>{% endif %}
+            {% if accessory.is_deleted %}<span class="chip" style="font-size:11px;color:#ff8b95">Silindi</span>
+            {% elif not accessory.is_active %}<span class="chip" style="font-size:11px;color:#ff8b95">Pasif</span>{% endif %}
           </div>
           <h2 class="font-display font-extrabold text-2xl">{{ accessory }}</h2>
           <p class="text-sm mt-1" style="color:var(--muted)">
@@ -25,6 +47,7 @@
           </p>
         </div>
         {# Mobilde başlığın altına tam genişlikte iner ve sola yaslanır; sm+ sağda durur. #}
+        {% if not accessory.is_deleted %}
         <div class="flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto"
              x-data="niimbotPrint({url: '{% url 'stock:niimbot_png' kind='aksesuar' pk=accessory.pk %}'})">
           <div class="flex gap-2 items-center">
@@ -71,6 +94,7 @@
              :style="err || !supported ? 'color:#ff8b95' : 'color:var(--muted)'"
              x-text="supported ? msg : 'Niimbot baskısı için Chrome veya Edge kullanın.'"></p>
         </div>
+        {% endif %}
       </div>
 
       <div class="grid sm:grid-cols-3 gap-4 mt-5 pt-5" style="border-top:1px solid var(--line)">
@@ -142,6 +166,7 @@
 
   <!-- Stok işlemleri -->
   <div class="space-y-5">
+    {% if not accessory.is_deleted %}
     <div class="card p-5">
       <h3 class="font-display font-bold mb-3">Mal Girişi</h3>
       <form method="post" action="{% url 'stock:accessory_adjust' pk=accessory.pk %}" class="space-y-3">
@@ -190,6 +215,26 @@
         </button>
       </form>
     </div>
+
+    <div class="card p-5">
+      <h3 class="font-display font-bold mb-1">Aksesuarı Sil</h3>
+      <p class="text-xs mb-3" style="color:var(--muted)">
+        Kart Silinenler'e taşınır; stok hareketleri ve satış geçmişi korunur.
+        Silinenler'den tekrar aktif edilebilir.
+      </p>
+      <form method="post" action="{% url 'stock:accessory_delete' pk=accessory.pk %}" class="space-y-3"
+            onsubmit="return confirm('{{ accessory|escapejs }} silinsin mi?')">
+        {% csrf_token %}
+        <input type="text" name="reason" required maxlength="200" class="input"
+               autocomplete="off" aria-label="Silme gerekçesi"
+               placeholder="Gerekçe (yanlış girildi, mükerrer kart…)">
+        <button class="btn btn-sm btn-block"
+                style="background:rgba(226,58,72,.12);color:#ff8b95;border:1px solid rgba(226,58,72,.3)">
+          🗑️ Aksesuarı Sil
+        </button>
+      </form>
+    </div>
+    {% endif %}
     {% endif %}
   </div>
 </div>

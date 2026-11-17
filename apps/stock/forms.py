@@ -180,6 +180,15 @@ class AccessoryForm(MoneyAwareModelForm):
                 self.auto_id % self.add_prefix("barcode"),
             )
 
+    def clean_barcode(self):
+        barcode = self.cleaned_data.get("barcode") or ""
+        if barcode:
+            holder = (Accessory.objects.filter(barcode=barcode, deleted_at__isnull=True)
+                      .exclude(pk=self.instance.pk).first())
+            if holder is not None:
+                raise forms.ValidationError(f"Bu barkod zaten \"{holder}\" kartında kayıtlı.")
+        return barcode
+
 
 class DeviceModelForm(MoneyAwareModelForm):
     class Meta:
@@ -345,3 +354,7 @@ class StocktakeForm(forms.Form):
         super().__init__(*args, **kwargs)
         from apps.dashboard.forms import _style
         _style(self.fields)
+
+
+class AccessoryDeleteForm(forms.Form):
+    reason = forms.CharField(label="Silme Gerekçesi", max_length=200)

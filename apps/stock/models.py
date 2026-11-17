@@ -476,6 +476,13 @@ class Accessory(models.Model):
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
                                    null=True, blank=True, editable=False,
                                    related_name="+", verbose_name="Son İşlemi Yapan")
+    deleted_at = models.DateTimeField("Silinme Zamanı", null=True, blank=True,
+                                      editable=False, db_index=True)
+    deleted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                   null=True, blank=True, editable=False,
+                                   related_name="+", verbose_name="Silen")
+    delete_reason = models.CharField("Silme Gerekçesi", max_length=200, blank=True,
+                                     default="", editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -484,7 +491,8 @@ class Accessory(models.Model):
         verbose_name_plural = "Aksesuarlar"
         ordering = ["name", "variant"]
         constraints = [
-            models.UniqueConstraint(fields=["barcode"], condition=~Q(barcode=""),
+            models.UniqueConstraint(fields=["barcode"],
+                                    condition=~Q(barcode="") & Q(deleted_at__isnull=True),
                                     name="uniq_accessory_barcode"),
             models.CheckConstraint(condition=Q(cost__gte=0) & Q(price__gte=0),
                                    name="accessory_prices_nonneg"),
@@ -508,6 +516,10 @@ class Accessory(models.Model):
             self.category.name if self.category_id else "",
         ])))[:400]
         super().save(*args, **kwargs)
+
+    @property
+    def is_deleted(self):
+        return self.deleted_at is not None
 
     @property
     def is_low_stock(self):

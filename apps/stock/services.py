@@ -102,12 +102,13 @@ def resolve_scan(raw_code: str):
         if device:
             return device
 
-    accessory = Accessory.objects.filter(sku__iexact=code).first()
+    alive = Accessory.objects.filter(deleted_at__isnull=True)
+    accessory = alive.filter(sku__iexact=code).first()
     if accessory:
         return accessory
 
     if digits:
-        accessory = Accessory.objects.filter(barcode=digits).first()
+        accessory = alive.filter(barcode=digits).first()
         if accessory:
             return accessory
 
@@ -217,12 +218,18 @@ def _record_movement(accessory: Accessory, quantity: int, reason: str, *,
     return movement
 
 
+def _refuse_deleted(accessory: Accessory) -> None:
+    if Accessory.objects.filter(pk=accessory.pk, deleted_at__isnull=False).exists():
+        raise StockError(f"{accessory} silinmiş. Önce Silinenler'den tekrar aktif edin.")
+
+
 @transaction.atomic
 def receive_accessory_stock(accessory: Accessory, quantity: int, *, user=None,
                             unit_cost=None, note="",
                             opening=False) -> StockMovement:
     if quantity <= 0:
         raise StockError("Giriş miktarı pozitif olmalıdır.")
+    _refuse_deleted(accessory)
     reason = (StockMovement.Reason.ACILIS if opening
               else StockMovement.Reason.GIRIS)
     movement = _record_movement(accessory, quantity, reason, user=user,
@@ -240,6 +247,7 @@ def receive_accessory_stock(accessory: Accessory, quantity: int, *, user=None,
 def adjust_accessory_stock(accessory: Accessory, counted_qty: int, *, user=None,
                            note="") -> StockMovement | None:
     """Sayım sonucu. Doğrudan set etmez, FARK kadar hareket yazar."""
+    _refuse_deleted(accessory)
     _lock_accessory(accessory)
     diff = counted_qty - _current_balance(accessory)
     if diff == 0:
@@ -253,8 +261,50 @@ def write_off_accessory(accessory: Accessory, quantity: int, *, user=None,
                         note="") -> StockMovement:
     if quantity <= 0:
         raise StockError("Fire miktarı pozitif olmalıdır.")
+    _refuse_deleted(accessory)
     return _record_movement(accessory, -quantity, StockMovement.Reason.FIRE,
                             user=user, note=note)
+
+
+@transaction.atomic
+def delete_accessory(accessory: Accessory, *, user, reason: str) -> Accessory:
+    reason = (reason or "").strip()
+    if not reason:
+        raise StockError("Silme gerekçesi zorunludur.")
+    locked = Accessory.objects.select_for_update().get(pk=accessory.pk)
+    if locked.deleted_at is not None:
+        raise StockError(f"{locked} zaten silinmiş.")
+    locked.deleted_at = timezone.now()
+    locked.deleted_by = user
+    locked.delete_reason = reason[:200]
+    locked.is_active = False
+    locked.updated_by = user
+    locked.save(update_fields=["deleted_at", "deleted_by", "delete_reason",
+                               "is_active", "updated_by", "updated_at"])
+    return locked
+
+
+@transaction.atomic
+def restore_accessory(accessory: Accessory, *, user) -> Accessory:
+    locked = Accessory.objects.select_for_update().get(pk=accessory.pk)
+    if locked.deleted_at is None:
+        raise StockError(f"{locked} silinmiş değil.")
+    if locked.barcode:
+        holder = (Accessory.objects
+                  .filter(barcode=locked.barcode, deleted_at__isnull=True)
+                  .exclude(pk=locked.pk).first())
+        if holder is not None:
+            raise StockError(
+                f"Barkod {locked.barcode} şu an \"{holder}\" kartında kullanılıyor. "
+                "Önce o kartın barkodunu değiştirin.")
+    locked.deleted_at = None
+    locked.deleted_by = None
+    locked.delete_reason = ""
+    locked.is_active = True
+    locked.updated_by = user
+    locked.save(update_fields=["deleted_at", "deleted_by", "delete_reason",
+                               "is_active", "updated_by", "updated_at"])
+    return locked
 
 
 # ===========================================================================
@@ -379,6 +429,8 @@ def create_sale_from_cart(cart: dict, *, user, payments=None, due_date=None,
         accessory = accessories.get(line["id"])
         if accessory is None:
             raise StockError("Sepetteki bazı aksesuarlar artık kayıtlı değil.")
+        if accessory.deleted_at is not None:
+            raise StockError(f"{accessory} silinmiş. Sepetten çıkarın.")
         if not line.get("allow_negative") and accessory.stock_qty < line["qty"]:
             raise InsufficientStock(
                 f"{accessory.name}: stokta {accessory.stock_qty} adet var, "

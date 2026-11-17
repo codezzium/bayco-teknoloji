@@ -10,8 +10,16 @@
         {% if accessory.brand %}<span>{{ accessory.brand.name }}</span>{% endif %}
         {% if accessory.category %}<span>{{ accessory.category.name }}</span>{% endif %}
         <span class="font-mono">{{ accessory.barcode|default:accessory.sku }}</span>
-        {% if not accessory.is_active %}<span style="color:#ff8b95">Pasif</span>{% endif %}
+        {% if accessory.is_deleted %}<span style="color:#ff8b95">Silindi</span>
+        {% elif not accessory.is_active %}<span style="color:#ff8b95">Pasif</span>{% endif %}
       </div>
+      {% if accessory.is_deleted %}
+      <div class="text-xs mt-1" style="color:#ff8b95">
+        {{ accessory.deleted_at|date:"d.m.Y H:i" }}
+        · {% if accessory.deleted_by %}{{ accessory.deleted_by.get_full_name|default:accessory.deleted_by.username }}{% else %}bilinmiyor{% endif %}
+        · {{ accessory.delete_reason|default:"gerekçe yok" }}
+      </div>
+      {% endif %}
     </div>
   </label>
 
@@ -31,6 +39,13 @@
       <div class="text-xs" style="color:var(--muted)">Alış {{ accessory.cost|tl }}</div>
       {% endif %}
     </div>
+    {% if accessory.is_deleted and access.delete %}
+    <form method="post" action="{% url 'stock:accessory_restore' pk=accessory.pk %}"
+          onsubmit="return confirm('{{ accessory|escapejs }} tekrar aktif edilsin mi?')">
+      {% csrf_token %}
+      <button class="btn btn-gradient btn-sm">↩️ Tekrar Aktif Et</button>
+    </form>
+    {% endif %}
     <a href="{% url 'stock:accessory_detail' pk=accessory.pk %}" class="btn btn-ghost btn-sm">Aç</a>
   </div>
 </div>

@@ -79,7 +79,8 @@ class AccessoryAdmin(StampUpdatedByAdmin):
     list_display = ("sku", "name", "variant", "stock_qty", "price", "is_active")
     list_filter = ("is_active", "category", "brand")
     search_fields = ("sku", "barcode", "name", "variant")
-    readonly_fields = ("sku", "stock_qty", "search_blob")
+    readonly_fields = ("sku", "stock_qty", "search_blob", "deleted_at", "deleted_by",
+                       "delete_reason")
 
 
 @admin.register(StockMovement)

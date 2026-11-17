@@ -38,6 +38,8 @@ LABELS = {
     "stock:accessory_create": "Aksesuar ekledi",
     "stock:accessory_edit": "Aksesuarı düzenledi",
     "stock:accessory_adjust": "Aksesuar stoğunu değiştirdi",
+    "stock:accessory_delete": "Aksesuarı sildi",
+    "stock:accessory_restore": "Aksesuarı tekrar aktif etti",
     # --- Tanımlar ---
     "stock:simple_create": "{singular} ekledi",
     "stock:simple_quick": "{singular} ekledi",

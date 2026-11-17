@@ -96,7 +96,8 @@ def cart_add(request):
         obj = Device.objects.filter(pk=request.POST.get("id")).first()
     else:
         from ..models import Accessory
-        obj = Accessory.objects.filter(pk=request.POST.get("id")).first()
+        obj = Accessory.objects.filter(pk=request.POST.get("id"),
+                                       deleted_at__isnull=True).first()
 
     if obj is None:
         return _render_cart(request, cart, "Ürün bulunamadı.")
@@ -587,7 +588,8 @@ def product_search(request):
                            status__in=[Device.Status.STOKTA, Device.Status.REZERVE])
                    .select_related("device_model__brand")[:8])
         accessories = (Accessory.objects
-                       .filter(search_blob__contains=folded, is_active=True)[:8])
+                       .filter(search_blob__contains=folded, is_active=True,
+                               deleted_at__isnull=True)[:8])
     return render(request, "stock/partials/product_search.html", {
         "q": query, "devices": devices, "accessories": accessories,
     })

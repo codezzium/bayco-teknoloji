@@ -34,6 +34,8 @@ urlpatterns = [
     path("aksesuar/<int:pk>/", catalog.accessory_detail, name="accessory_detail"),
     path("aksesuar/<int:pk>/duzenle/", catalog.accessory_form, name="accessory_edit"),
     path("aksesuar/<int:pk>/stok/", catalog.accessory_adjust, name="accessory_adjust"),
+    path("aksesuar/<int:pk>/sil/", catalog.accessory_delete, name="accessory_delete"),
+    path("aksesuar/<int:pk>/geri-al/", catalog.accessory_restore, name="accessory_restore"),
 
     # --- Model kataloğu & kategoriler ---
     path("tanim/<str:key>/", catalog.simple_list, name="simple_list"),

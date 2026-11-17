@@ -1,7 +1,7 @@
 """Cihaz ve aksesuar listeleri, detayları ve formları."""
 
 from django.contrib import messages
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F, ProtectedError, Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,6 +14,7 @@ from apps.catalog.models import Brand
 from .. import services
 from ..forms import (
     AccessoryCategoryForm,
+    AccessoryDeleteForm,
     AccessoryForm,
     DeviceForm,
     DeviceModelForm,
@@ -343,14 +344,17 @@ def accessory_list(request):
     if brand_slug:
         accessories = accessories.filter(brand__slug=brand_slug)
     if only == "kritik":
-        accessories = accessories.filter(is_active=True,
+        accessories = accessories.filter(is_active=True, deleted_at__isnull=True,
                                          stock_qty__lte=F("min_stock_level"))
     elif only == "eksi":
-        accessories = accessories.filter(stock_qty__lt=0)
+        accessories = accessories.filter(stock_qty__lt=0, deleted_at__isnull=True)
     elif only == "pasif":
-        accessories = accessories.filter(is_active=False)
+        accessories = accessories.filter(is_active=False, deleted_at__isnull=True)
+    elif only == "silinen":
+        accessories = (accessories.filter(deleted_at__isnull=False)
+                       .select_related("deleted_by"))
     else:
-        accessories = accessories.filter(is_active=True)
+        accessories = accessories.filter(is_active=True, deleted_at__isnull=True)
     if ordering not in ACCESSORY_ORDERING:
         ordering = DEFAULT_ORDERING
     accessories = accessories.order_by(ordering, "-id")
@@ -380,7 +384,7 @@ def accessory_list(request):
 @panel_required
 def accessory_detail(request, pk):
     accessory = get_object_or_404(
-        Accessory.objects.select_related("brand", "category"), pk=pk)
+        Accessory.objects.select_related("brand", "category", "deleted_by"), pk=pk)
     return render(request, "stock/accessory_detail.html", {
         "active": "aksesuarlar",
         "accessory": accessory,
@@ -394,6 +398,10 @@ def accessory_detail(request, pk):
 @panel_required
 def accessory_form(request, pk=None):
     instance = get_object_or_404(Accessory, pk=pk) if pk else None
+    if instance is not None and instance.is_deleted:
+        messages.error(request, "Silinmiş aksesuar düzenlenemez. Önce tekrar aktif edin.")
+        request.audit = {"invalid": True}
+        return redirect("stock:accessory_detail", pk=instance.pk)
     back = request.get_full_path()
     if request.method == "POST":
         form = AccessoryForm(request.POST, instance=instance, user=request.user,
@@ -448,6 +456,11 @@ def accessory_adjust(request, pk):
     mode = request.POST.get("mode", "giris")
     if mode == "fire" and not has_access(request.user, "delete"):
         return deny(request)
+    if accessory.is_deleted:
+        messages.error(request, "Silinmiş aksesuarda stok işlemi yapılamaz. "
+                                "Önce tekrar aktif edin.")
+        request.audit = {"invalid": True}
+        return redirect("stock:accessory_detail", pk=accessory.pk)
     try:
         if mode == "sayim":
             form = StocktakeForm(request.POST)
@@ -477,6 +490,45 @@ def accessory_adjust(request, pk):
                              f"{form.cleaned_data['quantity']} adet giriş yapıldı.")
     except (services.StockError, ValueError) as exc:
         messages.error(request, str(exc))
+    return redirect("stock:accessory_detail", pk=accessory.pk)
+
+
+@access_required("delete")
+@require_POST
+def accessory_delete(request, pk):
+    accessory = get_object_or_404(Accessory, pk=pk)
+    form = AccessoryDeleteForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Silmek için gerekçe yazın (en fazla 200 karakter).")
+        request.audit = {"invalid": True}
+        return redirect("stock:accessory_detail", pk=accessory.pk)
+    try:
+        accessory = services.delete_accessory(accessory, user=request.user,
+                                              reason=form.cleaned_data["reason"])
+    except services.StockError as exc:
+        messages.error(request, str(exc))
+        request.audit = {"invalid": True}
+        return redirect("stock:accessory_detail", pk=accessory.pk)
+    messages.success(request, f"{accessory} silindi. Silinenler'den tekrar aktif edilebilir.")
+    return redirect(f"{reverse('stock:accessory_list')}?filtre=silinen")
+
+
+@access_required("delete")
+@require_POST
+def accessory_restore(request, pk):
+    accessory = get_object_or_404(Accessory, pk=pk)
+    try:
+        accessory = services.restore_accessory(accessory, user=request.user)
+    except services.StockError as exc:
+        messages.error(request, str(exc))
+        request.audit = {"invalid": True}
+        return redirect("stock:accessory_detail", pk=accessory.pk)
+    except IntegrityError:
+        messages.error(request, "Bu aksesuarın barkodu başka bir kartta kullanılıyor. "
+                                "Önce o kartın barkodunu değiştirin.")
+        request.audit = {"invalid": True}
+        return redirect("stock:accessory_detail", pk=accessory.pk)
+    messages.success(request, f"{accessory} tekrar aktif edildi.")
     return redirect("stock:accessory_detail", pk=accessory.pk)
 
 

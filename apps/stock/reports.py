@@ -137,7 +137,8 @@ def stock_capital() -> dict:
     device_expenses = Expense.objects.filter(
         device__status__in=HELD_STATUSES, cycle_no=F("device__cycle_no")
     ).aggregate(t=Coalesce(Sum("amount", output_field=DEC), ZERO))["t"]
-    accessories = Accessory.objects.filter(stock_qty__gt=0).aggregate(
+    accessories = Accessory.objects.filter(stock_qty__gt=0,
+                                           deleted_at__isnull=True).aggregate(
         t=Coalesce(Sum(F("stock_qty") * F("cost"), output_field=DEC), ZERO))["t"]
 
     devices, device_expenses, accessories = (money(devices),
@@ -434,7 +435,8 @@ def low_stock():
 
 def negative_stock():
     """Eksiye düşmüş aksesuarlar — düzeltilmesi gereken kayıtlar."""
-    return Accessory.objects.filter(stock_qty__lt=0).order_by("stock_qty")
+    return (Accessory.objects.filter(stock_qty__lt=0, deleted_at__isnull=True)
+            .order_by("stock_qty"))
 
 
 def expiring_warranty(days=30):
@@ -470,6 +472,7 @@ def recent_products(limit=20) -> list[dict]:
                .select_related("device_model__brand", "updated_by")
                .order_by("-updated_at")[:limit])
     accessories = (Accessory.objects
+                   .filter(deleted_at__isnull=True)
                    .select_related("brand", "updated_by")
                    .order_by("-updated_at")[:limit])
 

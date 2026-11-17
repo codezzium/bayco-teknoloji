@@ -123,7 +123,8 @@ def intake(request):
 
 def _recent_intake(request):
     ids = request.session.get("stock_intake_recent", [])
-    accessories = {a.pk: a for a in Accessory.objects.filter(pk__in=ids)}
+    accessories = {a.pk: a for a in Accessory.objects.filter(pk__in=ids,
+                                                             deleted_at__isnull=True)}
     return [accessories[i] for i in ids if i in accessories]
 
 
@@ -154,7 +155,8 @@ def _scan_into_intake(request, obj):
 @require_POST
 def intake_add(request):
     """Listedeki bir satıra elle adet ekler/çıkarır."""
-    accessory = Accessory.objects.filter(pk=request.POST.get("accessory")).first()
+    accessory = Accessory.objects.filter(pk=request.POST.get("accessory"),
+                                         deleted_at__isnull=True).first()
     delta = int(request.POST.get("delta") or 0)
     if accessory and delta:
         try:
@@ -185,7 +187,8 @@ def stocktake(request):
 def _count_context(request):
     counted = request.session.get(COUNT_KEY, {})
     accessories = {a.pk: a for a in
-                   Accessory.objects.filter(pk__in=[int(k) for k in counted])}
+                   Accessory.objects.filter(pk__in=[int(k) for k in counted],
+                                            deleted_at__isnull=True)}
     rows = []
     for key, qty in counted.items():
         accessory = accessories.get(int(key))
