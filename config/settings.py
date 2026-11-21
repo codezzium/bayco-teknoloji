@@ -218,3 +218,8 @@ LOGGING = {
         "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
     },
 }
+
+PLAUSIBLE_SCRIPT = os.environ.get(
+    "PLAUSIBLE_SCRIPT",
+    "https://istatistik.furkankok.com/js/pa-h9YOLH46Z1HS7Ss0sffD1.js",
+)

@@ -59,6 +59,9 @@
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   {% block head_extra %}{% endblock %}
+  {% if plausible_script %}<script async src="{{ plausible_script }}"></script>
+  <script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>
+  {% endif %}
 </head>
 <body class="{% if site.campaign_active and site.campaign_text %}has-campaign{% endif %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
